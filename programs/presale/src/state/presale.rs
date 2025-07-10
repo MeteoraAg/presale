@@ -35,6 +35,18 @@ pub enum UnsoldTokenAction {
     Burn,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PresaleProgress {
+    /// Presale has not started yet
+    NotStarted,
+    /// Presale is ongoing
+    Ongoing,
+    /// Presale is ended
+    Completed,
+    /// Presale is ended but not enough capital raised
+    Failed,
+}
+
 #[account(zero_copy)]
 #[derive(InitSpace, Debug)]
 pub struct Presale {
@@ -154,6 +166,20 @@ impl Presale {
         {
             self.fixed_price_presale_unlock_unsold_token = unsold_token_action;
             self.fixed_price_presale_q_price = q_price;
+        }
+    }
+
+    pub fn get_presale_progress(&self, current_timestamp: u64) -> PresaleProgress {
+        if current_timestamp < self.presale_start_time {
+            return PresaleProgress::NotStarted;
+        } else if current_timestamp <= self.presale_end_time {
+            return PresaleProgress::Ongoing;
+        }
+
+        if self.total_deposit >= self.presale_minimum_cap {
+            PresaleProgress::Completed
+        } else {
+            PresaleProgress::Failed
         }
     }
 }

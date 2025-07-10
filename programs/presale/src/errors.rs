@@ -29,4 +29,19 @@ pub enum PresaleError {
 
     #[msg("Token2022 extensions or native mint is not supported")]
     UnsupportedToken2022MintOrExtension,
+
+    #[msg("Invalid creator account")]
+    InvalidCreatorAccount,
+
+    #[msg("Presale is not open for deposit")]
+    PresaleNotOpenForDeposit,
+
+    #[msg("Invalid presale whitelist mode")]
+    InvalidPresaleWhitelistMode,
+
+    #[msg("Presale is ended")]
+    PresaleEnded,
+
+    #[msg("Invalid merkle proof")]
+    InvalidMerkleProof,
 }

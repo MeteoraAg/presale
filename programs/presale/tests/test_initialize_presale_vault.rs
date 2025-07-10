@@ -1,9 +1,8 @@
 mod helpers;
 
-use std::rc::Rc;
-
 use anchor_lang::prelude::AccountMeta;
 use helpers::*;
+use std::rc::Rc;
 
 use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,

@@ -1,9 +1,9 @@
 mod helpers;
-use std::rc::Rc;
 
 use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
 use helpers::*;
 use presale::UnsoldTokenAction;
+use std::rc::Rc;
 
 #[test]
 pub fn test_initialize_fixed_token_price_extra_params() {

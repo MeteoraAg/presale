@@ -61,4 +61,28 @@ pub mod presale {
     ) -> Result<()> {
         instructions::handle_initialize_presale_token2022(ctx, &params)
     }
+
+    pub fn create_merkle_root_config(
+        ctx: Context<CreateMerkleRootConfigCtx>,
+        params: CreateMerkleRootConfigParams,
+    ) -> Result<()> {
+        instructions::handle_create_merkle_root_config(ctx, params)
+    }
+
+    pub fn create_permissionless_escrow(ctx: Context<CreatePermissionlessEscrowCtx>) -> Result<()> {
+        instructions::handle_create_permissionless_escrow(ctx)
+    }
+
+    pub fn create_permissioned_escrow_with_creator(
+        ctx: Context<CreatePermissionedEscrowWithCreatorCtx>,
+    ) -> Result<()> {
+        instructions::handle_create_permissioned_escrow_with_creator(ctx)
+    }
+
+    pub fn create_permissioned_escrow_with_merkle_proof(
+        ctx: Context<CreatePermissionedEscrowWithMerkleProofCtx>,
+        proof: Vec<[u8; 32]>,
+    ) -> Result<()> {
+        instructions::handle_create_permissioned_escrow_with_merkle_proof(ctx, proof)
+    }
 }

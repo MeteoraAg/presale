@@ -15,3 +15,6 @@ pub use commons::*;
 
 mod token2022;
 pub use token2022::*;
+
+mod process_initialize_escrow;
+pub use process_initialize_escrow::*;

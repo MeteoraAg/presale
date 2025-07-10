@@ -22,6 +22,8 @@ pub mod seeds {
     pub const BASE_VAULT_PREFIX: &[u8] = b"base_vault";
     pub const QUOTE_VAULT_PREFIX: &[u8] = b"quote_vault";
     pub const FIXED_PRICE_PRESALE_PARAM_PREFIX: &[u8] = b"fixed_price_param";
+    pub const ESCROW_PREFIX: &[u8] = b"escrow";
+    pub const MERKLE_ROOT_CONFIG_PREFIX: &[u8] = b"merkle_root";
 }
 
 pub const MAX_DEPOSIT_FEE_BPS: u64 = 1000; // 10%

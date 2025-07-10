@@ -50,3 +50,15 @@ pub fn derive_fixed_price_presale_args(
     )
     .0
 }
+
+pub fn derive_escrow(presale: Pubkey, owner: Pubkey, program_id: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            presale::seeds::ESCROW_PREFIX.as_ref(),
+            presale.as_ref(),
+            owner.as_ref(),
+        ],
+        program_id,
+    )
+    .0
+}
