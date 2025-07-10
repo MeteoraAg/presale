@@ -1,0 +1,32 @@
+[package]
+name = "presale"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "presale"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+
+[dependencies]
+anchor-lang = { version = "0.31.1", features = ["init-if-needed", "event-cpi"] }
+anchor-spl = "0.31.1"
+const-crypto = "0.3.0"
+mpl-token-metadata = "5.1.0"
+num_enum = "0.7.4"
+static_assertions = "1.1.0"
+bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
+
+[dev-dependencies]
+litesvm = "0.6.1"
+anchor-client = "0.31.1"
+serde_json = "1.0.140"

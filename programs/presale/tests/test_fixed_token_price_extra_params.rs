@@ -1,0 +1,69 @@
+mod helpers;
+use std::rc::Rc;
+
+use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
+use helpers::*;
+use presale::UnsoldTokenAction;
+
+#[test]
+pub fn test_initialize_fixed_token_price_extra_params() {
+    let SetupContext { mut lite_svm, user } = SetupContext::initialize();
+    let user_pubkey = user.pubkey();
+
+    let base_mint = Keypair::new();
+    let base_mint_pubkey = base_mint.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let ui_price = 0.01; // 0.01 SOL
+    let base_decimals = 6;
+    let quote_decimals = 9; // SOL has 9 decimals
+    let q_price = calculate_q_price_from_ui_price(ui_price, base_decimals, quote_decimals);
+
+    handle_initialize_fixed_token_price_presale_params(
+        &mut lite_svm,
+        HandleInitializeFixedTokenPricePresaleParamsArgs {
+            base_mint: base_mint_pubkey,
+            quote_mint,
+            q_price,
+            unsold_token_action: UnsoldTokenAction::Refund,
+            owner: user_pubkey,
+            payer: Rc::clone(&user),
+        },
+    );
+}
+
+#[test]
+pub fn test_close_fixed_token_price_extra_params() {
+    let SetupContext { mut lite_svm, user } = SetupContext::initialize();
+    let user_pubkey = user.pubkey();
+
+    let base_mint = Keypair::new();
+    let base_mint_pubkey = base_mint.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let ui_price = 0.01; // 0.01 SOL
+    let base_decimals = 6;
+    let quote_decimals = 9; // SOL has 9 decimals
+    let q_price = calculate_q_price_from_ui_price(ui_price, base_decimals, quote_decimals);
+
+    handle_initialize_fixed_token_price_presale_params(
+        &mut lite_svm,
+        HandleInitializeFixedTokenPricePresaleParamsArgs {
+            base_mint: base_mint_pubkey,
+            quote_mint,
+            q_price,
+            unsold_token_action: UnsoldTokenAction::Refund,
+            owner: user_pubkey,
+            payer: Rc::clone(&user),
+        },
+    );
+
+    handle_close_fixed_token_price_presale_params(
+        &mut lite_svm,
+        HandleCloseFixedTokenPricePresaleParamsArgs {
+            base_mint: base_mint_pubkey,
+            quote_mint,
+            owner: Rc::clone(&user),
+        },
+    );
+}

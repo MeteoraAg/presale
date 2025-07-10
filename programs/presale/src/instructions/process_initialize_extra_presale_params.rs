@@ -1,0 +1,58 @@
+use crate::*;
+
+#[event_cpi]
+#[derive(Accounts)]
+#[instruction(params: InitializeFixedPricePresaleExtraArgs)]
+pub struct InitializeFixedPricePresaleArgsCtx {
+    #[account(
+        init,
+        seeds = [
+            crate::constants::seeds::FIXED_PRICE_PRESALE_PARAM_PREFIX.as_ref(),
+            params.presale.as_ref(),
+        ],
+        payer = payer,
+        bump,
+        space = 8 + FixedPricePresaleExtraArgs::INIT_SPACE
+    )]
+    pub fixed_price_presale_params: AccountLoader<'info, FixedPricePresaleExtraArgs>,
+
+    /// CHECK: owner
+    pub owner: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+pub struct InitializeFixedPricePresaleExtraArgs {
+    pub presale: Pubkey,
+    pub unsold_token_action: u8,
+    pub q_price: u128,
+}
+
+pub fn handle_initialize_fixed_price_presale_args(
+    ctx: Context<InitializeFixedPricePresaleArgsCtx>,
+    params: InitializeFixedPricePresaleExtraArgs,
+) -> Result<()> {
+    let InitializeFixedPricePresaleExtraArgs {
+        presale,
+        unsold_token_action,
+        q_price,
+    } = params;
+
+    let fixed_price_presale_params = &mut ctx.accounts.fixed_price_presale_params.load_init()?;
+    fixed_price_presale_params.validate_and_initialize(
+        unsold_token_action,
+        q_price,
+        ctx.accounts.owner.key(),
+    )?;
+
+    emit_cpi!(EventFixedPricePresaleParams {
+        presale,
+        unsold_token_action,
+        q_price,
+    });
+
+    Ok(())
+}
