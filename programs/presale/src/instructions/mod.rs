@@ -12,3 +12,6 @@ pub use create_escrow::*;
 
 mod process_create_merkle_root_config;
 pub use process_create_merkle_root_config::*;
+
+mod process_deposit;
+pub use process_deposit::*;

@@ -29,6 +29,9 @@ pub use math::*;
 mod token2022;
 pub use token2022::*;
 
+mod presale_mode_handler;
+pub use presale_mode_handler::*;
+
 declare_id!("Ff7Lo7AsVxB4VtJH2Ajm7KLLVaVTGMV1W3ws2o5Eo2UT");
 
 #[program]
@@ -84,5 +87,9 @@ pub mod presale {
         proof: Vec<[u8; 32]>,
     ) -> Result<()> {
         instructions::handle_create_permissioned_escrow_with_merkle_proof(ctx, proof)
+    }
+
+    pub fn deposit(ctx: Context<DepositCtx>, max_amount: u64) -> Result<()> {
+        instructions::handle_deposit(ctx, max_amount)
     }
 }

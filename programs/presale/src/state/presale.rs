@@ -60,6 +60,7 @@ pub struct Presale {
     pub base_token_vault: Pubkey,
     /// Quote token vault
     pub quote_token_vault: Pubkey,
+    pub padding0: [u8; 32],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -78,6 +79,8 @@ pub struct Presale {
     pub creator_supply: u64,
     /// Total deposited quote token
     pub total_deposit: u64,
+    /// Total deposit fee collected
+    pub total_deposit_fee: u64,
     /// Total number of depositors. For statistic purpose only
     pub total_escrow: u64,
     /// Total escrow fee collected. For statistic purpose only
@@ -100,22 +103,47 @@ pub struct Presale {
     pub whitelist_mode: u8,
     /// Presale mode
     pub presale_mode: u8,
-    pub padding0: [u8; 3],
     /// What to do with unsold base token. Only applicable for fixed price presale mode
     pub fixed_price_presale_unlock_unsold_token: u8,
+    pub padding1: [u8; 11],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
 }
 
+pub struct PresaleInitializeArgs {
+    pub tokenomic_params: TokenomicArgs,
+    pub presale_params: PresaleArgs,
+    pub locked_vesting_params: Option<LockedVestingArgs>,
+    pub fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub base_token_vault: Pubkey,
+    pub quote_token_vault: Pubkey,
+    pub owner: Pubkey,
+    pub current_timestamp: u64,
+}
+
 impl Presale {
-    pub fn initialize(
-        &mut self,
-        tokenomic_params: TokenomicArgs,
-        presale_params: PresaleArgs,
-        locked_vesting_params: Option<LockedVestingArgs>,
-        fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
-        current_timestamp: u64,
-    ) {
+    pub fn initialize(&mut self, args: PresaleInitializeArgs) {
+        let PresaleInitializeArgs {
+            tokenomic_params,
+            presale_params,
+            locked_vesting_params,
+            fixed_price_presale_params,
+            base_mint,
+            quote_mint,
+            base_token_vault,
+            quote_token_vault,
+            owner,
+            current_timestamp,
+        } = args;
+
+        self.owner = owner;
+        self.base_mint = base_mint;
+        self.quote_mint = quote_mint;
+        self.base_token_vault = base_token_vault;
+        self.quote_token_vault = quote_token_vault;
+
         let TokenomicArgs {
             presale_pool_supply,
             creator_supply,
@@ -172,8 +200,16 @@ impl Presale {
     pub fn get_presale_progress(&self, current_timestamp: u64) -> PresaleProgress {
         if current_timestamp < self.presale_start_time {
             return PresaleProgress::NotStarted;
-        } else if current_timestamp <= self.presale_end_time {
+        } else if current_timestamp < self.presale_end_time {
             return PresaleProgress::Ongoing;
+        }
+
+        // TODO: Remove debug
+        if self.total_deposit > self.presale_maximum_cap {
+            unreachable!(
+                "Total deposit {} is greater than presale maximum cap {}",
+                self.total_deposit, self.presale_maximum_cap
+            );
         }
 
         if self.total_deposit >= self.presale_minimum_cap {
@@ -181,5 +217,46 @@ impl Presale {
         } else {
             PresaleProgress::Failed
         }
+    }
+
+    pub fn increase_escrow_count(&mut self) -> Result<()> {
+        self.total_escrow = self.total_escrow.checked_add(1).unwrap();
+        Ok(())
+    }
+
+    pub fn update_presale_end_time(&mut self, current_timestamp: u64) {
+        self.presale_end_time = current_timestamp;
+    }
+
+    pub fn get_remaining_deposit_quota(&self) -> Result<u64> {
+        let remaining_quota = self
+            .presale_maximum_cap
+            .checked_sub(self.total_deposit)
+            .unwrap();
+
+        Ok(remaining_quota)
+    }
+
+    pub fn deposit(
+        &mut self,
+        escrow: &mut Escrow,
+        deposit_fee_included_amount: u64,
+        deposit_fee: u64,
+    ) -> Result<()> {
+        let deposit_fee_excluded_amount = deposit_fee_included_amount
+            .checked_sub(deposit_fee)
+            .unwrap();
+
+        self.total_deposit = self
+            .total_deposit
+            .checked_add(deposit_fee_excluded_amount)
+            .unwrap();
+        self.total_deposit_fee = self.total_deposit_fee.checked_add(deposit_fee).unwrap();
+
+        escrow.deposit(deposit_fee_excluded_amount, deposit_fee)?;
+
+        self.total_escrow = self.total_escrow.checked_add(1).unwrap();
+
+        Ok(())
     }
 }

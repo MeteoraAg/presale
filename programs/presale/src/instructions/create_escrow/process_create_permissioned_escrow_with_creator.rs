@@ -38,7 +38,7 @@ pub struct CreatePermissionedEscrowWithCreatorCtx<'info> {
 pub fn handle_create_permissioned_escrow_with_creator(
     ctx: Context<CreatePermissionedEscrowWithCreatorCtx>,
 ) -> Result<()> {
-    let presale = ctx.accounts.presale.load()?;
+    let mut presale = ctx.accounts.presale.load_mut()?;
 
     // 1. Ensure presale is permissioned with authority
     let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
@@ -54,7 +54,7 @@ pub fn handle_create_permissioned_escrow_with_creator(
     );
 
     process_create_escrow(HandleCreateEscrowArgs {
-        presale: &presale,
+        presale: &mut presale,
         escrow: &ctx.accounts.escrow,
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
@@ -64,6 +64,7 @@ pub fn handle_create_permissioned_escrow_with_creator(
         presale: ctx.accounts.presale.key(),
         owner: ctx.accounts.owner.key(),
         whitelist_mode: presale.whitelist_mode,
+        total_escrow_count: presale.total_escrow,
     });
 
     Ok(())

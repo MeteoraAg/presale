@@ -1,11 +1,12 @@
 mod helpers;
 
-use anchor_client::solana_sdk::signer::Signer;
+use anchor_client::solana_sdk::{native_token::LAMPORTS_PER_SOL, signer::Signer};
 use helpers::*;
+use presale::Presale;
 use std::rc::Rc;
 
 #[test]
-fn test_initialize_permissionless_escrow() {
+fn test_deposit() {
     let SetupContext { mut lite_svm, user } = SetupContext::initialize();
 
     let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
@@ -14,11 +15,15 @@ fn test_initialize_permissionless_escrow() {
             Rc::clone(&user),
         );
 
-    handle_create_permissionless_escrow(
+    handle_escrow_deposit(
         &mut lite_svm,
-        HandleCreatePermissionlessEscrowArgs {
+        HandleEscrowDepositArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            max_amount: 10 * LAMPORTS_PER_SOL,
         },
     );
+
+    let presale_state: Presale = lite_svm.get_deserialized_account(&presale_pubkey).unwrap();
+    println!("Presale state after deposit: {:?}", presale_state);
 }

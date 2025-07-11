@@ -44,4 +44,10 @@ pub enum PresaleError {
 
     #[msg("Invalid merkle proof")]
     InvalidMerkleProof,
+
+    #[msg("Deposit amount out of cap")]
+    DepositAmountOutOfCap,
+
+    #[msg("Math overflow")]
+    MathOverflow,
 }

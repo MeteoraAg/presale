@@ -125,11 +125,19 @@ pub fn handle_initialize_presale_token2022<'a, 'b, 'c: 'info, 'info>(
     })?;
 
     // 6. Initialize vault
+    let mint_pubkeys = InitializePresaleVaultAccountPubkeys {
+        base_mint: ctx.accounts.mint.key(),
+        quote_mint: ctx.accounts.quote_token_mint.key(),
+        base_token_vault: ctx.accounts.presale_vault.key(),
+        quote_token_vault: ctx.accounts.quote_token_vault.key(),
+        owner: ctx.accounts.creator.key(),
+    };
     process_create_presale_vault(ProcessCreatePresaleVaultArgs {
         presale: &ctx.accounts.presale,
         tokenomic_params: tokenomic,
         presale_params,
         locked_vesting_params: locked_vesting_params.as_ref(),
+        mint_pubkeys,
         remaining_accounts: ctx.remaining_accounts,
     })?;
 

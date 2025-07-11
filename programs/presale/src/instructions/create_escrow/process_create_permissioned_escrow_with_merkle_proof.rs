@@ -46,7 +46,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
     ctx: Context<CreatePermissionedEscrowWithMerkleProofCtx>,
     proof: Vec<[u8; 32]>,
 ) -> Result<()> {
-    let presale = ctx.accounts.presale.load()?;
+    let mut presale = ctx.accounts.presale.load_mut()?;
 
     // 1. Ensure presale is permissioned with merkle proof
     let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
@@ -65,7 +65,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
     );
 
     process_create_escrow(HandleCreateEscrowArgs {
-        presale: &presale,
+        presale: &mut presale,
         escrow: &ctx.accounts.escrow,
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
@@ -75,6 +75,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
         presale: ctx.accounts.presale.key(),
         owner: ctx.accounts.owner.key(),
         whitelist_mode: presale.whitelist_mode,
+        total_escrow_count: presale.total_escrow,
     });
 
     Ok(())

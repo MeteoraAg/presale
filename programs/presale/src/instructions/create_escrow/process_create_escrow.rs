@@ -1,7 +1,7 @@
 use crate::*;
 
 pub struct HandleCreateEscrowArgs<'a, 'b, 'c> {
-    pub presale: &'a Presale,
+    pub presale: &'a mut Presale,
     pub escrow: &'b AccountLoader<'c, Escrow>,
     pub presale_pubkey: Pubkey,
     pub owner_pubkey: Pubkey,
@@ -26,6 +26,9 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
     // 2. Initialize the escrow account
     let mut escrow = escrow.load_init()?;
     escrow.initialize(presale_pubkey, owner_pubkey, current_timestamp)?;
+
+    // 3. Update the presale state
+    presale.increase_escrow_count()?;
 
     Ok(())
 }

@@ -18,3 +18,9 @@ pub use token2022::*;
 
 mod process_initialize_escrow;
 pub use process_initialize_escrow::*;
+
+mod process_deposit;
+pub use process_deposit::*;
+
+mod litesvm_ext;
+pub use litesvm_ext::*;

@@ -3,13 +3,22 @@ use std::rc::Rc;
 use anchor_client::solana_client::rpc_response::RpcKeyedAccount;
 use anchor_client::solana_sdk::instruction::Instruction;
 use anchor_client::solana_sdk::message::{Message, VersionedMessage};
+use anchor_client::solana_sdk::program_option::COption;
+use anchor_client::solana_sdk::program_pack::Pack;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Keypair;
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_client::solana_sdk::transaction::VersionedTransaction;
+use anchor_lang::prelude::Rent;
 use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent;
+use anchor_spl::token::spl_token::state::AccountState;
 use litesvm::LiteSVM;
 use presale::TokenInfoArgs;
+
+const NATIVE_SOL_MINT: Pubkey =
+    Pubkey::from_str_const("So11111111111111111111111111111111111111112");
 
 pub struct SetupContext {
     pub lite_svm: LiteSVM,
@@ -25,19 +34,18 @@ impl SetupContext {
             .with_sigverify(true)
             .with_blockhash_check(true);
 
-        load_programs(&mut svm);
-        load_accounts(&mut svm);
-
-        let user = Keypair::new();
+        let user = Rc::new(Keypair::new());
         let user_address = user.pubkey();
+
         svm.airdrop(&user_address, 1000 * LAMPORTS_PER_SOL)
             .expect("Failed to airdrop SOL to user");
 
-        let rc_user = Rc::new(user);
+        load_programs(&mut svm);
+        load_accounts(&mut svm, Rc::clone(&user));
 
         Self {
             lite_svm: svm,
-            user: rc_user,
+            user,
         }
     }
 }
@@ -74,7 +82,82 @@ fn load_programs(svm: &mut LiteSVM) {
     }
 }
 
-fn load_accounts(svm: &mut LiteSVM) {
+fn create_user_token_account_when_is_mint_account(
+    svm: &mut LiteSVM,
+    user_keypair: Rc<Keypair>,
+    account: &anchor_client::solana_sdk::account::Account,
+    account_pubkey: Pubkey,
+) {
+    if account.owner != anchor_spl::token::ID {
+        return;
+    }
+
+    let user = user_keypair.pubkey();
+
+    let ata_pubkey =
+        get_associated_token_address_with_program_id(&user, &NATIVE_SOL_MINT, &account.owner);
+
+    if account_pubkey == NATIVE_SOL_MINT {
+        let create_ata_ix = create_associated_token_account_idempotent(
+            &user,
+            &user,
+            &NATIVE_SOL_MINT,
+            &account.owner,
+        );
+
+        let transfer_ix = anchor_client::solana_sdk::system_instruction::transfer(
+            &user,
+            &ata_pubkey,
+            100 * LAMPORTS_PER_SOL,
+        );
+
+        let sync_native_ix =
+            anchor_spl::token::spl_token::instruction::sync_native(&account.owner, &ata_pubkey)
+                .unwrap();
+
+        process_transaction(
+            svm,
+            &[create_ata_ix, transfer_ix, sync_native_ix],
+            Some(&user),
+            &[&user_keypair],
+        );
+
+        return;
+    }
+
+    if let Ok(mint_account) = anchor_spl::token::spl_token::state::Mint::unpack(&account.data) {
+        let decimals = mint_account.decimals;
+        let token_account = anchor_spl::token::spl_token::state::Account {
+            mint: account_pubkey,
+            owner: user,
+            amount: 100_000 * 10u64.pow(decimals as u32),
+            delegate: COption::None,
+            is_native: COption::None,
+            state: AccountState::Initialized,
+            delegated_amount: 0,
+            close_authority: COption::None,
+        };
+
+        let mut data = [0u8; anchor_spl::token::spl_token::state::Account::LEN];
+        let rent: Rent = svm.get_sysvar();
+        let lamports = rent.minimum_balance(data.len());
+        anchor_spl::token::spl_token::state::Account::pack(token_account, &mut data)
+            .expect("Failed to pack token account");
+        svm.set_account(
+            ata_pubkey,
+            anchor_client::solana_sdk::account::Account {
+                lamports,
+                data: data.to_vec(),
+                owner: account.owner,
+                executable: false,
+                rent_epoch: 0,
+            },
+        )
+        .expect("Failed to set user token account");
+    }
+}
+
+fn load_accounts(svm: &mut LiteSVM, user_keypair: Rc<Keypair>) {
     let accounts_path = format!("{}/tests/fixtures/accounts", env!("CARGO_MANIFEST_DIR"));
 
     let accounts_dir = std::fs::read_dir(accounts_path).expect("Failed to read accounts directory");
@@ -87,10 +170,18 @@ fn load_accounts(svm: &mut LiteSVM) {
             let account: anchor_client::solana_sdk::account::Account =
                 rpc_account.account.decode().unwrap();
             let account_pubkey = Pubkey::from_str_const(&rpc_account.pubkey);
-            svm.set_account(account_pubkey, account).unwrap();
+
+            svm.set_account(account_pubkey, account.clone()).unwrap();
             println!(
                 "Added account: {} with pubkey: {}",
                 account_pubkey, account_pubkey
+            );
+
+            create_user_token_account_when_is_mint_account(
+                svm,
+                Rc::clone(&user_keypair),
+                &account,
+                account_pubkey,
             );
         }
     }

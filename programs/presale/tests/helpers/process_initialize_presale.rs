@@ -197,8 +197,8 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
         presale_mode: PresaleMode::FixedPrice.into(),
         buyer_maximum_deposit_cap: u64::MAX,
         buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
-        max_deposit_fee: 0,
-        deposit_fee_bps: 0,
+        max_deposit_fee: 1_000_000,           // 0.0001 SOL
+        deposit_fee_bps: 100,                 // 1%
         whitelist_mode: WhitelistMode::Permissionless.into(),
     };
 
