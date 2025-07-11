@@ -3,6 +3,12 @@ use crate::*;
 mod fixed_price_presale;
 use fixed_price_presale::*;
 
+mod prorata_presale;
+use prorata_presale::*;
+
+mod fcfs_presale;
+use fcfs_presale::*;
+
 pub struct InitializePresaleVaultAccountPubkeys {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
@@ -31,10 +37,8 @@ pub trait PresaleModeHandler {
 
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {
     match presale_mode {
-        PresaleMode::FixedPrice => Box::new(FixedPricePresaleHandler {}),
-        _ => unimplemented!(
-            "Presale mode handler not implemented for {:?}",
-            presale_mode
-        ),
+        PresaleMode::FixedPrice => Box::new(FixedPricePresaleHandler),
+        PresaleMode::Prorata => Box::new(ProrataPresaleHandler),
+        PresaleMode::Fcfs => Box::new(FcfsPresaleHandler),
     }
 }

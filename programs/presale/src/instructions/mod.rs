@@ -15,3 +15,6 @@ pub use process_create_merkle_root_config::*;
 
 mod process_deposit;
 pub use process_deposit::*;
+
+mod process_withdraw;
+pub use process_withdraw::*;

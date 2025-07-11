@@ -23,21 +23,14 @@ pub fn process_create_presale_vault(params: ProcessCreatePresaleVaultArgs) -> Re
     let presale_mode = PresaleMode::from(presale_params.presale_mode);
     let presale_handler = get_presale_mode_handler(presale_mode);
 
-    match presale_mode {
-        PresaleMode::FixedPrice => {
-            presale_handler.initialize_presale(
-                &mut presale,
-                tokenomic_params,
-                presale_params,
-                locked_vesting_params,
-                mint_pubkeys,
-                remaining_accounts,
-            )?;
-        }
-        PresaleMode::Prorata | PresaleMode::Fcfs => {
-            todo!("Implement Prorata and FCFS presale modes")
-        }
-    }
+    presale_handler.initialize_presale(
+        &mut presale,
+        tokenomic_params,
+        presale_params,
+        locked_vesting_params,
+        mint_pubkeys,
+        remaining_accounts,
+    )?;
 
     Ok(())
 }
