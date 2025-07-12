@@ -224,8 +224,19 @@ impl Presale {
         Ok(())
     }
 
-    pub fn update_presale_end_time(&mut self, current_timestamp: u64) {
+    pub fn advance_progress_to_completed(&mut self, current_timestamp: u64) -> Result<()> {
         self.presale_end_time = current_timestamp;
+        self.lock_start_time = self
+            .presale_end_time
+            .checked_add(self.lock_duration)
+            .unwrap();
+
+        self.vesting_start_time = self
+            .lock_start_time
+            .checked_add(self.vest_duration)
+            .unwrap();
+
+        Ok(())
     }
 
     pub fn get_remaining_deposit_quota(&self) -> Result<u64> {
@@ -258,5 +269,18 @@ impl Presale {
         self.total_escrow = self.total_escrow.checked_add(1).unwrap();
 
         Ok(())
+    }
+
+    pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<u64> {
+        let fee_amount_withdrawn = escrow.withdraw(amount)?;
+
+        self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
+        self.total_deposit_fee = self
+            .total_deposit_fee
+            .checked_sub(fee_amount_withdrawn)
+            .unwrap();
+
+        let total_withdrawn_amount = amount.checked_add(fee_amount_withdrawn).unwrap();
+        Ok(total_withdrawn_amount)
     }
 }

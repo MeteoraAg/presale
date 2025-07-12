@@ -89,5 +89,17 @@ pub fn handle_deposit(ctx: Context<DepositCtx>, max_amount: u64) -> Result<()> {
         ctx.accounts.quote_mint.decimals,
     )?;
 
+    emit_cpi!(EvtDeposit {
+        presale: ctx.accounts.presale.key(),
+        escrow: ctx.accounts.escrow.key(),
+        deposit_amount,
+        deposit_fee,
+        escrow_total_deposit_amount: escrow.total_deposit,
+        escrow_total_deposit_fee: escrow.deposit_fee,
+        presale_total_deposit_amount: presale.total_deposit,
+        presale_total_deposit_fee: presale.total_deposit_fee,
+        owner: ctx.accounts.payer.key()
+    });
+
     Ok(())
 }

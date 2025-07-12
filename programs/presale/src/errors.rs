@@ -36,6 +36,9 @@ pub enum PresaleError {
     #[msg("Presale is not open for deposit")]
     PresaleNotOpenForDeposit,
 
+    #[msg("Presale is not open for withdraw")]
+    PresaleNotOpenForWithdraw,
+
     #[msg("Invalid presale whitelist mode")]
     InvalidPresaleWhitelistMode,
 
@@ -50,4 +53,7 @@ pub enum PresaleError {
 
     #[msg("Math overflow")]
     MathOverflow,
+
+    #[msg("Insufficient escrow balance")]
+    InsufficientEscrowBalance,
 }

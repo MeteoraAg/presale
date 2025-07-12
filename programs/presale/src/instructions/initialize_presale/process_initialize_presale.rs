@@ -2,7 +2,7 @@ use crate::{
     instructions::initialize_presale::{
         process_create_metaplex_metadata::*,
         process_create_presale_vault::{
-            process_create_presale_vault, ProcessCreatePresaleVaultArgs
+            process_create_presale_vault, ProcessCreatePresaleVaultArgs,
         },
         process_mint::{process_mint_token_supply, ProcessMintTokenSupplyArgs},
     },
@@ -144,6 +144,29 @@ pub fn handle_initialize_token_and_create_presale_vault<'a, 'b, 'c: 'info, 'info
         mint_pubkeys,
         remaining_accounts: ctx.remaining_accounts,
     })?;
+
+    emit_cpi!(EvtPresaleVaultCreate {
+        base_mint: ctx.accounts.mint.key(),
+        quote_mint: ctx.accounts.quote_token_mint.key(),
+        buyer_maximum_deposit_cap: presale_params.buyer_maximum_deposit_cap,
+        buyer_minimum_deposit_cap: presale_params.buyer_minimum_deposit_cap,
+        lock_duration: locked_vesting_params
+            .as_ref()
+            .map(|p| p.lock_duration)
+            .unwrap_or(0),
+        vest_duration: locked_vesting_params
+            .as_ref()
+            .map(|p| p.vest_duration)
+            .unwrap_or(0),
+        whitelist_mode: presale_params.whitelist_mode,
+        presale_mode: presale_params.presale_mode,
+        presale_start_time: presale_params.presale_start_time,
+        presale_end_time: presale_params.presale_end_time,
+        presale_maximum_cap: presale_params.presale_maximum_cap,
+        presale_minimum_cap: presale_params.presale_minimum_cap,
+        max_deposit_fee: presale_params.max_deposit_fee,
+        deposit_fee_bps: presale_params.deposit_fee_bps,
+    });
 
     Ok(())
 }

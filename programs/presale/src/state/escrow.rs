@@ -48,4 +48,24 @@ impl Escrow {
 
         Ok(())
     }
+
+    pub fn withdraw(&mut self, amount: u64) -> Result<u64> {
+        let mut fee_amount = self
+            .deposit_fee
+            .checked_mul(amount)
+            .unwrap()
+            .checked_div(self.total_deposit)
+            .unwrap();
+
+        self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
+
+        // Withdraw all
+        if self.total_deposit == 0 {
+            fee_amount = self.deposit_fee;
+        }
+
+        self.deposit_fee = self.deposit_fee.checked_sub(fee_amount).unwrap();
+
+        Ok(fee_amount)
+    }
 }

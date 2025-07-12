@@ -46,10 +46,24 @@ impl PresaleModeHandler for ProrataPresaleHandler {
 
     fn end_presale_if_max_cap_reached(
         &self,
-        presale: &mut Presale,
-        current_timestamp: u64,
+        _presale: &mut Presale,
+        _current_timestamp: u64,
     ) -> Result<()> {
         // Do nothing because prorata allow over subscription
         Ok(())
+    }
+
+    fn can_withdraw(&self) -> bool {
+        // Prorata presale allows withdraw
+        true
+    }
+
+    fn process_withdraw(
+        &self,
+        presale: &mut Presale,
+        escrow: &mut Escrow,
+        amount: u64,
+    ) -> Result<u64> {
+        presale.withdraw(escrow, amount)
     }
 }

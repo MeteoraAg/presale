@@ -92,4 +92,8 @@ pub mod presale {
     pub fn deposit(ctx: Context<DepositCtx>, max_amount: u64) -> Result<()> {
         instructions::handle_deposit(ctx, max_amount)
     }
+
+    pub fn withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
+        instructions::handle_withdraw(ctx, amount)
+    }
 }

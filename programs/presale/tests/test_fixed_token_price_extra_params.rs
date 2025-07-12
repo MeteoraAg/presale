@@ -2,7 +2,7 @@ mod helpers;
 
 use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
 use helpers::*;
-use presale::UnsoldTokenAction;
+use presale::{FixedPricePresaleExtraArgs, UnsoldTokenAction};
 use std::rc::Rc;
 
 #[test]
@@ -30,6 +30,23 @@ pub fn test_initialize_fixed_token_price_extra_params() {
             payer: Rc::clone(&user),
         },
     );
+
+    let fixed_price_args_pubkey =
+        derive_fixed_price_presale_args(&base_mint_pubkey, &quote_mint, &presale::ID);
+    let fixed_price_args: FixedPricePresaleExtraArgs = lite_svm
+        .get_deserialized_account(&fixed_price_args_pubkey)
+        .unwrap();
+
+    let FixedPricePresaleExtraArgs {
+        unsold_token_action,
+        q_price: q_price_set,
+        owner,
+        ..
+    } = fixed_price_args;
+
+    assert_eq!(unsold_token_action, UnsoldTokenAction::Refund as u8);
+    assert_eq!(q_price_set, q_price);
+    assert_eq!(owner, user_pubkey);
 }
 
 #[test]

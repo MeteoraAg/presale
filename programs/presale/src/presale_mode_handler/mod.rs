@@ -33,6 +33,13 @@ pub trait PresaleModeHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()>;
+    fn can_withdraw(&self) -> bool;
+    fn process_withdraw(
+        &self,
+        presale: &mut Presale,
+        escrow: &mut Escrow,
+        amount: u64,
+    ) -> Result<u64>;
 }
 
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {

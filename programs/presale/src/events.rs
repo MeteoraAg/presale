@@ -13,7 +13,22 @@ pub struct EvtFixedPricePresaleArgsClose {
 }
 
 #[event]
-pub struct EvtPresaleVaultCreate {}
+pub struct EvtPresaleVaultCreate {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub buyer_maximum_deposit_cap: u64,
+    pub buyer_minimum_deposit_cap: u64,
+    pub lock_duration: u64,
+    pub vest_duration: u64,
+    pub whitelist_mode: u8,
+    pub presale_mode: u8,
+    pub presale_start_time: u64,
+    pub presale_end_time: u64,
+    pub presale_maximum_cap: u64,
+    pub presale_minimum_cap: u64,
+    pub max_deposit_fee: u64,
+    pub deposit_fee_bps: u16,
+}
 
 #[event]
 pub struct EvtEscrowCreate {
@@ -38,6 +53,18 @@ pub struct EvtDeposit {
     pub escrow: Pubkey,
     pub deposit_amount: u64,
     pub deposit_fee: u64,
+    pub escrow_total_deposit_amount: u64,
+    pub escrow_total_deposit_fee: u64,
+    pub presale_total_deposit_amount: u64,
+    pub presale_total_deposit_fee: u64,
+    pub owner: Pubkey,
+}
+
+#[event]
+pub struct EvtWithdraw {
+    pub presale: Pubkey,
+    pub escrow: Pubkey,
+    pub withdraw_amount: u64,
     pub escrow_total_deposit_amount: u64,
     pub escrow_total_deposit_fee: u64,
     pub presale_total_deposit_amount: u64,

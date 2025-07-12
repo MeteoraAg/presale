@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::time::SystemTime;
 
 use anchor_client::solana_client::rpc_response::RpcKeyedAccount;
 use anchor_client::solana_sdk::instruction::Instruction;
@@ -9,13 +10,12 @@ use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Keypair;
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_client::solana_sdk::transaction::VersionedTransaction;
-use anchor_lang::prelude::Rent;
+use anchor_lang::prelude::{Clock, Rent};
 use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent;
 use anchor_spl::token::spl_token::state::AccountState;
 use litesvm::LiteSVM;
-use presale::TokenInfoArgs;
 
 const NATIVE_SOL_MINT: Pubkey =
     Pubkey::from_str_const("So11111111111111111111111111111111111111112");
@@ -43,11 +43,24 @@ impl SetupContext {
         load_programs(&mut svm);
         load_accounts(&mut svm, Rc::clone(&user));
 
+        adjust_clock_to_current_time(&mut svm);
+
         Self {
             lite_svm: svm,
             user,
         }
     }
+}
+
+fn adjust_clock_to_current_time(lite_svm: &mut LiteSVM) {
+    let current_timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let mut clock: Clock = lite_svm.get_sysvar();
+    clock.unix_timestamp = current_timestamp as i64;
+    lite_svm.set_sysvar(&clock);
 }
 
 fn load_programs(svm: &mut LiteSVM) {
@@ -184,15 +197,6 @@ fn load_accounts(svm: &mut LiteSVM, user_keypair: Rc<Keypair>) {
                 account_pubkey,
             );
         }
-    }
-}
-
-pub fn create_token_info() -> TokenInfoArgs {
-    TokenInfoArgs {
-        decimals: 6,
-        name: "Test Token".into(),
-        symbol: "TT".into(),
-        uri: "https://example.com/token/tt".into(),
     }
 }
 

@@ -85,9 +85,23 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         current_timestamp: u64,
     ) -> Result<()> {
         if presale.total_deposit >= presale.presale_maximum_cap {
-            presale.update_presale_end_time(current_timestamp);
+            presale.advance_progress_to_completed(current_timestamp)?;
         }
 
         Ok(())
+    }
+
+    fn can_withdraw(&self) -> bool {
+        // Fixed price presale allow withdraw
+        true
+    }
+
+    fn process_withdraw(
+        &self,
+        presale: &mut Presale,
+        escrow: &mut Escrow,
+        amount: u64,
+    ) -> Result<u64> {
+        presale.withdraw(escrow, amount)
     }
 }
