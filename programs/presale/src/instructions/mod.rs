@@ -18,3 +18,6 @@ pub use process_deposit::*;
 
 mod process_withdraw;
 pub use process_withdraw::*;
+
+mod process_claim;
+pub use process_claim::*;

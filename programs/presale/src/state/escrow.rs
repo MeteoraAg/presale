@@ -3,7 +3,7 @@ use crate::*;
 // TODO: Assert account size to changes on padding have no effect on the account size.
 
 #[account(zero_copy)]
-#[derive(InitSpace)]
+#[derive(Debug, InitSpace)]
 pub struct Escrow {
     // Presale vault of the escrow
     pub presale: Pubkey,
@@ -13,6 +13,8 @@ pub struct Escrow {
     pub total_deposit: u64,
     // Deposit fee
     pub deposit_fee: u64,
+    // Total claimed base token
+    pub total_claimed_token: u64,
     // Timestamp of when the escrow was created
     pub created_at: u64,
 }
@@ -67,5 +69,10 @@ impl Escrow {
         self.deposit_fee = self.deposit_fee.checked_sub(fee_amount).unwrap();
 
         Ok(fee_amount)
+    }
+
+    pub fn claim(&mut self, amount: u64) -> Result<()> {
+        self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
+        Ok(())
     }
 }

@@ -96,4 +96,8 @@ pub mod presale {
     pub fn withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
         instructions::handle_withdraw(ctx, amount)
     }
+
+    pub fn claim(ctx: Context<ClaimCtx>) -> Result<()> {
+        instructions::handle_claim(ctx)
+    }
 }

@@ -91,12 +91,15 @@ pub struct Presale {
     pub lock_duration: u64,
     /// Duration of bought token will be vested until claimable
     pub vest_duration: u64,
-    /// When the lock starts
-    pub lock_start_time: u64,
-    /// When the vesting starts
-    pub vesting_start_time: u64,
+    /// When the lock ends
+    pub lock_end_time: u64,
+    /// When the vesting ends
+    pub vesting_end_time: u64,
+    /// Total claimed base token. For statistic purpose only
+    pub total_claimed_token: u64,
     /// Maximum deposit fee that can be charged to the buyer
     pub max_deposit_fee: u64,
+    pub total_refunded_quote_token: u64,
     /// Deposit fee in basis points (bps). 100 bps = 1%
     pub deposit_fee_bps: u16,
     /// Whitelist mode
@@ -104,7 +107,7 @@ pub struct Presale {
     /// Presale mode
     pub presale_mode: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
-    pub fixed_price_presale_unlock_unsold_token: u8,
+    pub fixed_price_presale_unlock_unsold_token_action: u8,
     pub padding1: [u8; 11],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
@@ -192,7 +195,7 @@ impl Presale {
             ..
         }) = fixed_price_presale_params
         {
-            self.fixed_price_presale_unlock_unsold_token = unsold_token_action;
+            self.fixed_price_presale_unlock_unsold_token_action = unsold_token_action;
             self.fixed_price_presale_q_price = q_price;
         }
     }
@@ -226,15 +229,13 @@ impl Presale {
 
     pub fn advance_progress_to_completed(&mut self, current_timestamp: u64) -> Result<()> {
         self.presale_end_time = current_timestamp;
-        self.lock_start_time = self
+
+        self.lock_end_time = self
             .presale_end_time
             .checked_add(self.lock_duration)
             .unwrap();
 
-        self.vesting_start_time = self
-            .lock_start_time
-            .checked_add(self.vest_duration)
-            .unwrap();
+        self.vesting_end_time = self.lock_end_time.checked_add(self.vest_duration).unwrap();
 
         Ok(())
     }
@@ -282,5 +283,14 @@ impl Presale {
 
         let total_withdrawn_amount = amount.checked_add(fee_amount_withdrawn).unwrap();
         Ok(total_withdrawn_amount)
+    }
+
+    pub fn in_locking_period(&self, current_timestamp: u64) -> bool {
+        current_timestamp >= self.presale_end_time && current_timestamp < self.lock_end_time
+    }
+
+    pub fn claim(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
+        self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
+        escrow.claim(amount)
     }
 }

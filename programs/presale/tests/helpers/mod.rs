@@ -27,3 +27,6 @@ pub use litesvm_ext::*;
 
 mod process_withdraw_escrow;
 pub use process_withdraw_escrow::*;
+
+mod process_claim;
+pub use process_claim::*;

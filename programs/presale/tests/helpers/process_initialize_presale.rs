@@ -27,7 +27,7 @@ pub fn create_token_info() -> TokenInfoArgs {
 
 pub fn create_tokenomic_args(decimals: u8) -> TokenomicArgs {
     TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(decimals as u32), // 1 million with specified decimals
+        presale_pool_supply: 100_000_000_000 * 10u64.pow(decimals as u32), // 100 million with specified decimals
         creator_supply: 500_000 * 10u64.pow(decimals as u32), // 1 million with specified decimals
     }
 }

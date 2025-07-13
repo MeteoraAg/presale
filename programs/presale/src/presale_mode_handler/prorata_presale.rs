@@ -66,4 +66,13 @@ impl PresaleModeHandler for ProrataPresaleHandler {
     ) -> Result<u64> {
         presale.withdraw(escrow, amount)
     }
+
+    fn process_claim(
+        &self,
+        presale: &mut Presale,
+        escrow: &mut Escrow,
+        current_timestamp: u64,
+    ) -> Result<u64> {
+        process_claim_full_presale_supply_by_share(presale, escrow, current_timestamp)
+    }
 }

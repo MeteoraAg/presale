@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::PresaleModeHandler;
 use crate::*;
 
@@ -8,6 +10,24 @@ fn ensure_token_buyable(q_price: u128, amount: u64) -> Result<()> {
     require!(max_token_bought > 0, PresaleError::ZeroTokenAmount);
     require!(
         max_token_bought <= u64::MAX as u128,
+        PresaleError::InvalidTokenPrice
+    );
+    Ok(())
+}
+
+fn ensure_enough_presale_supply(
+    q_price: u128,
+    presale_supply: u64,
+    maximum_cap: u64,
+) -> Result<()> {
+    let q_amount = u128::from(maximum_cap).checked_shl(64).unwrap();
+    let max_presale_supply_bought = q_amount.checked_div(q_price).unwrap();
+
+    msg!("max_presale_supply_bought: {}", max_presale_supply_bought);
+    msg!("presale_supply: {}", presale_supply);
+
+    require!(
+        max_presale_supply_bought <= u128::from(presale_supply),
         PresaleError::InvalidTokenPrice
     );
     Ok(())
@@ -39,6 +59,12 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         ensure_token_buyable(
             presale_extra_param.q_price,
             presale_params.buyer_maximum_deposit_cap,
+        )?;
+
+        ensure_enough_presale_supply(
+            presale_extra_param.q_price,
+            tokenomic_params.presale_pool_supply,
+            presale_params.presale_maximum_cap,
         )?;
 
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
@@ -103,5 +129,51 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         amount: u64,
     ) -> Result<u64> {
         presale.withdraw(escrow, amount)
+    }
+
+    fn process_claim(
+        &self,
+        presale: &mut Presale,
+        escrow: &mut Escrow,
+        current_timestamp: u64,
+    ) -> Result<u64> {
+        // 1. Calculate how many base tokens were bought
+        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
+        let total_sold_token = q_total_deposit
+            .checked_div(presale.fixed_price_presale_q_price)
+            .unwrap();
+
+        // 2. Calculate how many base tokens can be claimed based on vesting schedule
+        let vesting_start_time = presale.lock_end_time;
+        let elapsed_seconds = current_timestamp
+            .checked_sub(vesting_start_time)
+            .unwrap()
+            .min(presale.vest_duration);
+
+        let dripped_total_sold_token = total_sold_token
+            .checked_mul(elapsed_seconds.into())
+            .unwrap()
+            .checked_div(presale.vest_duration.into())
+            .unwrap();
+
+        // 3. Calculate how many base tokens can be claimed by the escrow
+        let dripped_escrow_bought_token = dripped_total_sold_token
+            .checked_mul(escrow.total_deposit.into())
+            .unwrap()
+            .checked_div(presale.total_deposit.into())
+            .unwrap();
+
+        let claimable_bought_token: u64 = dripped_escrow_bought_token
+            .checked_sub(escrow.total_claimed_token.into())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        if claimable_bought_token > 0 {
+            // 4. Update presale and escrow state
+            presale.claim(escrow, claimable_bought_token)?;
+        }
+
+        Ok(claimable_bought_token)
     }
 }

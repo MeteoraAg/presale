@@ -34,7 +34,7 @@ pub fn test_initialize_fixed_token_price_extra_params() {
     let fixed_price_args_pubkey =
         derive_fixed_price_presale_args(&base_mint_pubkey, &quote_mint, &presale::ID);
     let fixed_price_args: FixedPricePresaleExtraArgs = lite_svm
-        .get_deserialized_account(&fixed_price_args_pubkey)
+        .get_deserialized_zc_account(&fixed_price_args_pubkey)
         .unwrap();
 
     let FixedPricePresaleExtraArgs {

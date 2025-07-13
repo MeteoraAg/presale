@@ -24,6 +24,8 @@ fn test_deposit() {
         },
     );
 
-    let presale_state: Presale = lite_svm.get_deserialized_account(&presale_pubkey).unwrap();
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
     println!("Presale state after deposit: {:?}", presale_state);
 }

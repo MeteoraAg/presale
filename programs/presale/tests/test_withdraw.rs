@@ -27,7 +27,7 @@ fn test_withdraw_fixed_price_presale() {
 
     let escrow = derive_escrow(presale_pubkey, user_pubkey, &presale::ID);
     let escrow_state = lite_svm
-        .get_deserialized_account::<Escrow>(&escrow)
+        .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
 
     handle_escrow_withdraw(

@@ -25,7 +25,7 @@ pub fn handle_escrow_withdraw(lite_svm: &mut LiteSVM, args: HandleEscrowWithdraw
 
     let mut instructions = vec![];
 
-    let presale_state: Presale = lite_svm.get_deserialized_account(&presale).unwrap();
+    let presale_state: Presale = lite_svm.get_deserialized_zc_account(&presale).unwrap();
 
     let quote_token_program = lite_svm
         .get_account(&presale_state.quote_mint)

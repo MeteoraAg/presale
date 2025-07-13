@@ -45,6 +45,9 @@ pub enum PresaleError {
     #[msg("Presale is ended")]
     PresaleEnded,
 
+    #[msg("Presale is not open for claim")]
+    PresaleNotOpenForClaim,
+
     #[msg("Invalid merkle proof")]
     InvalidMerkleProof,
 

@@ -12,8 +12,10 @@ use anchor_client::solana_sdk::signer::Signer;
 use anchor_client::solana_sdk::transaction::VersionedTransaction;
 use anchor_lang::prelude::{Clock, Rent};
 use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent;
+use anchor_spl::associated_token::{
+    get_associated_token_address, get_associated_token_address_with_program_id,
+};
 use anchor_spl::token::spl_token::state::AccountState;
 use litesvm::LiteSVM;
 
@@ -216,4 +218,48 @@ pub fn process_transaction(
     }
 
     lite_svm.send_transaction(tx).unwrap();
+    lite_svm.expire_blockhash();
+}
+
+pub fn transfer_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, destination: Pubkey, amount: u64) {
+    let transfer_ix = anchor_client::solana_sdk::system_instruction::transfer(
+        &user.pubkey(),
+        &destination,
+        amount,
+    );
+
+    process_transaction(lite_svm, &[transfer_ix], Some(&user.pubkey()), &[&user]);
+}
+
+pub fn wrap_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, amount: u64) {
+    let wsol_ata = get_associated_token_address(&user.pubkey(), &NATIVE_SOL_MINT);
+    let create_ata_ix = create_associated_token_account_idempotent(
+        &user.pubkey(),
+        &user.pubkey(),
+        &NATIVE_SOL_MINT,
+        &anchor_spl::token::ID,
+    );
+
+    let mut instructions = vec![create_ata_ix];
+
+    let transfer_ix =
+        anchor_client::solana_sdk::system_instruction::transfer(&user.pubkey(), &wsol_ata, amount);
+    instructions.push(transfer_ix);
+
+    let sync_native_ix =
+        anchor_spl::token::spl_token::instruction::sync_native(&anchor_spl::token::ID, &wsol_ata)
+            .unwrap();
+    instructions.push(sync_native_ix);
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]);
+}
+
+pub fn warp_time(lite_svm: &mut LiteSVM, timestamp: u64) {
+    let mut clock: Clock = lite_svm.get_sysvar();
+    assert!(
+        timestamp > clock.unix_timestamp as u64,
+        "Cannot warp to past time"
+    );
+    clock.unix_timestamp = timestamp as i64;
+    lite_svm.set_sysvar(&clock);
 }
