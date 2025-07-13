@@ -72,8 +72,11 @@ pub fn handle_deposit(ctx: Context<DepositCtx>, max_amount: u64) -> Result<()> {
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
 
     // 4. Transfer
-    let include_transfer_fee_deposit_amount =
-        calculate_transfer_fee_included_amount(&ctx.accounts.quote_mint, deposit_amount)?.amount;
+    let include_transfer_fee_deposit_amount = calculate_transfer_fee_included_amount(
+        &ctx.accounts.quote_mint,
+        deposit_fee_included_amount,
+    )?
+    .amount;
 
     transfer_checked(
         CpiContext::new(

@@ -30,6 +30,7 @@ pub struct WithdrawCtx {
     )]
     pub escrow: AccountLoader<'info, Escrow>,
 
+    #[account(mut)]
     pub owner_quote_token: Box<InterfaceAccount<'info, TokenAccount>>,
     pub owner: Signer<'info>,
 

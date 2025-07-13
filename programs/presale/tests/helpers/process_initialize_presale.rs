@@ -5,7 +5,10 @@ use anchor_client::solana_sdk::{
     instruction::Instruction, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::Keypair,
     signer::Signer,
 };
-use anchor_lang::{prelude::AccountMeta, *};
+use anchor_lang::{
+    prelude::{AccountMeta, Clock},
+    *,
+};
 use litesvm::LiteSVM;
 use mpl_token_metadata::accounts::Metadata;
 use presale::{
@@ -29,10 +32,14 @@ pub fn create_tokenomic_args(decimals: u8) -> TokenomicArgs {
     }
 }
 
-pub fn create_presale_args() -> PresaleArgs {
+pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_start_time = clock.unix_timestamp as u64;
+    let presale_end_time = presale_start_time + 120; // 2 minutes later
+
     PresaleArgs {
-        presale_start_time: 0,
-        presale_end_time: 120,
+        presale_start_time,
+        presale_end_time,
         presale_maximum_cap: 1 * LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
@@ -224,7 +231,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
 
     let tokenomic = create_tokenomic_args(token_info.decimals);
 
-    let mut presale_params = create_presale_args();
+    let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
 
     let locked_vesting_params = create_locked_vesting_args();
@@ -278,7 +285,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
 
     let tokenomic = create_tokenomic_args(token_info.decimals);
 
-    let mut presale_params = create_presale_args();
+    let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::Fcfs.into();
 
     let locked_vesting_params = create_locked_vesting_args();
