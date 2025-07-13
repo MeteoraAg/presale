@@ -21,3 +21,6 @@ pub use process_withdraw::*;
 
 mod process_claim;
 pub use process_claim::*;
+
+mod process_withdraw_remaining_quote;
+pub use process_withdraw_remaining_quote::*;

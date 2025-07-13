@@ -15,6 +15,9 @@ pub struct Escrow {
     pub deposit_fee: u64,
     // Total claimed base token
     pub total_claimed_token: u64,
+    // Determine whether user withdrawn remaining quote token
+    pub is_remaining_quote_withdrawn: u8,
+    pub padding0: [u8; 7],
     // Timestamp of when the escrow was created
     pub created_at: u64,
 }
@@ -52,6 +55,7 @@ impl Escrow {
     }
 
     pub fn withdraw(&mut self, amount: u64) -> Result<u64> {
+        // TODO: Test this whether if repeatly deposit and withdraw will causes the amount + fee > reserve amount
         let mut fee_amount = self
             .deposit_fee
             .checked_mul(amount)
@@ -74,5 +78,19 @@ impl Escrow {
     pub fn claim(&mut self, amount: u64) -> Result<()> {
         self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
         Ok(())
+    }
+
+    pub fn update_remaining_quote_withdrawn(&mut self) -> Result<()> {
+        self.is_remaining_quote_withdrawn = 1;
+        Ok(())
+    }
+
+    pub fn is_remaining_quote_withdrawn(&self) -> bool {
+        self.is_remaining_quote_withdrawn == 1
+    }
+
+    pub fn get_total_deposit_amount_with_fees(&self) -> Result<u64> {
+        let total_deposit_with_fees = self.total_deposit.checked_add(self.deposit_fee).unwrap();
+        Ok(total_deposit_with_fees)
     }
 }

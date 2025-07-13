@@ -100,4 +100,8 @@ pub mod presale {
     pub fn claim(ctx: Context<ClaimCtx>) -> Result<()> {
         instructions::handle_claim(ctx)
     }
+
+    pub fn withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) -> Result<()> {
+        instructions::handle_withdraw_remaining_quote(ctx)
+    }
 }

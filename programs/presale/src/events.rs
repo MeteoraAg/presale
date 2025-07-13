@@ -81,3 +81,12 @@ pub struct EvtClaim {
     pub presale_total_claim_amount: u64,
     pub owner: Pubkey,
 }
+
+#[event]
+pub struct EvtWithdrawRemainingQuote {
+    pub presale: Pubkey,
+    pub escrow: Pubkey,
+    pub owner: Pubkey,
+    pub amount_refunded: u64,
+    pub presale_total_refunded_quote_token: u64,
+}

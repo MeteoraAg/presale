@@ -20,7 +20,10 @@ pub struct ClaimCtx<'info> {
 
     pub base_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// CHECK: The presale authority
+    /// CHECK: The presale authority is the PDA of the presale.
+    #[account(
+        address = crate::const_pda::presale_authority::ID,
+    )]
     pub presale_authority: UncheckedAccount<'info>,
 
     #[account(
@@ -79,11 +82,14 @@ pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
         ctx.accounts.base_mint.decimals,
     )?;
 
+    let excluded_fee_claim_amount =
+        calculate_transfer_fee_excluded_amount(&ctx.accounts.base_mint, claim_amount)?.amount;
+
     emit_cpi!(EvtClaim {
         presale: ctx.accounts.presale.key(),
         escrow: ctx.accounts.escrow.key(),
         owner: ctx.accounts.owner.key(),
-        claim_amount,
+        claim_amount: excluded_fee_claim_amount,
         escrow_total_claim_amount: escrow.total_claimed_token,
         presale_total_claim_amount: presale.total_claimed_token
     });

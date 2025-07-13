@@ -1,6 +1,6 @@
 mod helpers;
 
-use anchor_lang::prelude::AccountMeta;
+use anchor_lang::prelude::{AccountMeta, Clock};
 use helpers::*;
 use std::rc::Rc;
 
@@ -36,9 +36,11 @@ fn test_initialize_presale_vault() {
         creator_supply: 0,
     };
 
+    let clock: Clock = lite_svm.get_sysvar();
+
     let presale_params = PresaleArgs {
-        presale_start_time: 0,
-        presale_end_time: 120,
+        presale_start_time: clock.unix_timestamp as u64,
+        presale_end_time: clock.unix_timestamp as u64 + 120,
         presale_maximum_cap: 1 * LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
@@ -111,9 +113,11 @@ fn test_initialize_presale_vault_token_2022() {
         creator_supply: 0,
     };
 
+    let clock: Clock = lite_svm.get_sysvar();
+
     let presale_params = PresaleArgs {
-        presale_start_time: 0,
-        presale_end_time: 120,
+        presale_start_time: clock.unix_timestamp as u64,
+        presale_end_time: clock.unix_timestamp as u64 + 120,
         presale_maximum_cap: 1 * LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),

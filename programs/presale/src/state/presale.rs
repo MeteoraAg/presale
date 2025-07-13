@@ -293,4 +293,11 @@ impl Presale {
         self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
         escrow.claim(amount)
     }
+
+    pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
+        self.total_refunded_quote_token =
+            self.total_refunded_quote_token.checked_add(amount).unwrap();
+
+        Ok(())
+    }
 }

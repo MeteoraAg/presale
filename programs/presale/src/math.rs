@@ -52,8 +52,8 @@ mod tests {
         let fee_bps = 100;
 
         let included_amount = calculate_deposit_fee_included_amount(amount, fee_bps).unwrap();
-        let excluded_amount = calculate_deposit_fee_excluded_amount(amount, fee_bps);
+        let excluded_amount = calculate_deposit_fee_excluded_amount(included_amount, fee_bps);
 
-        assert_eq!(included_amount, excluded_amount);
+        assert_eq!(excluded_amount, amount);
     }
 }

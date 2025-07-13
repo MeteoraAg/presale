@@ -44,9 +44,9 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
         buyer_maximum_deposit_cap: u64::MAX,
-        buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
-        max_deposit_fee: 1_000_000,           // 0.0001 SOL
-        deposit_fee_bps: 100,                 // 1%
+        buyer_minimum_deposit_cap: 1000, // 0.0000001 SOL
+        max_deposit_fee: 1_000_000,      // 0.0001 SOL
+        deposit_fee_bps: 100,            // 1%
         whitelist_mode: WhitelistMode::Permissionless.into(),
     }
 }

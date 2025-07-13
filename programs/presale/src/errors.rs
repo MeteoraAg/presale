@@ -39,6 +39,9 @@ pub enum PresaleError {
     #[msg("Presale is not open for withdraw")]
     PresaleNotOpenForWithdraw,
 
+    #[msg("Presale is not open for withdraw remaining quote")]
+    PresaleNotOpenForWithdrawRemainingQuote,
+
     #[msg("Invalid presale whitelist mode")]
     InvalidPresaleWhitelistMode,
 
@@ -59,4 +62,7 @@ pub enum PresaleError {
 
     #[msg("Insufficient escrow balance")]
     InsufficientEscrowBalance,
+
+    #[msg("Remaining quote has already been withdrawn")]
+    RemainingQuoteAlreadyWithdrawn,
 }
