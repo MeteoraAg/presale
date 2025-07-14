@@ -110,4 +110,10 @@ pub mod presale {
     ) -> Result<()> {
         instructions::handle_perform_unsold_base_token_action(ctx)
     }
+
+    pub fn close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
+        instructions::handle_close_escrow(ctx)
+    }
+
+    // TODO: vesting refresh ix
 }

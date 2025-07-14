@@ -97,3 +97,11 @@ pub struct EvtPerformUnsoldBaseTokenAction {
     pub total_token_unsold: u64,
     pub unsold_base_token_action: u8,
 }
+
+#[event]
+pub struct EvtEscrowClose {
+    pub presale: Pubkey,
+    pub escrow: Pubkey,
+    pub owner: Pubkey,
+    pub rent_receiver: Pubkey,
+}

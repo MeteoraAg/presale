@@ -28,6 +28,7 @@ pub struct ClaimCtx<'info> {
 
     #[account(
         mut,
+        has_one = presale,
         has_one = owner
     )]
     pub escrow: AccountLoader<'info, Escrow>,

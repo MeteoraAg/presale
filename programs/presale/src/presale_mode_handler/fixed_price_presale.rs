@@ -135,6 +135,37 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         escrow: &mut Escrow,
         current_timestamp: u64,
     ) -> Result<u64> {
+        let dripped_escrow_bought_token =
+            self.get_escrow_dripped_bought_token(presale, escrow, current_timestamp)?;
+
+        let claimable_bought_token: u64 = dripped_escrow_bought_token
+            .checked_sub(escrow.total_claimed_token.into())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        if claimable_bought_token > 0 {
+            presale.claim(escrow, claimable_bought_token)?;
+        }
+
+        Ok(claimable_bought_token)
+    }
+
+    fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
+        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
+        let total_sold_token = q_total_deposit
+            .checked_div(presale.fixed_price_presale_q_price)
+            .unwrap();
+
+        Ok(total_sold_token.try_into().unwrap())
+    }
+
+    fn get_escrow_dripped_bought_token(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        current_timestamp: u64,
+    ) -> Result<u128> {
         // 1. Calculate how many base tokens were bought
         let total_sold_token = u128::from(self.get_total_base_token_sold(presale)?);
 
@@ -158,26 +189,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             .checked_div(presale.total_deposit.into())
             .unwrap();
 
-        let claimable_bought_token: u64 = dripped_escrow_bought_token
-            .checked_sub(escrow.total_claimed_token.into())
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        if claimable_bought_token > 0 {
-            // 4. Update presale and escrow state
-            presale.claim(escrow, claimable_bought_token)?;
-        }
-
-        Ok(claimable_bought_token)
-    }
-
-    fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
-        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
-        let total_sold_token = q_total_deposit
-            .checked_div(presale.fixed_price_presale_q_price)
-            .unwrap();
-
-        Ok(total_sold_token.try_into().unwrap())
+        Ok(dripped_escrow_bought_token)
     }
 }

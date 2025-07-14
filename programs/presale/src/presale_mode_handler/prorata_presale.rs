@@ -76,6 +76,15 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         process_claim_full_presale_supply_by_share(presale, escrow, current_timestamp)
     }
 
+    fn get_escrow_dripped_bought_token(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        current_timestamp: u64,
+    ) -> Result<u128> {
+        get_dripped_escrow_bought_token_by_share(presale, escrow, current_timestamp)
+    }
+
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
         // Prorata presale sells the full supply of base token
         Ok(presale.presale_supply)

@@ -1,0 +1,118 @@
+use crate::*;
+
+#[event_cpi]
+#[derive(Accounts)]
+pub struct CloseEscrowCtx<'info> {
+    #[account(mut)]
+    pub presale: AccountLoader<'info, Presale>,
+
+    #[account(
+        mut,
+        has_one = presale,
+        has_one = owner,
+        close = rent_receiver
+    )]
+    pub escrow: AccountLoader<'info, Escrow>,
+
+    pub owner: Signer<'info>,
+
+    /// CHECK: Account to receive the remaining rent after closing the escrow.
+    #[account(mut)]
+    pub rent_receiver: UncheckedAccount<'info>,
+}
+
+pub fn handle_close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
+    let mut presale = ctx.accounts.presale.load_mut()?;
+    let escrow = ctx.accounts.escrow.load()?;
+
+    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let presale_progress = presale.get_presale_progress(current_timestamp);
+
+    match presale_progress {
+        PresaleProgress::Ongoing | PresaleProgress::Failed => {
+            ensure_escrow_no_deposit(&escrow)?;
+        }
+        PresaleProgress::Completed => {
+            ensure_escrow_done_claim_and_withdraw_remaining_quote(
+                &presale,
+                &escrow,
+                current_timestamp,
+            )?;
+        }
+        _ => {
+            unreachable!(
+                "Invalid presale progress state for closing escrow: {:?}",
+                presale_progress
+            );
+        }
+    }
+
+    presale.decrease_escrow_count()?;
+
+    emit_cpi!(EvtEscrowClose {
+        presale: ctx.accounts.presale.key(),
+        escrow: ctx.accounts.escrow.key(),
+        owner: ctx.accounts.owner.key(),
+        rent_receiver: ctx.accounts.rent_receiver.key(),
+    });
+
+    Ok(())
+}
+
+fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
+    presale: &Presale,
+    escrow: &Escrow,
+    current_timestamp: u64,
+) -> Result<()> {
+    // 1. Ensure the escrow has withdrawn remaining quote token
+    match presale.validate_and_get_escrow_remaining_quote(escrow, current_timestamp) {
+        Ok(remaining_quote) => {
+            if remaining_quote > 0 {
+                require!(
+                    escrow.is_remaining_quote_withdrawn(),
+                    PresaleError::EscrowNotEmpty
+                );
+            }
+        }
+        Err(e) => {
+            // If the presale mode does not allow withdraw remaining quote, no need to check for escrow remaining quote is withdrawn or not
+            // Bubble up the error if something else is wrong
+            if e.ne(&Error::from(
+                PresaleError::PresaleNotOpenForWithdrawRemainingQuote,
+            )) {
+                return Err(e);
+            }
+        }
+    }
+
+    // 2. Ensure the escrow has claimed all bought tokens
+    let presale_mode = PresaleMode::from(presale.presale_mode);
+    let presale_handler = get_presale_mode_handler(presale_mode);
+
+    let vesting_end_time = presale
+        .lock_end_time
+        .checked_add(presale.vest_duration)
+        .unwrap();
+
+    // Get total dripped bought token at vesting end time
+    let escrow_total_claimable_amount: u64 = presale_handler
+        .get_escrow_dripped_bought_token(presale, escrow, vesting_end_time)?
+        .try_into()
+        .unwrap();
+
+    require!(
+        escrow.total_claimed_token == escrow_total_claimable_amount,
+        PresaleError::EscrowNotEmpty
+    );
+
+    Ok(())
+}
+
+fn ensure_escrow_no_deposit(escrow: &Escrow) -> Result<()> {
+    require!(
+        escrow.total_deposit == 0 && escrow.deposit_fee == 0,
+        PresaleError::EscrowNotEmpty
+    );
+
+    Ok(())
+}

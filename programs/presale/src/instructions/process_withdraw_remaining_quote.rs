@@ -26,6 +26,7 @@ pub struct WithdrawRemainingQuoteCtx<'info> {
 
     #[account(
         mut,
+        has_one = presale,
         has_one = owner
     )]
     pub escrow: AccountLoader<'info, Escrow>,
@@ -49,38 +50,14 @@ pub fn handle_withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) 
     );
 
     let current_timestamp = Clock::get()?.unix_timestamp as u64;
-    let presale_progress = presale.get_presale_progress(current_timestamp);
 
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-
-    // 2. Ensure presale is in failed or prorata completed state
-    require!(
-        presale_progress == PresaleProgress::Failed
-            || (presale_progress == PresaleProgress::Completed
-                && presale_mode == PresaleMode::Prorata),
-        PresaleError::PresaleNotOpenForWithdrawRemainingQuote
-    );
-
-    let amount_to_refund = if presale_progress == PresaleProgress::Failed {
-        // 3. Failed presale will refund all tokens to the owner
-        escrow.get_total_deposit_amount_with_fees()?
-    } else {
-        // 4. Prorata will refund only the overflow (unused) quote token
-        let remaining_quote_amount = presale
-            .total_deposit
-            .saturating_sub(presale.presale_maximum_cap);
-
-        u128::from(escrow.total_deposit)
-            .checked_mul(remaining_quote_amount.into())
-            .unwrap()
-            .checked_div(presale.total_deposit.into())
-            .unwrap()
-            .try_into()
-            .unwrap()
-    };
+    // 2. Ensure the presale is in a state that allows withdrawing remaining quote
+    let amount_to_refund =
+        presale.validate_and_get_escrow_remaining_quote(&escrow, current_timestamp)?;
 
     require!(amount_to_refund > 0, PresaleError::ZeroTokenAmount);
 
+    // 3. Update presale and escrow state
     presale.update_total_refunded_quote_token(amount_to_refund)?;
     escrow.update_remaining_quote_withdrawn()?;
 

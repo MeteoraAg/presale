@@ -47,6 +47,12 @@ pub trait PresaleModeHandler {
         current_timestamp: u64,
     ) -> Result<u64>;
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64>;
+    fn get_escrow_dripped_bought_token(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        current_timestamp: u64,
+    ) -> Result<u128>;
 }
 
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {
@@ -57,11 +63,11 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
     }
 }
 
-pub fn process_claim_full_presale_supply_by_share(
-    presale: &mut Presale,
-    escrow: &mut Escrow,
+pub fn get_dripped_escrow_bought_token_by_share(
+    presale: &Presale,
+    escrow: &Escrow,
     current_timestamp: u64,
-) -> Result<u64> {
+) -> Result<u128> {
     let vesting_start_time = presale.lock_end_time;
     let elapsed_seconds = current_timestamp
         .checked_sub(vesting_start_time)
@@ -79,6 +85,17 @@ pub fn process_claim_full_presale_supply_by_share(
         .unwrap()
         .checked_div(presale.total_deposit.into())
         .unwrap();
+
+    Ok(dripped_escrow_bought_token)
+}
+
+pub fn process_claim_full_presale_supply_by_share(
+    presale: &mut Presale,
+    escrow: &mut Escrow,
+    current_timestamp: u64,
+) -> Result<u64> {
+    let dripped_escrow_bought_token =
+        get_dripped_escrow_bought_token_by_share(presale, escrow, current_timestamp)?;
 
     let claimable_bought_token: u64 = dripped_escrow_bought_token
         .checked_sub(escrow.total_claimed_token.into())

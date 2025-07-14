@@ -229,6 +229,11 @@ impl Presale {
         Ok(())
     }
 
+    pub fn decrease_escrow_count(&mut self) -> Result<()> {
+        self.total_escrow = self.total_escrow.checked_sub(1).unwrap();
+        Ok(())
+    }
+
     pub fn advance_progress_to_completed(&mut self, current_timestamp: u64) -> Result<()> {
         self.presale_end_time = current_timestamp;
 
@@ -307,5 +312,45 @@ impl Presale {
     pub fn set_fixed_price_presale_unsold_token_action_performed(&mut self) -> Result<()> {
         self.is_fixed_price_presale_unsold_token_action_performed = 1;
         Ok(())
+    }
+
+    pub fn allow_withdraw_remaining_quote(&self, presale_progress: PresaleProgress) -> bool {
+        let presale_mode = PresaleMode::from(self.presale_mode);
+
+        presale_progress == PresaleProgress::Failed
+            || (presale_progress == PresaleProgress::Completed
+                && presale_mode == PresaleMode::Prorata)
+    }
+
+    pub fn validate_and_get_escrow_remaining_quote(
+        &self,
+        escrow: &Escrow,
+        current_timestamp: u64,
+    ) -> Result<u64> {
+        // 1. Ensure presale is in failed or prorata completed state
+        let presale_progress = self.get_presale_progress(current_timestamp);
+        require!(
+            self.allow_withdraw_remaining_quote(presale_progress),
+            PresaleError::PresaleNotOpenForWithdrawRemainingQuote
+        );
+
+        let refund_amount = if presale_progress == PresaleProgress::Failed {
+            // 2. Failed presale will refund all tokens to the owner
+            escrow.get_total_deposit_amount_with_fees()?
+        } else {
+            // 3. Prorata will refund only the overflow (unused) quote token
+            let remaining_quote_amount =
+                self.total_deposit.saturating_sub(self.presale_maximum_cap);
+
+            u128::from(escrow.total_deposit)
+                .checked_mul(remaining_quote_amount.into())
+                .unwrap()
+                .checked_div(self.total_deposit.into())
+                .unwrap()
+                .try_into()
+                .unwrap()
+        };
+
+        Ok(refund_amount)
     }
 }
