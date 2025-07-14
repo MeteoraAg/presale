@@ -213,6 +213,7 @@ pub fn process_transaction(
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
 
     let sim_res = lite_svm.simulate_transaction(tx.clone());
+    // println!("Simulation result: {:?}", sim_res);
     if let Err(e) = sim_res {
         panic!("Simulation failed: {:?}", e);
     }

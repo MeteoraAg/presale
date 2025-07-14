@@ -136,10 +136,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         current_timestamp: u64,
     ) -> Result<u64> {
         // 1. Calculate how many base tokens were bought
-        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
-        let total_sold_token = q_total_deposit
-            .checked_div(presale.fixed_price_presale_q_price)
-            .unwrap();
+        let total_sold_token = u128::from(self.get_total_base_token_sold(presale)?);
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
         let vesting_start_time = presale.lock_end_time;
@@ -173,5 +170,14 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         }
 
         Ok(claimable_bought_token)
+    }
+
+    fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
+        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
+        let total_sold_token = q_total_deposit
+            .checked_div(presale.fixed_price_presale_q_price)
+            .unwrap();
+
+        Ok(total_sold_token.try_into().unwrap())
     }
 }

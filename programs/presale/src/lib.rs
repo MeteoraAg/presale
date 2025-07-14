@@ -104,4 +104,10 @@ pub mod presale {
     pub fn withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) -> Result<()> {
         instructions::handle_withdraw_remaining_quote(ctx)
     }
+
+    pub fn perform_unsold_base_token_action(
+        ctx: Context<PerformUnsoldBaseTokenActionCtx>,
+    ) -> Result<()> {
+        instructions::handle_perform_unsold_base_token_action(ctx)
+    }
 }

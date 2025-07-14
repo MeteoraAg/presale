@@ -223,7 +223,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
             base_mint: base_mint.pubkey(),
             quote_mint,
             q_price: calculate_q_price_from_ui_price(0.01, token_info.decimals, 9),
-            unsold_token_action: UnsoldTokenAction::Refund,
+            unsold_token_action: UnsoldTokenAction::Burn,
             owner: user_pubkey,
             payer: Rc::clone(&user),
         },

@@ -46,6 +46,7 @@ pub trait PresaleModeHandler {
         escrow: &mut Escrow,
         current_timestamp: u64,
     ) -> Result<u64>;
+    fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64>;
 }
 
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {

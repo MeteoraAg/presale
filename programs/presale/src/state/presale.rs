@@ -107,8 +107,9 @@ pub struct Presale {
     /// Presale mode
     pub presale_mode: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
-    pub fixed_price_presale_unlock_unsold_token_action: u8,
-    pub padding1: [u8; 11],
+    pub fixed_price_presale_unsold_token_action: u8,
+    pub is_fixed_price_presale_unsold_token_action_performed: u8,
+    pub padding1: [u8; 10],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
 }
@@ -146,6 +147,7 @@ impl Presale {
         self.quote_mint = quote_mint;
         self.base_token_vault = base_token_vault;
         self.quote_token_vault = quote_token_vault;
+        // self.total_escrow = 0;
 
         let TokenomicArgs {
             presale_pool_supply,
@@ -195,7 +197,7 @@ impl Presale {
             ..
         }) = fixed_price_presale_params
         {
-            self.fixed_price_presale_unlock_unsold_token_action = unsold_token_action;
+            self.fixed_price_presale_unsold_token_action = unsold_token_action;
             self.fixed_price_presale_q_price = q_price;
         }
     }
@@ -266,9 +268,6 @@ impl Presale {
         self.total_deposit_fee = self.total_deposit_fee.checked_add(deposit_fee).unwrap();
 
         escrow.deposit(deposit_fee_excluded_amount, deposit_fee)?;
-
-        self.total_escrow = self.total_escrow.checked_add(1).unwrap();
-
         Ok(())
     }
 
@@ -298,6 +297,15 @@ impl Presale {
         self.total_refunded_quote_token =
             self.total_refunded_quote_token.checked_add(amount).unwrap();
 
+        Ok(())
+    }
+
+    pub fn is_fixed_price_presale_unsold_token_action_performed(&self) -> bool {
+        self.is_fixed_price_presale_unsold_token_action_performed != 0
+    }
+
+    pub fn set_fixed_price_presale_unsold_token_action_performed(&mut self) -> Result<()> {
+        self.is_fixed_price_presale_unsold_token_action_performed = 1;
         Ok(())
     }
 }

@@ -90,3 +90,10 @@ pub struct EvtWithdrawRemainingQuote {
     pub amount_refunded: u64,
     pub presale_total_refunded_quote_token: u64,
 }
+
+#[event]
+pub struct EvtPerformUnsoldBaseTokenAction {
+    pub presale: Pubkey,
+    pub total_token_unsold: u64,
+    pub unsold_base_token_action: u8,
+}

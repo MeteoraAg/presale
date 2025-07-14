@@ -65,4 +65,10 @@ pub enum PresaleError {
 
     #[msg("Remaining quote has already been withdrawn")]
     RemainingQuoteAlreadyWithdrawn,
+
+    #[msg("Presale not completed")]
+    PresaleNotCompleted,
+
+    #[msg("No unsold tokens")]
+    NoUnsoldTokens,
 }
