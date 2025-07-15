@@ -21,9 +21,6 @@ fn ensure_enough_presale_supply(
     let q_amount = u128::from(maximum_cap).checked_shl(64).unwrap();
     let max_presale_supply_bought = q_amount.checked_div(q_price).unwrap();
 
-    msg!("max_presale_supply_bought: {}", max_presale_supply_bought);
-    msg!("presale_supply: {}", presale_supply);
-
     require!(
         max_presale_supply_bought <= u128::from(presale_supply),
         PresaleError::InvalidTokenPrice
@@ -140,26 +137,25 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         presale.withdraw(escrow, amount)
     }
 
-    fn process_claim(
+    fn update_pending_claim_amount(
         &self,
-        presale: &mut Presale,
+        presale: &Presale,
         escrow: &mut Escrow,
         current_timestamp: u64,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         let dripped_escrow_bought_token =
             self.get_escrow_dripped_bought_token(presale, escrow, current_timestamp)?;
 
         let claimable_bought_token: u64 = dripped_escrow_bought_token
-            .checked_sub(escrow.total_claimed_token.into())
+            .checked_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())
             .unwrap()
             .try_into()
             .unwrap();
 
-        if claimable_bought_token > 0 {
-            presale.claim(escrow, claimable_bought_token)?;
-        }
+        escrow.accumulate_pending_claim_token(claimable_bought_token)?;
+        escrow.update_last_refreshed_at(current_timestamp)?;
 
-        Ok(claimable_bought_token)
+        Ok(())
     }
 
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {

@@ -59,13 +59,16 @@ pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
     );
 
     // 2. Process claim
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_handler = get_presale_mode_handler(presale_mode);
+    require!(
+        escrow.last_refreshed_at == current_timestamp,
+        PresaleError::EscrowNotRefreshed
+    );
 
-    let claim_amount =
-        presale_handler.process_claim(&mut presale, &mut escrow, current_timestamp)?;
+    let pending_claim_token = escrow.pending_claim_token;
 
-    if claim_amount > 0 {
+    if pending_claim_token > 0 {
+        presale.claim(&mut escrow)?;
+
         let signer_seeds = &[&presale_authority_seeds!()[..]];
         transfer_checked(
             CpiContext::new_with_signer(
@@ -78,13 +81,14 @@ pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
                 },
                 signer_seeds,
             ),
-            claim_amount,
+            pending_claim_token,
             ctx.accounts.base_mint.decimals,
         )?;
     }
 
     let excluded_fee_claim_amount =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.base_mint, claim_amount)?.amount;
+        calculate_transfer_fee_excluded_amount(&ctx.accounts.base_mint, pending_claim_token)?
+            .amount;
 
     emit_cpi!(EvtClaim {
         presale: ctx.accounts.presale.key(),

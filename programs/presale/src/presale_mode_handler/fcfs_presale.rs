@@ -81,12 +81,12 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         unreachable!("FCFS presale does not support withdraw");
     }
 
-    fn process_claim(
+    fn update_pending_claim_amount(
         &self,
-        presale: &mut Presale,
+        presale: &Presale,
         escrow: &mut Escrow,
         current_timestamp: u64,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         process_claim_full_presale_supply_by_share(presale, escrow, current_timestamp)
     }
 

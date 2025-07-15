@@ -122,3 +122,12 @@ pub struct EvtCreatorWithdraw {
     pub creator_deposit_fee: u64,
     pub creator: Pubkey,
 }
+
+#[event]
+pub struct EvtEscrowRefresh {
+    pub presale: Pubkey,
+    pub escrow: Pubkey,
+    pub owner: Pubkey,
+    pub current_timestamp: u64,
+    pub pending_claim_token: u64,
+}

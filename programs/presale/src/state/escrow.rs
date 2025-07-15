@@ -18,8 +18,12 @@ pub struct Escrow {
     // Determine whether user withdrawn remaining quote token
     pub is_remaining_quote_withdrawn: u8,
     pub padding0: [u8; 7],
+    // Total pending claim token
+    pub pending_claim_token: u64,
     // Timestamp of when the escrow was created
     pub created_at: u64,
+    // Timestamp of when the escrow was refreshed
+    pub last_refreshed_at: u64,
 }
 
 impl Escrow {
@@ -28,6 +32,7 @@ impl Escrow {
         self.owner = owner;
         self.total_deposit = 0;
         self.created_at = created_at;
+        self.last_refreshed_at = created_at;
 
         Ok(())
     }
@@ -75,8 +80,12 @@ impl Escrow {
         Ok(fee_amount)
     }
 
-    pub fn claim(&mut self, amount: u64) -> Result<()> {
-        self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
+    pub fn claim(&mut self) -> Result<()> {
+        self.total_claimed_token = self
+            .total_claimed_token
+            .checked_add(self.pending_claim_token)
+            .unwrap();
+        self.pending_claim_token = 0;
         Ok(())
     }
 
@@ -92,5 +101,25 @@ impl Escrow {
     pub fn get_total_deposit_amount_with_fees(&self) -> Result<u64> {
         let total_deposit_with_fees = self.total_deposit.checked_add(self.deposit_fee).unwrap();
         Ok(total_deposit_with_fees)
+    }
+
+    pub fn sum_claimed_and_pending_claim_amount(&self) -> Result<u64> {
+        Ok(self
+            .total_claimed_token
+            .checked_add(self.pending_claim_token)
+            .unwrap())
+    }
+
+    pub fn accumulate_pending_claim_token(&mut self, pending_claim_token: u64) -> Result<()> {
+        self.pending_claim_token = self
+            .pending_claim_token
+            .checked_add(pending_claim_token)
+            .unwrap();
+        Ok(())
+    }
+
+    pub fn update_last_refreshed_at(&mut self, current_timestamp: u64) -> Result<()> {
+        self.last_refreshed_at = current_timestamp;
+        Ok(())
     }
 }

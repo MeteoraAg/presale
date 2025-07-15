@@ -353,11 +353,6 @@ impl Presale {
         current_timestamp >= self.lock_start_time && current_timestamp <= self.lock_end_time
     }
 
-    pub fn claim(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
-        self.total_claimed_token = self.total_claimed_token.checked_add(amount).unwrap();
-        escrow.claim(amount)
-    }
-
     pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
         self.total_refunded_quote_token =
             self.total_refunded_quote_token.checked_add(amount).unwrap();
@@ -441,5 +436,14 @@ impl Presale {
     pub fn update_creator_withdrawn(&mut self) -> Result<()> {
         self.has_creator_withdrawn = 1;
         Ok(())
+    }
+
+    pub fn claim(&mut self, escrow: &mut Escrow) -> Result<()> {
+        self.total_claimed_token = self
+            .total_claimed_token
+            .checked_add(escrow.pending_claim_token)
+            .unwrap();
+
+        escrow.claim()
     }
 }

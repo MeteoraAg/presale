@@ -126,5 +126,7 @@ pub mod presale {
         instructions::handle_creator_withdraw(ctx)
     }
 
-    // TODO: vesting refresh ix
+    pub fn refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {
+        instructions::handle_refresh_escrow(ctx)
+    }
 }

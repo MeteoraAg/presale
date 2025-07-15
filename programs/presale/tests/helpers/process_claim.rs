@@ -61,7 +61,23 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
     }
     .to_account_metas(None);
 
-    let ix = Instruction {
+    let claim_ix = Instruction {
+        program_id: presale::ID,
+        accounts,
+        data: ix_data,
+    };
+
+    let ix_data = presale::instruction::RefreshEscrow {}.data();
+
+    let accounts = presale::accounts::RefreshEscrowCtx {
+        presale,
+        escrow,
+        program: presale::ID,
+        event_authority: derive_event_authority(&presale::ID),
+    }
+    .to_account_metas(None);
+
+    let refresh_ix = Instruction {
         program_id: presale::ID,
         accounts,
         data: ix_data,
@@ -69,7 +85,7 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
 
     process_transaction(
         lite_svm,
-        &[create_owner_base_token_ix, ix],
+        &[create_owner_base_token_ix, refresh_ix, claim_ix],
         Some(&owner_pubkey),
         &[&owner],
     );

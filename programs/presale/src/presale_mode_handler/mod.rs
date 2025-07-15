@@ -40,12 +40,12 @@ pub trait PresaleModeHandler {
         escrow: &mut Escrow,
         amount: u64,
     ) -> Result<u64>;
-    fn process_claim(
+    fn update_pending_claim_amount(
         &self,
-        presale: &mut Presale,
+        presale: &Presale,
         escrow: &mut Escrow,
         current_timestamp: u64,
-    ) -> Result<u64>;
+    ) -> Result<()>;
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64>;
     fn get_escrow_dripped_bought_token(
         &self,
@@ -64,10 +64,10 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
 }
 
 pub fn process_claim_full_presale_supply_by_share(
-    presale: &mut Presale,
+    presale: &Presale,
     escrow: &mut Escrow,
     current_timestamp: u64,
-) -> Result<u64> {
+) -> Result<()> {
     let dripped_escrow_bought_token = calculate_dripped_amount_for_user(
         presale.lock_end_time,
         presale.vest_duration,
@@ -78,14 +78,13 @@ pub fn process_claim_full_presale_supply_by_share(
     )?;
 
     let claimable_bought_token: u64 = dripped_escrow_bought_token
-        .checked_sub(escrow.total_claimed_token.into())
+        .checked_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())
         .unwrap()
         .try_into()
         .unwrap();
 
-    if claimable_bought_token > 0 {
-        presale.claim(escrow, claimable_bought_token)?;
-    }
+    escrow.accumulate_pending_claim_token(claimable_bought_token)?;
+    escrow.update_last_refreshed_at(current_timestamp)?;
 
-    Ok(claimable_bought_token)
+    Ok(())
 }

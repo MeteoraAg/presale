@@ -80,4 +80,7 @@ pub enum PresaleError {
 
     #[msg("Creator has already withdrawn")]
     CreatorAlreadyWithdrawn,
+
+    #[msg("Escrow not refreshed")]
+    EscrowNotRefreshed,
 }
