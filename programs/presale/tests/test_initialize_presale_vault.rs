@@ -10,7 +10,7 @@ use anchor_client::solana_sdk::{
 use presale::{PresaleArgs, PresaleMode, TokenomicArgs, UnsoldTokenAction, WhitelistMode};
 
 #[test]
-fn test_initialize_presale_vault() {
+fn test_initialize_presale_vault_with_fixed_token_price() {
     let SetupContext { mut lite_svm, user } = SetupContext::initialize();
     let user_pubkey = user.pubkey();
 
