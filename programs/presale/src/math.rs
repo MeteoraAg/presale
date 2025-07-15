@@ -13,6 +13,16 @@ pub fn calculate_deposit_fee_included_amount(amount: u64, fee_bps: u16) -> Resul
     Ok(include_fee_amount)
 }
 
+pub fn calculate_fee_amount(amount: u64, fee_bps: u16) -> Result<u64> {
+    let fee_amount = amount
+        .checked_mul(fee_bps as u64)
+        .unwrap()
+        .checked_div(10_000)
+        .unwrap();
+
+    Ok(fee_amount)
+}
+
 pub fn calculate_deposit_fee_included_amount_with_max_cap(
     amount: u64,
     fee_bps: u16,

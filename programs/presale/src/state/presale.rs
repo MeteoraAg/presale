@@ -136,10 +136,12 @@ pub struct Presale {
     pub presale_mode: u8,
     /// Lock or transfer / burn unsold token
     pub lock_unsold_token: u8,
+    /// Determine whether creator withdrawn the raised capital
+    pub has_creator_withdrawn: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
     pub fixed_price_presale_unsold_token_action: u8,
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding2: [u8; 9],
+    pub padding2: [u8; 8],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
 }
@@ -425,13 +427,19 @@ impl Presale {
         self.lock_unsold_token != 0
     }
 
-    pub fn get_total_unsold_token(
-        &self,
-        presale_handler: &Box<dyn PresaleModeHandler>,
-    ) -> Result<u64> {
+    pub fn get_total_unsold_token(&self, presale_handler: &dyn PresaleModeHandler) -> Result<u64> {
         let total_token_sold = presale_handler.get_total_base_token_sold(self)?;
         let total_token_unsold = self.presale_supply.checked_sub(total_token_sold).unwrap();
 
         Ok(total_token_unsold)
+    }
+
+    pub fn has_creator_withdrawn(&self) -> bool {
+        self.has_creator_withdrawn != 0
+    }
+
+    pub fn update_creator_withdrawn(&mut self) -> Result<()> {
+        self.has_creator_withdrawn = 1;
+        Ok(())
     }
 }

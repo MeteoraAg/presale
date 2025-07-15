@@ -34,6 +34,9 @@ pub use presale_mode_handler::*;
 
 declare_id!("Ff7Lo7AsVxB4VtJH2Ajm7KLLVaVTGMV1W3ws2o5Eo2UT");
 
+pub const TREASURY_ID: Pubkey =
+    Pubkey::from_str_const("BJQbRiRWhJCyTYZcAuAL3ngDCx3AyFQGKDq8zhiZAKUw");
+
 #[program]
 pub mod presale {
     use super::*;
@@ -117,6 +120,10 @@ pub mod presale {
 
     pub fn creator_claim(ctx: Context<CreatorClaimCtx>) -> Result<()> {
         instructions::handle_creator_claim(ctx)
+    }
+
+    pub fn creator_withdraw(ctx: Context<CreatorWithdrawCtx>) -> Result<()> {
+        instructions::handle_creator_withdraw(ctx)
     }
 
     // TODO: vesting refresh ix

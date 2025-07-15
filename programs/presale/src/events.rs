@@ -113,3 +113,12 @@ pub struct EvtEscrowClose {
     pub owner: Pubkey,
     pub rent_receiver: Pubkey,
 }
+
+#[event]
+pub struct EvtCreatorWithdraw {
+    pub presale: Pubkey,
+    pub creator_withdraw_amount: u64,
+    pub protocol_fee_amount: u64,
+    pub creator_deposit_fee: u64,
+    pub creator: Pubkey,
+}

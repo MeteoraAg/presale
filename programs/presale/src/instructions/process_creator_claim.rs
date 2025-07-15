@@ -48,7 +48,7 @@ pub fn handle_creator_claim(ctx: Context<CreatorClaimCtx>) -> Result<()> {
     let presale_handler = get_presale_mode_handler(presale_mode);
 
     let total_unsold_token = if presale.should_lock_unsold_token() {
-        presale.get_total_unsold_token(&presale_handler)?
+        presale.get_total_unsold_token(presale_handler.as_ref())?
     } else {
         0
     };

@@ -27,4 +27,6 @@ pub mod seeds {
 }
 
 pub const MAX_DEPOSIT_FEE_BPS: u64 = 1000; // 10%
-pub const PROTOCOL_FEE_BPS: u64 = 2000; // 20%
+
+// DLMM seems doing well with 5%, let's follow 5% too?
+pub const PROTOCOL_FEE_BPS: u64 = 500; // 5%

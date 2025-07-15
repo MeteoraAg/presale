@@ -77,4 +77,7 @@ pub enum PresaleError {
 
     #[msg("Invalid unsold token action")]
     InvalidUnsoldTokenAction,
+
+    #[msg("Creator has already withdrawn")]
+    CreatorAlreadyWithdrawn,
 }
