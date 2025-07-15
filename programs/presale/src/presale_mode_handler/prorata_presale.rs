@@ -15,6 +15,14 @@ impl PresaleModeHandler for ProrataPresaleHandler {
     ) -> Result<()> {
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
 
+        if let Some(lock) = locked_vesting_params {
+            // Ensure cannot lock unsold token since prorata presale will sold all supply
+            require!(
+                lock.lock_unsold_token == 0,
+                PresaleError::InvalidUnsoldTokenAction
+            );
+        }
+
         let InitializePresaleVaultAccountPubkeys {
             base_mint,
             quote_mint,
@@ -35,7 +43,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
             quote_token_vault,
             owner,
             current_timestamp,
-        });
+        })?;
 
         Ok(())
     }
@@ -82,7 +90,14 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         escrow: &Escrow,
         current_timestamp: u64,
     ) -> Result<u128> {
-        get_dripped_escrow_bought_token_by_share(presale, escrow, current_timestamp)
+        calculate_dripped_amount_for_user(
+            presale.lock_end_time,
+            presale.vest_duration,
+            current_timestamp,
+            presale.presale_supply,
+            escrow.total_deposit,
+            presale.total_deposit,
+        )
     }
 
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {

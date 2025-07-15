@@ -28,7 +28,7 @@ fn test_withdraw_remaining_quote() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time);
+    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
 
     handle_escrow_withdraw_remaining_quote(
         &mut lite_svm,

@@ -83,6 +83,14 @@ pub struct EvtClaim {
 }
 
 #[event]
+pub struct EvtCreatorClaim {
+    pub presale: Pubkey,
+    pub claim_amount: u64,
+    pub creator_total_claimed_amount: u64,
+    pub creator: Pubkey,
+}
+
+#[event]
 pub struct EvtWithdrawRemainingQuote {
     pub presale: Pubkey,
     pub escrow: Pubkey,

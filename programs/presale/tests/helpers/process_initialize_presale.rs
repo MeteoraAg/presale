@@ -51,10 +51,26 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
     }
 }
 
-fn create_locked_vesting_args() -> LockedVestingArgs {
+fn create_locked_vesting_args(unsold_token_action: Option<UnsoldTokenAction>) -> LockedVestingArgs {
+    if let Some(action) = unsold_token_action {
+        return LockedVestingArgs {
+            lock_duration: 3600,           // 1 hour
+            vest_duration: 86400,          // 1 day
+            creator_lock_duration: 7200,   // 2 hours
+            creator_vest_duration: 172800, // 2 days
+            lock_unsold_token: if action == UnsoldTokenAction::Burn {
+                false.into()
+            } else {
+                true.into()
+            },
+        };
+    }
     LockedVestingArgs {
-        lock_duration: 3600,  // 1 hour
-        vest_duration: 86400, // 1 day
+        lock_duration: 3600,           // 1 hour
+        vest_duration: 86400,          // 1 day
+        creator_lock_duration: 7200,   // 2 hours
+        creator_vest_duration: 172800, // 2 days
+        lock_unsold_token: true.into(),
     }
 }
 
@@ -217,24 +233,23 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
 
     let user_pubkey = user.pubkey();
 
-    handle_initialize_fixed_token_price_presale_params(
-        lite_svm,
-        HandleInitializeFixedTokenPricePresaleParamsArgs {
-            base_mint: base_mint.pubkey(),
-            quote_mint,
-            q_price: calculate_q_price_from_ui_price(0.01, token_info.decimals, 9),
-            unsold_token_action: UnsoldTokenAction::Burn,
-            owner: user_pubkey,
-            payer: Rc::clone(&user),
-        },
-    );
+    let unsold_token_action = UnsoldTokenAction::Burn;
+    let args = HandleInitializeFixedTokenPricePresaleParamsArgs {
+        base_mint: base_mint.pubkey(),
+        quote_mint,
+        q_price: calculate_q_price_from_ui_price(0.01, token_info.decimals, 9),
+        unsold_token_action,
+        owner: user_pubkey,
+        payer: Rc::clone(&user),
+    };
+    handle_initialize_fixed_token_price_presale_params(lite_svm, args.clone());
 
     let tokenomic = create_tokenomic_args(token_info.decimals);
 
     let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
 
-    let locked_vesting_params = create_locked_vesting_args();
+    let locked_vesting_params = create_locked_vesting_args(Some(unsold_token_action));
 
     handle_initialize_presale(
         lite_svm,
@@ -288,7 +303,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
     let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::Fcfs.into();
 
-    let locked_vesting_params = create_locked_vesting_args();
+    let locked_vesting_params = create_locked_vesting_args(None);
 
     handle_initialize_presale(
         lite_svm,

@@ -8,6 +8,7 @@ use anchor_lang::*;
 use litesvm::LiteSVM;
 use presale::UnsoldTokenAction;
 
+#[derive(Clone)]
 pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,

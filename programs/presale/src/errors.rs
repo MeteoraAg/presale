@@ -74,4 +74,7 @@ pub enum PresaleError {
 
     #[msg("Escrow is not empty")]
     EscrowNotEmpty,
+
+    #[msg("Invalid unsold token action")]
+    InvalidUnsoldTokenAction,
 }

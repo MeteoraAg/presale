@@ -115,5 +115,9 @@ pub mod presale {
         instructions::handle_close_escrow(ctx)
     }
 
+    pub fn creator_claim(ctx: Context<CreatorClaimCtx>) -> Result<()> {
+        instructions::handle_creator_claim(ctx)
+    }
+
     // TODO: vesting refresh ix
 }

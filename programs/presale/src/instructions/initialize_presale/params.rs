@@ -166,6 +166,12 @@ pub struct LockedVestingArgs {
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
     pub vest_duration: u64,
+    /// Lock duration until creator can claim the token
+    pub creator_lock_duration: u64,
+    /// Vesting duration until creator can claim the token
+    pub creator_vest_duration: u64,
+    /// Whether unsold token will be locked or transferred to creator or burnt
+    pub lock_unsold_token: u8,
 }
 
 impl LockedVestingArgs {
@@ -180,6 +186,18 @@ impl LockedVestingArgs {
             total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
             PresaleError::InvalidLockVestingInfo
         );
+
+        let total_duration = self
+            .creator_lock_duration
+            .checked_add(self.creator_vest_duration)
+            .unwrap();
+
+        require!(
+            total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
+            PresaleError::InvalidLockVestingInfo
+        );
+
+        Bool::try_from(self.lock_unsold_token).unwrap();
 
         Ok(())
     }

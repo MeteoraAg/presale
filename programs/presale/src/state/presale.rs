@@ -35,6 +35,14 @@ pub enum UnsoldTokenAction {
     Burn,
 }
 
+#[derive(FromPrimitive, IntoPrimitive)]
+#[repr(u8)]
+pub enum Bool {
+    #[num_enum(default)]
+    False,
+    True,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PresaleProgress {
     /// Presale has not started yet
@@ -91,25 +99,47 @@ pub struct Presale {
     pub lock_duration: u64,
     /// Duration of bought token will be vested until claimable
     pub vest_duration: u64,
+    /// When the lock starts
+    pub lock_start_time: u64,
     /// When the lock ends
     pub lock_end_time: u64,
+    /// When the vesting starts
+    pub vesting_start_time: u64,
     /// When the vesting ends
     pub vesting_end_time: u64,
     /// Total claimed base token. For statistic purpose only
     pub total_claimed_token: u64,
     /// Maximum deposit fee that can be charged to the buyer
     pub max_deposit_fee: u64,
+    /// Total refunded quote token. For statistic purpose only
     pub total_refunded_quote_token: u64,
+    /// Lock duration for creator's base token supply
+    pub creator_lock_duration: u64,
+    /// Vest duration for creator's base token supply
+    pub creator_vest_duration: u64,
+    /// When the creator's lock starts
+    pub creator_lock_start_time: u64,
+    /// When the creator's lock ends
+    pub creator_lock_end_time: u64,
+    /// When the creator's vesting starts
+    pub creator_vest_start_time: u64,
+    /// When the creator's vesting ends
+    pub creator_vest_end_time: u64,
+    /// Total claimed creator's base token supply
+    pub total_creator_claimed_token: u64,
+    pub padding1: u64,
     /// Deposit fee in basis points (bps). 100 bps = 1%
     pub deposit_fee_bps: u16,
     /// Whitelist mode
     pub whitelist_mode: u8,
     /// Presale mode
     pub presale_mode: u8,
+    /// Lock or transfer / burn unsold token
+    pub lock_unsold_token: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
     pub fixed_price_presale_unsold_token_action: u8,
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding1: [u8; 10],
+    pub padding2: [u8; 9],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
 }
@@ -128,7 +158,7 @@ pub struct PresaleInitializeArgs {
 }
 
 impl Presale {
-    pub fn initialize(&mut self, args: PresaleInitializeArgs) {
+    pub fn initialize(&mut self, args: PresaleInitializeArgs) -> Result<()> {
         let PresaleInitializeArgs {
             tokenomic_params,
             presale_params,
@@ -157,15 +187,6 @@ impl Presale {
         self.presale_supply = presale_pool_supply;
         self.creator_supply = creator_supply;
 
-        if let Some(LockedVestingArgs {
-            lock_duration,
-            vest_duration,
-        }) = locked_vesting_params
-        {
-            self.lock_duration = lock_duration;
-            self.vest_duration = vest_duration;
-        }
-
         let PresaleArgs {
             presale_maximum_cap,
             presale_minimum_cap,
@@ -191,6 +212,23 @@ impl Presale {
         self.deposit_fee_bps = deposit_fee_bps;
         self.created_at = current_timestamp;
 
+        if let Some(LockedVestingArgs {
+            lock_duration,
+            vest_duration,
+            creator_lock_duration,
+            creator_vest_duration,
+            lock_unsold_token,
+        }) = locked_vesting_params
+        {
+            self.lock_unsold_token = lock_unsold_token;
+            self.lock_duration = lock_duration;
+            self.vest_duration = vest_duration;
+            self.creator_lock_duration = creator_lock_duration;
+            self.creator_vest_duration = creator_vest_duration;
+
+            self.recalculate_presale_timing(self.presale_end_time)?;
+        }
+
         if let Some(FixedPricePresaleExtraArgs {
             unsold_token_action,
             q_price,
@@ -200,12 +238,14 @@ impl Presale {
             self.fixed_price_presale_unsold_token_action = unsold_token_action;
             self.fixed_price_presale_q_price = q_price;
         }
+
+        Ok(())
     }
 
     pub fn get_presale_progress(&self, current_timestamp: u64) -> PresaleProgress {
         if current_timestamp < self.presale_start_time {
             return PresaleProgress::NotStarted;
-        } else if current_timestamp < self.presale_end_time {
+        } else if current_timestamp <= self.presale_end_time {
             return PresaleProgress::Ongoing;
         }
 
@@ -234,17 +274,35 @@ impl Presale {
         Ok(())
     }
 
-    pub fn advance_progress_to_completed(&mut self, current_timestamp: u64) -> Result<()> {
-        self.presale_end_time = current_timestamp;
+    fn recalculate_presale_timing(&mut self, new_presale_end_time: u64) -> Result<()> {
+        self.presale_end_time = new_presale_end_time;
 
+        self.lock_start_time = self.presale_end_time.checked_add(1).unwrap();
         self.lock_end_time = self
-            .presale_end_time
+            .lock_start_time
             .checked_add(self.lock_duration)
             .unwrap();
 
+        self.vesting_start_time = self.lock_end_time.checked_add(1).unwrap();
         self.vesting_end_time = self.lock_end_time.checked_add(self.vest_duration).unwrap();
 
+        self.creator_lock_start_time = self.presale_end_time.checked_add(1).unwrap();
+        self.creator_lock_end_time = self
+            .presale_end_time
+            .checked_add(self.creator_lock_duration)
+            .unwrap();
+
+        self.creator_vest_start_time = self.creator_lock_end_time.checked_add(1).unwrap();
+        self.creator_vest_end_time = self
+            .creator_lock_end_time
+            .checked_add(self.creator_vest_duration)
+            .unwrap();
+
         Ok(())
+    }
+
+    pub fn advance_progress_to_completed(&mut self, current_timestamp: u64) -> Result<()> {
+        self.recalculate_presale_timing(current_timestamp)
     }
 
     pub fn get_remaining_deposit_quota(&self) -> Result<u64> {
@@ -290,7 +348,7 @@ impl Presale {
     }
 
     pub fn in_locking_period(&self, current_timestamp: u64) -> bool {
-        current_timestamp >= self.presale_end_time && current_timestamp < self.lock_end_time
+        current_timestamp >= self.lock_start_time && current_timestamp <= self.lock_end_time
     }
 
     pub fn claim(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
@@ -301,6 +359,15 @@ impl Presale {
     pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
         self.total_refunded_quote_token =
             self.total_refunded_quote_token.checked_add(amount).unwrap();
+
+        Ok(())
+    }
+
+    pub fn update_total_creator_claimed_token(&mut self, amount: u64) -> Result<()> {
+        self.total_creator_claimed_token = self
+            .total_creator_claimed_token
+            .checked_add(amount)
+            .unwrap();
 
         Ok(())
     }
@@ -352,5 +419,19 @@ impl Presale {
         };
 
         Ok(refund_amount)
+    }
+
+    pub fn should_lock_unsold_token(&self) -> bool {
+        self.lock_unsold_token != 0
+    }
+
+    pub fn get_total_unsold_token(
+        &self,
+        presale_handler: &Box<dyn PresaleModeHandler>,
+    ) -> Result<u64> {
+        let total_token_sold = presale_handler.get_total_base_token_sold(self)?;
+        let total_token_unsold = self.presale_supply.checked_sub(total_token_sold).unwrap();
+
+        Ok(total_token_unsold)
     }
 }

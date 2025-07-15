@@ -1,10 +1,8 @@
+use crate::*;
 use anchor_spl::{
     token_2022::{burn, transfer_checked, Burn, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
-
-// Burn or refund unsold token to the creator
-use crate::*;
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -57,13 +55,12 @@ pub fn handle_perform_unsold_base_token_action(
     let presale_mode = PresaleMode::from(presale.presale_mode);
     let presale_handler = get_presale_mode_handler(presale_mode);
 
-    let total_token_sold = presale_handler.get_total_base_token_sold(&presale)?;
-    let total_token_unsold = presale
-        .presale_supply
-        .checked_sub(total_token_sold)
-        .unwrap();
+    let total_token_unsold = presale.get_total_unsold_token(&presale_handler)?;
+    require!(
+        total_token_unsold > 0 && !presale.should_lock_unsold_token(),
+        PresaleError::NoUnsoldTokens
+    );
 
-    require!(total_token_unsold > 0, PresaleError::NoUnsoldTokens);
     presale.set_fixed_price_presale_unsold_token_action_performed()?;
 
     // 3. Burn or refund the unsold base tokens to the creator
@@ -85,20 +82,24 @@ pub fn handle_perform_unsold_base_token_action(
             ),
             total_token_unsold,
         )?,
-        UnsoldTokenAction::Refund => transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.base_token_vault.to_account_info(),
-                    to: ctx.accounts.creator_base_token.to_account_info(),
-                    authority: ctx.accounts.presale_authority.to_account_info(),
-                    mint: ctx.accounts.base_mint.to_account_info(),
-                },
-                signer_seeds,
-            ),
-            total_token_unsold,
-            ctx.accounts.base_mint.decimals,
-        )?,
+        UnsoldTokenAction::Refund => {
+            if !presale.should_lock_unsold_token() {
+                transfer_checked(
+                    CpiContext::new_with_signer(
+                        ctx.accounts.token_program.to_account_info(),
+                        TransferChecked {
+                            from: ctx.accounts.base_token_vault.to_account_info(),
+                            to: ctx.accounts.creator_base_token.to_account_info(),
+                            authority: ctx.accounts.presale_authority.to_account_info(),
+                            mint: ctx.accounts.base_mint.to_account_info(),
+                        },
+                        signer_seeds,
+                    ),
+                    total_token_unsold,
+                    ctx.accounts.base_mint.decimals,
+                )?
+            }
+        }
     }
 
     emit_cpi!(EvtPerformUnsoldBaseTokenAction {

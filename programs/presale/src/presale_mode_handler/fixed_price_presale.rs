@@ -65,6 +65,17 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             presale_params.presale_maximum_cap,
         )?;
 
+        if let Some(lock) = locked_vesting_params {
+            if lock.lock_unsold_token == 1 {
+                let unsold_token_action =
+                    UnsoldTokenAction::from(presale_extra_param.unsold_token_action);
+                require!(
+                    unsold_token_action == UnsoldTokenAction::Refund,
+                    PresaleError::InvalidUnsoldTokenAction
+                );
+            }
+        }
+
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
 
         let InitializePresaleVaultAccountPubkeys {
@@ -87,7 +98,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             quote_token_vault,
             owner,
             current_timestamp,
-        });
+        })?;
 
         Ok(())
     }
@@ -167,27 +178,17 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         current_timestamp: u64,
     ) -> Result<u128> {
         // 1. Calculate how many base tokens were bought
-        let total_sold_token = u128::from(self.get_total_base_token_sold(presale)?);
+        let total_sold_token = self.get_total_base_token_sold(presale)?;
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
-        let vesting_start_time = presale.lock_end_time;
-        let elapsed_seconds = current_timestamp
-            .checked_sub(vesting_start_time)
-            .unwrap()
-            .min(presale.vest_duration);
-
-        let dripped_total_sold_token = total_sold_token
-            .checked_mul(elapsed_seconds.into())
-            .unwrap()
-            .checked_div(presale.vest_duration.into())
-            .unwrap();
-
-        // 3. Calculate how many base tokens can be claimed by the escrow
-        let dripped_escrow_bought_token = dripped_total_sold_token
-            .checked_mul(escrow.total_deposit.into())
-            .unwrap()
-            .checked_div(presale.total_deposit.into())
-            .unwrap();
+        let dripped_escrow_bought_token = calculate_dripped_amount_for_user(
+            presale.lock_end_time,
+            presale.vest_duration,
+            current_timestamp,
+            total_sold_token,
+            escrow.total_deposit,
+            presale.total_deposit,
+        )?;
 
         Ok(dripped_escrow_bought_token)
     }

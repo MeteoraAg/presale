@@ -6,7 +6,7 @@ use presale::Presale;
 use std::rc::Rc;
 
 #[test]
-fn test_unsold_token_action() {
+fn test_creator_claim() {
     let SetupContext { mut lite_svm, user } = SetupContext::initialize();
 
     let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
@@ -15,39 +15,33 @@ fn test_unsold_token_action() {
             Rc::clone(&user),
         );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let amount = presale_state.presale_minimum_cap;
+
     handle_escrow_deposit(
         &mut lite_svm,
         HandleEscrowDepositArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
-            max_amount: 1_000_000,
+            max_amount: amount,
         },
     );
 
-    let presale_state: Presale = lite_svm
-        .get_deserialized_zc_account(&presale_pubkey)
-        .unwrap();
+    warp_time(&mut lite_svm, presale_state.creator_vest_start_time + 1);
 
-    warp_time(&mut lite_svm, presale_state.vesting_start_time);
-
-    handle_escrow_claim(
+    handle_creator_claim_base_token(
         &mut lite_svm,
-        HandleEscrowClaimArgs {
+        HandleCreatorClaimBaseTokenArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
         },
     );
 
-    handle_perform_unsold_token_action(
-        &mut lite_svm,
-        HandlePerformUnsoldTokenActionArgs {
-            presale: presale_pubkey,
-            creator: Rc::clone(&user),
-        },
-    );
-
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
-    println!("Presale state after withdraw: {:?}", presale_state);
+    println!("Presale state after claim: {:?}", presale_state);
 }

@@ -65,23 +65,23 @@ pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
     let claim_amount =
         presale_handler.process_claim(&mut presale, &mut escrow, current_timestamp)?;
 
-    require!(claim_amount > 0, PresaleError::ZeroTokenAmount);
-
-    let signer_seeds = &[&presale_authority_seeds!()[..]];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.base_token_vault.to_account_info(),
-                to: ctx.accounts.owner_base_token.to_account_info(),
-                mint: ctx.accounts.base_mint.to_account_info(),
-                authority: ctx.accounts.presale_authority.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        claim_amount,
-        ctx.accounts.base_mint.decimals,
-    )?;
+    if claim_amount > 0 {
+        let signer_seeds = &[&presale_authority_seeds!()[..]];
+        transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                TransferChecked {
+                    from: ctx.accounts.base_token_vault.to_account_info(),
+                    to: ctx.accounts.owner_base_token.to_account_info(),
+                    mint: ctx.accounts.base_mint.to_account_info(),
+                    authority: ctx.accounts.presale_authority.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            claim_amount,
+            ctx.accounts.base_mint.decimals,
+        )?;
+    }
 
     let excluded_fee_claim_amount =
         calculate_transfer_fee_excluded_amount(&ctx.accounts.base_mint, claim_amount)?.amount;
