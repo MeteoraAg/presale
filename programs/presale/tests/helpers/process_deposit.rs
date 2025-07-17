@@ -75,5 +75,5 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
     };
     instructions.push(instruction);
 
-    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]);
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
 }

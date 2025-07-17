@@ -88,5 +88,6 @@ pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreator
         ],
         Some(&owner_pubkey),
         &[&owner],
-    );
+    )
+    .unwrap();
 }

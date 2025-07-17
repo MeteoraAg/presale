@@ -57,5 +57,5 @@ pub fn handle_create_permissionless_escrow(
     let instruction = create_permissionless_escrow_ix(lite_svm, args.clone()).unwrap();
     let HandleCreatePermissionlessEscrowArgs { owner, .. } = args;
     let owner_pubkey = owner.pubkey();
-    process_transaction(lite_svm, &[instruction], Some(&owner_pubkey), &[&owner]);
+    process_transaction(lite_svm, &[instruction], Some(&owner_pubkey), &[&owner]).unwrap();
 }

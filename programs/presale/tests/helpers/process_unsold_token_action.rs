@@ -72,5 +72,6 @@ pub fn handle_perform_unsold_token_action(
         &[create_creator_base_token_ix, ix],
         Some(&creator_pubkey),
         &[&creator],
-    );
+    )
+    .unwrap();
 }

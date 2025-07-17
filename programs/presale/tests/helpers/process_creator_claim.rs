@@ -73,5 +73,6 @@ pub fn handle_creator_claim_base_token(
         &[create_owner_base_token_ix, ix],
         Some(&owner_pubkey),
         &[&owner],
-    );
+    )
+    .unwrap();
 }

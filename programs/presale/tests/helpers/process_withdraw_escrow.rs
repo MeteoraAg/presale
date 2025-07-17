@@ -61,5 +61,5 @@ pub fn handle_escrow_withdraw(lite_svm: &mut LiteSVM, args: HandleEscrowWithdraw
     };
     instructions.push(instruction);
 
-    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]);
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
 }

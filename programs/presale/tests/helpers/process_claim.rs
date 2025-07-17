@@ -88,5 +88,6 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
         &[create_owner_base_token_ix, refresh_ix, claim_ix],
         Some(&owner_pubkey),
         &[&owner],
-    );
+    )
+    .unwrap();
 }

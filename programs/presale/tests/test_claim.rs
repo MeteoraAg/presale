@@ -1,4 +1,4 @@
-mod helpers;
+pub mod helpers;
 
 use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,

@@ -4,6 +4,32 @@ This is an Anchor-based smart contract for conducting a token presale on the Sol
 
 The program does not manage the deployment of liquidity for the raised capital. This means the presale creator must manually withdraw the raised funds and deploy the liquidity themselves.
 
+## Presale configuration
+
+| Name                      | Description                                                                                                                   | Remark                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| decimals                  | token decimals                                                                                                                |                                                                                                           |
+| name                      | token name                                                                                                                    |                                                                                                           |
+| symbol                    | token symbol                                                                                                                  |                                                                                                           |
+| uri                       | token metadata uri                                                                                                            |                                                                                                           |
+| presale_pool_supply       | token supply for sale                                                                                                         |                                                                                                           |
+| creator_supply            | token supply for the creator                                                                                                  | Will be removed since creator will be depositing token into the presale instead of the program minting it |
+| presale_maximum_cap       | Maximum presale fund to raise                                                                                                 |                                                                                                           |
+| presale_minimum_cap       | Minimum presale fund to raise. If the fund raised is below presale_minimum_cap threshold, the presale is considered as failed |
+| buyer_minimum_deposit_cap | Minimum deposit amount from buyer                                                                                             |                                                                                                           |
+| buyer_maximum_deposit_cap | Maximum deposit amount from buyer                                                                                             |                                                                                                           |
+| presale_start_time        | When does the presale start                                                                                                   |                                                                                                           |
+| presale_end_time          | When does the presale end                                                                                                     |                                                                                                           |
+| max_deposit_fee           | Maximum deposit fee charged                                                                                                   | Will be removed                                                                                           |
+| deposit_fee_bps           | Deposit fee bps charged for buyer                                                                                             | Will be removed                                                                                           |
+| whitelist_mode            | Permissionless, permissioned with authority, and permissioned with merkle tree                                                |                                                                                                           |
+| presale_mode              | Fixed price, FCFS, and prorata                                                                                                |                                                                                                           |
+| lock_duration             | Buyer token lock duration                                                                                                     |                                                                                                           |
+| vest_duration             | Buyer token vest duration                                                                                                     |                                                                                                           |
+| creator_lock_duration     | Creator token lock duration                                                                                                   | Will be removed                                                                                           |
+| vest_duration             | Creator token vest duration                                                                                                   | Will be removed                                                                                           |
+| lock_unsold_token         | Does unsold token for the creator will be locked                                                                              | Will be removed                                                                                           |
+
 ## Modes
 
 ### Fixed Price

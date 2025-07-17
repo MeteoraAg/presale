@@ -1,4 +1,4 @@
-mod helpers;
+pub mod helpers;
 
 use anchor_client::solana_sdk::signer::Signer;
 use helpers::*;

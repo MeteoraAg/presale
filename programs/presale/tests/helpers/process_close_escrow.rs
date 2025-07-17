@@ -36,5 +36,5 @@ pub fn handle_close_escrow(lite_svm: &mut LiteSVM, args: HandleCloseEscrowArgs) 
         data: ix_data,
     };
 
-    process_transaction(lite_svm, &[ix], Some(&owner_pubkey), &[&owner]);
+    process_transaction(lite_svm, &[ix], Some(&owner_pubkey), &[&owner]).unwrap();
 }

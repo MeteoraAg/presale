@@ -60,7 +60,7 @@ pub fn handle_initialize_fixed_token_price_presale_params(
         data: ix_data,
     };
 
-    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]);
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
 }
 
 pub struct HandleCloseFixedTokenPricePresaleParamsArgs {
@@ -98,5 +98,5 @@ pub fn handle_close_fixed_token_price_presale_params(
         data: ix_data,
     };
 
-    process_transaction(lite_svm, &[instruction], Some(&owner.pubkey()), &[&owner]);
+    process_transaction(lite_svm, &[instruction], Some(&owner.pubkey()), &[&owner]).unwrap();
 }

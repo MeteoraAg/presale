@@ -9,7 +9,7 @@ use anchor_lang::{
     prelude::{AccountMeta, Clock},
     *,
 };
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use mpl_token_metadata::accounts::Metadata;
 use presale::{
     LockedVestingArgs, PresaleArgs, PresaleMode, TokenInfoArgs, TokenomicArgs, UnsoldTokenAction,
@@ -74,6 +74,7 @@ fn create_locked_vesting_args(unsold_token_action: Option<UnsoldTokenAction>) ->
     }
 }
 
+#[derive(Clone)]
 pub struct HandleInitializePresaleArgs {
     pub base_mint: Rc<Keypair>,
     pub quote_mint: Pubkey,
@@ -86,7 +87,7 @@ pub struct HandleInitializePresaleArgs {
     pub remaining_accounts: Vec<AccountMeta>,
 }
 
-pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
+pub fn create_initialize_presale_ix(args: HandleInitializePresaleArgs) -> Vec<Instruction> {
     let HandleInitializePresaleArgs {
         base_mint,
         quote_mint,
@@ -137,18 +138,46 @@ pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializeP
 
     accounts.extend_from_slice(&remaining_accounts);
 
-    let instruction = Instruction {
+    let init_presale_ix = Instruction {
         program_id: presale::ID,
         accounts,
         data: ix_data,
     };
 
+    vec![init_presale_ix]
+}
+
+pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
+    let HandleInitializePresaleArgs {
+        base_mint, payer, ..
+    } = args.clone();
+
+    let instructions = create_initialize_presale_ix(args);
     process_transaction(
         lite_svm,
-        &[instruction],
+        &instructions,
         Some(&payer.pubkey()),
         &[&payer, &base_mint],
-    );
+    )
+    .unwrap();
+}
+
+pub fn handle_initialize_presale_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializePresaleArgs,
+) -> FailedTransactionMetadata {
+    let HandleInitializePresaleArgs {
+        base_mint, payer, ..
+    } = args.clone();
+
+    let instructions = create_initialize_presale_ix(args);
+    process_transaction(
+        lite_svm,
+        &instructions,
+        Some(&payer.pubkey()),
+        &[&payer, &base_mint],
+    )
+    .unwrap_err()
 }
 
 pub fn handle_initialize_presale_token_2022(
@@ -213,7 +242,8 @@ pub fn handle_initialize_presale_token_2022(
         &[instruction],
         Some(&payer.pubkey()),
         &[&payer, &base_mint],
-    );
+    )
+    .unwrap();
 }
 
 pub struct HandleCreatePredefinedPermissionlessFixedPricePresaleResponse {

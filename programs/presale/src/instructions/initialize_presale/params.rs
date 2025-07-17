@@ -109,11 +109,6 @@ impl PresaleArgs {
         );
 
         require!(
-            self.buyer_minimum_deposit_cap > 0,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        require!(
             self.presale_start_time >= current_timestamp,
             PresaleError::InvalidPresaleInfo
         );

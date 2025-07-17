@@ -58,7 +58,8 @@ pub fn create_token_2022(args: CreateToken2022Args) {
         &[create_account_ix, initialize_mint_ix],
         Some(&payer_pubkey),
         &[&payer, &mint],
-    );
+    )
+    .unwrap();
 }
 
 pub struct MintToken2022ToArgs<'a> {
@@ -108,5 +109,6 @@ fn mint_token2022_to(args: MintToken2022ToArgs) {
         &[create_ata_ix, mint_ix],
         Some(&mint_authority_pubkey),
         &[&mint_authority],
-    );
+    )
+    .unwrap();
 }

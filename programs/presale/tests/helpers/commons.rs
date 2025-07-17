@@ -17,6 +17,7 @@ use anchor_spl::associated_token::{
     get_associated_token_address, get_associated_token_address_with_program_id,
 };
 use anchor_spl::token::spl_token::state::AccountState;
+use litesvm::types::{FailedTransactionMetadata, SimulatedTransactionInfo};
 use litesvm::LiteSVM;
 
 const NATIVE_SOL_MINT: Pubkey =
@@ -135,7 +136,8 @@ fn create_user_token_account_when_is_mint_account(
             &[create_ata_ix, transfer_ix, sync_native_ix],
             Some(&user),
             &[&user_keypair],
-        );
+        )
+        .unwrap();
 
         return;
     }
@@ -207,19 +209,17 @@ pub fn process_transaction(
     instructions: &[Instruction],
     payer: Option<&Pubkey>,
     signers: &[&Keypair],
-) {
+) -> Result<SimulatedTransactionInfo, FailedTransactionMetadata> {
     let blockhash = lite_svm.latest_blockhash();
     let msg = Message::new_with_blockhash(instructions, payer, &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
 
-    let sim_res = lite_svm.simulate_transaction(tx.clone());
-    // println!("Simulation result: {:?}", sim_res);
-    if let Err(e) = sim_res {
-        panic!("Simulation failed: {:?}", e);
-    }
+    let sim_res = lite_svm.simulate_transaction(tx.clone())?;
 
     lite_svm.send_transaction(tx).unwrap();
     lite_svm.expire_blockhash();
+
+    Ok(sim_res)
 }
 
 pub fn transfer_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, destination: Pubkey, amount: u64) {
@@ -229,7 +229,7 @@ pub fn transfer_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, destination: Pubk
         amount,
     );
 
-    process_transaction(lite_svm, &[transfer_ix], Some(&user.pubkey()), &[&user]);
+    process_transaction(lite_svm, &[transfer_ix], Some(&user.pubkey()), &[&user]).unwrap();
 }
 
 pub fn wrap_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, amount: u64) {
@@ -252,7 +252,7 @@ pub fn wrap_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, amount: u64) {
             .unwrap();
     instructions.push(sync_native_ix);
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]);
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 }
 
 pub fn warp_time(lite_svm: &mut LiteSVM, timestamp: u64) {

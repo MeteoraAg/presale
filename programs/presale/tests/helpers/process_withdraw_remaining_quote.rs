@@ -59,5 +59,5 @@ pub fn handle_escrow_withdraw_remaining_quote(
     };
     instructions.push(instruction);
 
-    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]);
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
 }
