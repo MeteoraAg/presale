@@ -40,8 +40,8 @@ pub use process_unsold_token_action::*;
 mod process_close_escrow;
 pub use process_close_escrow::*;
 
-mod process_creator_claim;
-pub use process_creator_claim::*;
-
 mod process_creator_withdraw;
 pub use process_creator_withdraw::*;
+
+mod token;
+pub use token::*;

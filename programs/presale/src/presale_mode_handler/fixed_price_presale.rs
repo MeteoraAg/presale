@@ -1,9 +1,15 @@
 use crate::PresaleModeHandler;
 use crate::*;
 
-fn ensure_token_buyable(q_price: u128, amount: u64) -> Result<()> {
+fn calculate_token_bought(q_price: u128, amount: u64) -> Result<u128> {
     let q_amount = u128::from(amount).checked_shl(64).unwrap();
-    let max_token_bought = q_amount.checked_div(q_price).unwrap();
+    let token_bought = q_amount.checked_div(q_price).unwrap();
+
+    Ok(token_bought)
+}
+
+fn ensure_token_buyable(q_price: u128, amount: u64) -> Result<()> {
+    let max_token_bought = calculate_token_bought(q_price, amount)?;
 
     require!(max_token_bought > 0, PresaleError::ZeroTokenAmount);
     require!(
@@ -18,8 +24,7 @@ fn ensure_enough_presale_supply(
     presale_supply: u64,
     maximum_cap: u64,
 ) -> Result<()> {
-    let q_amount = u128::from(maximum_cap).checked_shl(64).unwrap();
-    let max_presale_supply_bought = q_amount.checked_div(q_price).unwrap();
+    let max_presale_supply_bought = calculate_token_bought(q_price, maximum_cap)?;
 
     require!(
         max_presale_supply_bought <= u128::from(presale_supply),
@@ -31,24 +36,33 @@ fn ensure_enough_presale_supply(
 pub struct FixedPricePresaleHandler;
 
 impl PresaleModeHandler for FixedPricePresaleHandler {
-    fn initialize_presale<'c: 'info, 'info>(
+    fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
+        presale_pubkey: Pubkey,
         presale: &mut Presale,
         tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        remaining_accounts: &'c [AccountInfo<'info>],
+        remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
         // 1. Get extra params about fixed price presale mode
-        let presale_extra_param_ai = remaining_accounts
-            .first()
-            .ok_or_else(|| error!(PresaleError::MissingPresaleExtraParams))?;
+        let slice = remaining_accounts.split_first();
+
+        let Some((presale_extra_param_ai, remaining_account_slice)) = slice else {
+            return Err(PresaleError::MissingPresaleExtraParams.into());
+        };
+
+        *remaining_accounts = remaining_account_slice;
 
         let presale_extra_param_al =
             AccountLoader::<FixedPricePresaleExtraArgs>::try_from(presale_extra_param_ai)?;
 
         let presale_extra_param = presale_extra_param_al.load()?;
+        require!(
+            presale_extra_param.presale == presale_pubkey,
+            PresaleError::MissingPresaleExtraParams
+        );
 
         // 2. Validate fixed price presale parameters
         ensure_token_buyable(
@@ -62,17 +76,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             presale_params.presale_maximum_cap,
         )?;
 
-        if let Some(lock) = locked_vesting_params {
-            if lock.lock_unsold_token == 1 {
-                let unsold_token_action =
-                    UnsoldTokenAction::from(presale_extra_param.unsold_token_action);
-                require!(
-                    unsold_token_action == UnsoldTokenAction::Refund,
-                    PresaleError::InvalidUnsoldTokenAction
-                );
-            }
-        }
-
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
 
         let InitializePresaleVaultAccountPubkeys {
@@ -81,6 +84,9 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             base_token_vault,
             quote_token_vault,
             owner,
+            base,
+            base_token_program,
+            quote_token_program,
         } = mint_pubkeys;
 
         // 3. Create presale vault
@@ -95,6 +101,9 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             quote_token_vault,
             owner,
             current_timestamp,
+            base,
+            base_token_program,
+            quote_token_program,
         })?;
 
         Ok(())
@@ -133,7 +142,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         presale: &mut Presale,
         escrow: &mut Escrow,
         amount: u64,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         presale.withdraw(escrow, amount)
     }
 

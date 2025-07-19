@@ -3,6 +3,9 @@ use crate::*;
 #[error_code]
 #[derive(PartialEq)]
 pub enum PresaleError {
+    #[msg("Invalid metaplex metadata")]
+    InvalidMintMetadata,
+
     #[msg("Invalid token info")]
     InvalidTokenInfo,
 
@@ -14,6 +17,9 @@ pub enum PresaleError {
 
     #[msg("Invalid quote mint")]
     InvalidQuoteMint,
+
+    #[msg("Invalid base mint")]
+    InvalidBaseMint,
 
     #[msg("Invalid lock vesting info")]
     InvalidLockVestingInfo,
@@ -83,4 +89,25 @@ pub enum PresaleError {
 
     #[msg("Escrow not refreshed")]
     EscrowNotRefreshed,
+
+    #[msg("Undetermined error")]
+    UndeterminedError,
+
+    #[msg("Invalid token vault")]
+    InvalidTokenVault,
+
+    #[msg("Invalid remaining account slice")]
+    InvalidRemainingAccountSlice,
+
+    #[msg("Duplicated remaining account types")]
+    DuplicatedRemainingAccountTypes,
+
+    #[msg("Missing remaining account for transfer hook")]
+    MissingRemainingAccountForTransferHook,
+
+    #[msg("No transfer hook program")]
+    NoTransferHookProgram,
+
+    #[msg("Invalid operator")]
+    InvalidOperator,
 }

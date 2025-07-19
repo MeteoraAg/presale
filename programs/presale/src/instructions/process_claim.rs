@@ -1,4 +1,5 @@
 use anchor_spl::{
+    memo::Memo,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -38,9 +39,14 @@ pub struct ClaimCtx<'info> {
     pub owner: Signer<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
+
+    pub memo_program: Program<'info, Memo>,
 }
 
-pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
+pub fn handle_claim<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, ClaimCtx<'info>>,
+    remaining_accounts_info: RemainingAccountsInfo,
+) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
@@ -69,20 +75,24 @@ pub fn handle_claim(ctx: Context<ClaimCtx>) -> Result<()> {
     if pending_claim_token > 0 {
         presale.claim(&mut escrow)?;
 
-        let signer_seeds = &[&presale_authority_seeds!()[..]];
-        transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.base_token_vault.to_account_info(),
-                    to: ctx.accounts.owner_base_token.to_account_info(),
-                    mint: ctx.accounts.base_mint.to_account_info(),
-                    authority: ctx.accounts.presale_authority.to_account_info(),
-                },
-                signer_seeds,
-            ),
+        let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
+            &mut &ctx.remaining_accounts[..],
+            &remaining_accounts_info.slices,
+            &[AccountsType::TransferHookBase],
+        )?;
+
+        transfer_from_presale_to_user(
+            &ctx.accounts.presale_authority,
+            &ctx.accounts.base_mint,
+            &ctx.accounts.base_token_vault,
+            &ctx.accounts.owner_base_token,
+            &ctx.accounts.token_program,
             pending_claim_token,
-            ctx.accounts.base_mint.decimals,
+            Some(MemoTransferContext {
+                memo_program: &ctx.accounts.memo_program,
+                memo: PRESALE_MEMO,
+            }),
+            transfer_hook_accounts.transfer_hook_base,
         )?;
     }
 

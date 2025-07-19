@@ -19,10 +19,18 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(
 ) {
     let user_pubkey = user.pubkey();
 
+    let token_decimals = 6;
     let base_mint = Rc::new(Keypair::new());
 
+    create_token(CreateTokenArgs {
+        lite_svm,
+        mint: Rc::clone(&base_mint),
+        mint_authority: Rc::clone(&user),
+        payer: Rc::clone(&user),
+        decimals: token_decimals,
+    });
+
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-    let token_info = create_token_info();
 
     let price = 0.01;
     handle_initialize_fixed_token_price_presale_params(
@@ -30,23 +38,22 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint.pubkey(),
             quote_mint,
-            q_price: calculate_q_price_from_ui_price(price, token_info.decimals, 9),
+            q_price: calculate_q_price_from_ui_price(price, 6, 9),
             unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 
     let presale_pool_supply = 1_000_000;
 
     let tokenomic = TokenomicArgs {
-        presale_pool_supply: presale_pool_supply * 10u64.pow(token_info.decimals.into()),
-        creator_supply: 0,
+        presale_pool_supply: presale_pool_supply * 10u64.pow(6),
     };
 
     let token_per_sol = 1.0 / price;
-    let base_lamport_per_sol_lamport =
-        token_per_sol * 10.0f64.powi(i32::from(token_info.decimals) - 9);
+    let base_lamport_per_sol_lamport = token_per_sol * 10.0f64.powi(i32::from(6) - 9);
 
     // How many base lamport per sol lamport?
     println!(
@@ -72,17 +79,14 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(
         presale_mode: PresaleMode::FixedPrice.into(),
         buyer_maximum_deposit_cap,
         buyer_minimum_deposit_cap: 0,
-        max_deposit_fee: 0,
-        deposit_fee_bps: 0,
         whitelist_mode: WhitelistMode::Permissionless.into(),
     };
 
     let err = handle_initialize_presale_err(
         lite_svm,
         HandleInitializePresaleArgs {
-            base_mint: Rc::clone(&base_mint),
+            base_mint: base_mint.pubkey(),
             quote_mint,
-            token_info,
             tokenomic,
             presale_params,
             locked_vesting_params: None,
@@ -92,6 +96,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(
                 pubkey: derive_fixed_price_presale_args(
                     &base_mint.pubkey(),
                     &quote_mint,
+                    &user_pubkey,
                     &presale::ID,
                 ),
                 is_signer: false,
@@ -119,26 +124,34 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     let SetupContext { mut lite_svm, user } = SetupContext::initialize();
     let user_pubkey = user.pubkey();
 
+    let token_decimals = 6;
     let base_mint = Rc::new(Keypair::new());
 
+    create_token(CreateTokenArgs {
+        lite_svm: &mut lite_svm,
+        mint: Rc::clone(&base_mint),
+        mint_authority: Rc::clone(&user),
+        payer: Rc::clone(&user),
+        decimals: token_decimals,
+    });
+
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-    let token_info = create_token_info();
 
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint.pubkey(),
             quote_mint,
-            q_price: calculate_q_price_from_ui_price(0.01, token_info.decimals, 9),
+            q_price: calculate_q_price_from_ui_price(0.01, 6, 9),
             unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 
     let tokenomic = TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(token_info.decimals.into()), // 1 million
-        creator_supply: 0,
+        presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
     };
 
     let clock: Clock = lite_svm.get_sysvar();
@@ -151,17 +164,14 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_mode: PresaleMode::FixedPrice.into(),
         buyer_maximum_deposit_cap: u64::MAX,
         buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
-        max_deposit_fee: 0,
-        deposit_fee_bps: 0,
         whitelist_mode: WhitelistMode::Permissionless.into(),
     };
 
     handle_initialize_presale(
         &mut lite_svm,
         HandleInitializePresaleArgs {
-            base_mint: Rc::clone(&base_mint),
+            base_mint: base_mint.pubkey(),
             quote_mint,
-            token_info,
             tokenomic,
             presale_params,
             locked_vesting_params: None,
@@ -171,6 +181,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
                 pubkey: derive_fixed_price_presale_args(
                     &base_mint.pubkey(),
                     &quote_mint,
+                    &user_pubkey,
                     &presale::ID,
                 ),
                 is_signer: false,
@@ -185,7 +196,17 @@ fn test_initialize_presale_vault_token_2022() {
     let SetupContext { mut lite_svm, user } = SetupContext::initialize();
     let user_pubkey = user.pubkey();
 
+    let token_decimals = 6;
     let base_mint = Rc::new(Keypair::new());
+
+    create_token(CreateTokenArgs {
+        lite_svm: &mut lite_svm,
+        mint: Rc::clone(&base_mint),
+        mint_authority: Rc::clone(&user),
+        payer: Rc::clone(&user),
+        decimals: token_decimals,
+    });
+
     let quote_mint = Rc::new(Keypair::new());
 
     let base_mint_pubkey = base_mint.pubkey();
@@ -199,23 +220,21 @@ fn test_initialize_presale_vault_token_2022() {
         decimals: 9,
     });
 
-    let token_info = create_token_info();
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
-            q_price: calculate_q_price_from_ui_price(0.01, token_info.decimals, 9),
+            q_price: calculate_q_price_from_ui_price(0.01, 6, 9),
             unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 
     let tokenomic = TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(token_info.decimals.into()), // 1 million
-        creator_supply: 0,
+        presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
     };
 
     let clock: Clock = lite_svm.get_sysvar();
@@ -228,17 +247,14 @@ fn test_initialize_presale_vault_token_2022() {
         presale_mode: PresaleMode::FixedPrice.into(),
         buyer_maximum_deposit_cap: u64::MAX,
         buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
-        max_deposit_fee: 0,
-        deposit_fee_bps: 0,
         whitelist_mode: WhitelistMode::Permissionless.into(),
     };
 
-    handle_initialize_presale_token_2022(
+    handle_initialize_presale(
         &mut lite_svm,
         HandleInitializePresaleArgs {
-            base_mint: Rc::clone(&base_mint),
+            base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
-            token_info,
             tokenomic,
             presale_params,
             locked_vesting_params: None,
@@ -248,6 +264,7 @@ fn test_initialize_presale_vault_token_2022() {
                 pubkey: derive_fixed_price_presale_args(
                     &base_mint_pubkey,
                     &quote_mint_pubkey,
+                    &user_pubkey,
                     &presale::ID,
                 ),
                 is_signer: false,

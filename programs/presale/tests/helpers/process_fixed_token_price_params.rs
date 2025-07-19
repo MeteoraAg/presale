@@ -16,6 +16,7 @@ pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
     pub unsold_token_action: UnsoldTokenAction,
     pub owner: Pubkey,
     pub payer: Rc<Keypair>,
+    pub base: Pubkey,
 }
 
 pub fn handle_initialize_fixed_token_price_presale_params(
@@ -29,12 +30,13 @@ pub fn handle_initialize_fixed_token_price_presale_params(
         unsold_token_action,
         owner,
         payer,
+        base,
     } = args;
 
-    let presale = derive_presale(&base_mint, &quote_mint, &presale::ID);
+    let presale = derive_presale(&base_mint, &quote_mint, &base, &presale::ID);
     let event_authority = derive_event_authority(&presale::ID);
     let fixed_price_presale_params =
-        derive_fixed_price_presale_args(&base_mint, &quote_mint, &presale::ID);
+        derive_fixed_price_presale_args(&base_mint, &quote_mint, &base, &presale::ID);
 
     let ix_data = presale::instruction::InitializeFixedPricePresaleArgs {
         params: presale::InitializeFixedPricePresaleExtraArgs {
@@ -67,6 +69,7 @@ pub struct HandleCloseFixedTokenPricePresaleParamsArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub owner: Rc<Keypair>,
+    pub base: Pubkey,
 }
 
 pub fn handle_close_fixed_token_price_presale_params(
@@ -77,11 +80,12 @@ pub fn handle_close_fixed_token_price_presale_params(
         base_mint,
         quote_mint,
         owner,
+        base,
     } = args;
 
     let event_authority = derive_event_authority(&presale::ID);
     let fixed_price_presale_args =
-        derive_fixed_price_presale_args(&base_mint, &quote_mint, &presale::ID);
+        derive_fixed_price_presale_args(&base_mint, &quote_mint, &base, &presale::ID);
 
     let ix_data = presale::instruction::CloseFixedPricePresaleArgs {}.data();
 

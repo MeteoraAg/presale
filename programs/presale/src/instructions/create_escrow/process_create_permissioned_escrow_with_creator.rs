@@ -27,7 +27,9 @@ pub struct CreatePermissionedEscrowWithCreatorCtx<'info> {
     /// CHECK: Owner of the escrow account
     pub owner: UncheckedAccount<'info>,
 
-    pub creator: Signer<'info>,
+    pub operator: AccountLoader<'info, Operator>,
+
+    pub operator_owner: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -47,11 +49,13 @@ pub fn handle_create_permissioned_escrow_with_creator(
         PresaleError::InvalidPresaleWhitelistMode
     );
 
-    // 2. Ensure creator is the owner of the presale
-    require!(
-        ctx.accounts.creator.key() == presale.owner,
-        PresaleError::InvalidCreatorAccount
-    );
+    // 2. Ensure rightful operator is provided
+    let operator = ctx.accounts.operator.load()?;
+    ensure_operator_belongs_to_presale_creator(
+        &presale,
+        &operator,
+        &ctx.accounts.operator_owner.key(),
+    )?;
 
     process_create_escrow(HandleCreateEscrowArgs {
         presale: &mut presale,
@@ -67,5 +71,22 @@ pub fn handle_create_permissioned_escrow_with_creator(
         total_escrow_count: presale.total_escrow,
     });
 
+    Ok(())
+}
+
+fn ensure_operator_belongs_to_presale_creator(
+    presale: &Presale,
+    operator: &Operator,
+    operator_owner: &Pubkey,
+) -> Result<()> {
+    require!(
+        operator.owner == *operator_owner,
+        PresaleError::InvalidOperator
+    );
+
+    require!(
+        operator.creator == presale.owner,
+        PresaleError::InvalidOperator
+    );
     Ok(())
 }

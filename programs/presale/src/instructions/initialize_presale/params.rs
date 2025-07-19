@@ -2,14 +2,12 @@ use crate::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InitializePresaleArgs {
-    pub token_info: TokenInfoArgs,
     pub tokenomic: TokenomicArgs,
     pub presale_params: PresaleArgs,
     pub locked_vesting_params: Option<LockedVestingArgs>,
 }
 impl InitializePresaleArgs {
     pub fn validate(&self) -> Result<()> {
-        self.token_info.validate()?;
         self.tokenomic.validate()?;
 
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
@@ -22,34 +20,9 @@ impl InitializePresaleArgs {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct TokenInfoArgs {
-    pub decimals: u8,
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-}
-
-impl TokenInfoArgs {
-    pub fn validate(&self) -> Result<()> {
-        // When it's 12 decimal place, max supply is 18_446_744.073_709_551_615. ~18k
-        require!(
-            self.decimals > 0 && self.decimals <= 12,
-            PresaleError::InvalidTokenInfo
-        );
-        require!(self.name.len() > 0, PresaleError::InvalidTokenInfo);
-        require!(self.symbol.len() > 0, PresaleError::InvalidTokenInfo);
-        require!(self.uri.len() > 0, PresaleError::InvalidTokenInfo);
-
-        Ok(())
-    }
-}
-
-// presale_pool_supply + creator_supply = supply
 #[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone)]
 pub struct TokenomicArgs {
     pub presale_pool_supply: u64,
-    pub creator_supply: u64,
 }
 
 impl TokenomicArgs {
@@ -58,21 +31,8 @@ impl TokenomicArgs {
             self.presale_pool_supply > 0,
             PresaleError::InvalidTokenSupply
         );
-        let total_supply = u128::from(self.presale_pool_supply)
-            .checked_add(self.creator_supply.into())
-            .unwrap();
-        require!(
-            total_supply <= u128::from(u64::MAX),
-            PresaleError::InvalidTokenSupply
-        );
-        Ok(())
-    }
 
-    pub fn get_total_supply(&self) -> Result<u64> {
-        Ok(self
-            .presale_pool_supply
-            .checked_add(self.creator_supply)
-            .unwrap())
+        Ok(())
     }
 }
 
@@ -85,8 +45,6 @@ pub struct PresaleArgs {
     pub buyer_maximum_deposit_cap: u64,
     pub presale_start_time: u64,
     pub presale_end_time: u64,
-    pub max_deposit_fee: u64,
-    pub deposit_fee_bps: u16,
     pub whitelist_mode: u8,
     pub presale_mode: u8,
 }
@@ -105,6 +63,16 @@ impl PresaleArgs {
 
         require!(
             self.buyer_maximum_deposit_cap >= self.buyer_minimum_deposit_cap,
+            PresaleError::InvalidPresaleInfo
+        );
+
+        require!(
+            self.buyer_maximum_deposit_cap > 0,
+            PresaleError::InvalidPresaleInfo
+        );
+
+        require!(
+            self.buyer_maximum_deposit_cap <= self.presale_maximum_cap,
             PresaleError::InvalidPresaleInfo
         );
 
@@ -138,15 +106,6 @@ impl PresaleArgs {
             PresaleError::InvalidPresaleInfo
         );
 
-        require!(
-            u64::from(self.deposit_fee_bps) <= MAX_DEPOSIT_FEE_BPS,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        if self.deposit_fee_bps > 0 {
-            require!(self.max_deposit_fee > 0, PresaleError::InvalidPresaleInfo);
-        }
-
         WhitelistMode::try_from(self.whitelist_mode).unwrap();
         PresaleMode::try_from(self.presale_mode).unwrap();
 
@@ -161,38 +120,15 @@ pub struct LockedVestingArgs {
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
     pub vest_duration: u64,
-    /// Lock duration until creator can claim the token
-    pub creator_lock_duration: u64,
-    /// Vesting duration until creator can claim the token
-    pub creator_vest_duration: u64,
-    /// Whether unsold token will be locked or transferred to creator or burnt
-    pub lock_unsold_token: u8,
 }
 
 impl LockedVestingArgs {
     pub fn validate(&self) -> Result<()> {
-        require!(
-            self.vest_duration >= self.lock_duration,
-            PresaleError::InvalidLockVestingInfo
-        );
-
         let total_duration = self.vest_duration.checked_add(self.lock_duration).unwrap();
         require!(
             total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
             PresaleError::InvalidLockVestingInfo
         );
-
-        let total_duration = self
-            .creator_lock_duration
-            .checked_add(self.creator_vest_duration)
-            .unwrap();
-
-        require!(
-            total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
-            PresaleError::InvalidLockVestingInfo
-        );
-
-        Bool::try_from(self.lock_unsold_token).unwrap();
 
         Ok(())
     }

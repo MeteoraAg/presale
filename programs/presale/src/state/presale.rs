@@ -35,16 +35,10 @@ pub enum UnsoldTokenAction {
     Burn,
 }
 
-#[derive(FromPrimitive, IntoPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive, IntoPrimitive)]
 #[repr(u8)]
-pub enum Bool {
-    #[num_enum(default)]
-    False,
-    True,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PresaleProgress {
+    #[num_enum(default)]
     /// Presale has not started yet
     NotStarted,
     /// Presale is ongoing
@@ -53,6 +47,16 @@ pub enum PresaleProgress {
     Completed,
     /// Presale is ended but not enough capital raised
     Failed,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[repr(u8)]
+pub enum TokenProgramFlags {
+    /// SPL Token program
+    #[num_enum(default)]
+    SplToken,
+    /// SPL Token 2022 program
+    SplToken2022,
 }
 
 #[account(zero_copy)]
@@ -68,7 +72,8 @@ pub struct Presale {
     pub base_token_vault: Pubkey,
     /// Quote token vault
     pub quote_token_vault: Pubkey,
-    pub padding0: [u8; 32],
+    /// Base key
+    pub base: Pubkey,
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -83,16 +88,10 @@ pub struct Presale {
     pub buyer_maximum_deposit_cap: u64,
     /// Total base token supply that can be bought by presale participants
     pub presale_supply: u64,
-    /// Total base token supply reserved for the creator
-    pub creator_supply: u64,
     /// Total deposited quote token
     pub total_deposit: u64,
-    /// Total deposit fee collected
-    pub total_deposit_fee: u64,
     /// Total number of depositors. For statistic purpose only
     pub total_escrow: u64,
-    /// Total escrow fee collected. For statistic purpose only
-    pub total_escrow_fee: u64,
     /// When was the presale created
     pub created_at: u64,
     /// Duration of bought token will be locked until claimable
@@ -109,39 +108,23 @@ pub struct Presale {
     pub vesting_end_time: u64,
     /// Total claimed base token. For statistic purpose only
     pub total_claimed_token: u64,
-    /// Maximum deposit fee that can be charged to the buyer
-    pub max_deposit_fee: u64,
     /// Total refunded quote token. For statistic purpose only
     pub total_refunded_quote_token: u64,
-    /// Lock duration for creator's base token supply
-    pub creator_lock_duration: u64,
-    /// Vest duration for creator's base token supply
-    pub creator_vest_duration: u64,
-    /// When the creator's lock starts
-    pub creator_lock_start_time: u64,
-    /// When the creator's lock ends
-    pub creator_lock_end_time: u64,
-    /// When the creator's vesting starts
-    pub creator_vest_start_time: u64,
-    /// When the creator's vesting ends
-    pub creator_vest_end_time: u64,
-    /// Total claimed creator's base token supply
-    pub total_creator_claimed_token: u64,
-    pub padding1: u64,
-    /// Deposit fee in basis points (bps). 100 bps = 1%
-    pub deposit_fee_bps: u16,
+    pub padding0: u64,
     /// Whitelist mode
     pub whitelist_mode: u8,
     /// Presale mode
     pub presale_mode: u8,
-    /// Lock or transfer / burn unsold token
-    pub lock_unsold_token: u8,
     /// Determine whether creator withdrawn the raised capital
     pub has_creator_withdrawn: u8,
+    /// Base token program flag
+    pub base_token_program_flag: u8,
+    /// Quote token program flag
+    pub quote_token_program_flag: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
     pub fixed_price_presale_unsold_token_action: u8,
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding2: [u8; 8],
+    pub padding2: [u8; 17],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
 }
@@ -157,6 +140,19 @@ pub struct PresaleInitializeArgs {
     pub quote_token_vault: Pubkey,
     pub owner: Pubkey,
     pub current_timestamp: u64,
+    pub base: Pubkey,
+    pub base_token_program: Pubkey,
+    pub quote_token_program: Pubkey,
+}
+
+fn token_program_to_flag(program: Pubkey) -> TokenProgramFlags {
+    if program == anchor_spl::token::ID {
+        TokenProgramFlags::SplToken
+    } else if program == anchor_spl::token_2022::ID {
+        TokenProgramFlags::SplToken2022
+    } else {
+        unreachable!("Unsupported token program: {}", program);
+    }
 }
 
 impl Presale {
@@ -172,6 +168,9 @@ impl Presale {
             quote_token_vault,
             owner,
             current_timestamp,
+            base,
+            base_token_program,
+            quote_token_program,
         } = args;
 
         self.owner = owner;
@@ -179,15 +178,15 @@ impl Presale {
         self.quote_mint = quote_mint;
         self.base_token_vault = base_token_vault;
         self.quote_token_vault = quote_token_vault;
-        // self.total_escrow = 0;
+        self.base = base;
+        self.base_token_program_flag = token_program_to_flag(base_token_program).into();
+        self.quote_token_program_flag = token_program_to_flag(quote_token_program).into();
 
         let TokenomicArgs {
             presale_pool_supply,
-            creator_supply,
         } = tokenomic_params;
 
         self.presale_supply = presale_pool_supply;
-        self.creator_supply = creator_supply;
 
         let PresaleArgs {
             presale_maximum_cap,
@@ -196,8 +195,6 @@ impl Presale {
             buyer_maximum_deposit_cap,
             presale_start_time,
             presale_end_time,
-            max_deposit_fee,
-            deposit_fee_bps,
             whitelist_mode,
             presale_mode,
         } = presale_params;
@@ -210,23 +207,15 @@ impl Presale {
         self.presale_end_time = presale_end_time;
         self.whitelist_mode = whitelist_mode;
         self.presale_mode = presale_mode;
-        self.max_deposit_fee = max_deposit_fee;
-        self.deposit_fee_bps = deposit_fee_bps;
         self.created_at = current_timestamp;
 
         if let Some(LockedVestingArgs {
             lock_duration,
             vest_duration,
-            creator_lock_duration,
-            creator_vest_duration,
-            lock_unsold_token,
         }) = locked_vesting_params
         {
-            self.lock_unsold_token = lock_unsold_token;
             self.lock_duration = lock_duration;
             self.vest_duration = vest_duration;
-            self.creator_lock_duration = creator_lock_duration;
-            self.creator_vest_duration = creator_vest_duration;
 
             self.recalculate_presale_timing(self.presale_end_time)?;
         }
@@ -288,18 +277,6 @@ impl Presale {
         self.vesting_start_time = self.lock_end_time.checked_add(1).unwrap();
         self.vesting_end_time = self.lock_end_time.checked_add(self.vest_duration).unwrap();
 
-        self.creator_lock_start_time = self.presale_end_time.checked_add(1).unwrap();
-        self.creator_lock_end_time = self
-            .presale_end_time
-            .checked_add(self.creator_lock_duration)
-            .unwrap();
-
-        self.creator_vest_start_time = self.creator_lock_end_time.checked_add(1).unwrap();
-        self.creator_vest_end_time = self
-            .creator_lock_end_time
-            .checked_add(self.creator_vest_duration)
-            .unwrap();
-
         Ok(())
     }
 
@@ -316,37 +293,16 @@ impl Presale {
         Ok(remaining_quota)
     }
 
-    pub fn deposit(
-        &mut self,
-        escrow: &mut Escrow,
-        deposit_fee_included_amount: u64,
-        deposit_fee: u64,
-    ) -> Result<()> {
-        let deposit_fee_excluded_amount = deposit_fee_included_amount
-            .checked_sub(deposit_fee)
-            .unwrap();
-
-        self.total_deposit = self
-            .total_deposit
-            .checked_add(deposit_fee_excluded_amount)
-            .unwrap();
-        self.total_deposit_fee = self.total_deposit_fee.checked_add(deposit_fee).unwrap();
-
-        escrow.deposit(deposit_fee_excluded_amount, deposit_fee)?;
+    pub fn deposit(&mut self, escrow: &mut Escrow, deposit_amount: u64) -> Result<()> {
+        self.total_deposit = self.total_deposit.checked_add(deposit_amount).unwrap();
+        escrow.deposit(deposit_amount)?;
         Ok(())
     }
 
-    pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<u64> {
-        let fee_amount_withdrawn = escrow.withdraw(amount)?;
-
+    pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
+        escrow.withdraw(amount)?;
         self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
-        self.total_deposit_fee = self
-            .total_deposit_fee
-            .checked_sub(fee_amount_withdrawn)
-            .unwrap();
-
-        let total_withdrawn_amount = amount.checked_add(fee_amount_withdrawn).unwrap();
-        Ok(total_withdrawn_amount)
+        Ok(())
     }
 
     pub fn in_locking_period(&self, current_timestamp: u64) -> bool {
@@ -356,15 +312,6 @@ impl Presale {
     pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
         self.total_refunded_quote_token =
             self.total_refunded_quote_token.checked_add(amount).unwrap();
-
-        Ok(())
-    }
-
-    pub fn update_total_creator_claimed_token(&mut self, amount: u64) -> Result<()> {
-        self.total_creator_claimed_token = self
-            .total_creator_claimed_token
-            .checked_add(amount)
-            .unwrap();
 
         Ok(())
     }
@@ -400,7 +347,7 @@ impl Presale {
 
         let refund_amount = if presale_progress == PresaleProgress::Failed {
             // 2. Failed presale will refund all tokens to the owner
-            escrow.get_total_deposit_amount_with_fees()?
+            escrow.total_deposit
         } else {
             // 3. Prorata will refund only the overflow (unused) quote token
             let remaining_quote_amount =
@@ -416,10 +363,6 @@ impl Presale {
         };
 
         Ok(refund_amount)
-    }
-
-    pub fn should_lock_unsold_token(&self) -> bool {
-        self.lock_unsold_token != 0
     }
 
     pub fn get_total_unsold_token(&self, presale_handler: &dyn PresaleModeHandler) -> Result<u64> {

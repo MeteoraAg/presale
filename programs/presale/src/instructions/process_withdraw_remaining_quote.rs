@@ -1,6 +1,6 @@
 use crate::*;
 use anchor_spl::{
-    token_2022::{transfer_checked, TransferChecked},
+    memo::Memo,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
@@ -37,9 +37,14 @@ pub struct WithdrawRemainingQuoteCtx<'info> {
     pub owner: Signer<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
+
+    pub memo_program: Program<'info, Memo>,
 }
 
-pub fn handle_withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) -> Result<()> {
+pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, WithdrawRemainingQuoteCtx<'info>>,
+    remaining_accounts_info: RemainingAccountsInfo,
+) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
@@ -61,20 +66,24 @@ pub fn handle_withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) 
     presale.update_total_refunded_quote_token(amount_to_refund)?;
     escrow.update_remaining_quote_withdrawn()?;
 
-    let signer_seeds = &[&presale_authority_seeds!()[..]];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.quote_token_vault.to_account_info(),
-                to: ctx.accounts.owner_quote_token.to_account_info(),
-                mint: ctx.accounts.quote_mint.to_account_info(),
-                authority: ctx.accounts.presale_authority.to_account_info(),
-            },
-            signer_seeds,
-        ),
+    let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
+        &mut &ctx.remaining_accounts[..],
+        &remaining_accounts_info.slices,
+        &[AccountsType::TransferHookQuote],
+    )?;
+
+    transfer_from_presale_to_user(
+        &ctx.accounts.presale_authority,
+        &ctx.accounts.quote_mint,
+        &ctx.accounts.quote_token_vault,
+        &ctx.accounts.owner_quote_token,
+        &ctx.accounts.token_program,
         amount_to_refund,
-        ctx.accounts.quote_mint.decimals,
+        Some(MemoTransferContext {
+            memo_program: &ctx.accounts.memo_program,
+            memo: PRESALE_MEMO,
+        }),
+        transfer_hook_accounts.transfer_hook_quote,
     )?;
 
     let exclude_fee_amount_to_refund =

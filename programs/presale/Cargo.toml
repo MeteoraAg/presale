@@ -18,14 +18,18 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [dependencies]
 anchor-lang = { version = "0.31.1", features = ["init-if-needed", "event-cpi"] }
-anchor-spl = "0.31.1"
+anchor-spl = { version = "0.31.1", features = ["memo"] }
 const-crypto = "0.3.0"
 mpl-token-metadata = "5.1.0"
 num_enum = "0.7.4"
 static_assertions = "1.1.0"
 bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
+spl-transfer-hook-interface = "0.10.0"
 
 [dev-dependencies]
 litesvm = "0.6.1"
 anchor-client = "0.31.1"
 serde_json = "1.0.140"
+spl-discriminator = "0.4.1"
+spl-type-length-value = "0.8.0"
+spl-tlv-account-resolution = "0.10.0"

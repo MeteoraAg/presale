@@ -46,6 +46,7 @@ pub fn handle_initialize_fixed_price_presale_args(
         unsold_token_action,
         q_price,
         ctx.accounts.owner.key(),
+        presale,
     )?;
 
     emit_cpi!(EvtFixedPricePresaleArgsCreate {

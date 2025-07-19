@@ -1,10 +1,3 @@
-use anchor_lang::prelude::*;
-
-// Supported quote mints
-const SOL: Pubkey = Pubkey::from_str_const("So11111111111111111111111111111111111111112");
-const USDC: Pubkey = Pubkey::from_str_const("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-pub const QUOTE_MINTS: [Pubkey; 2] = [SOL, USDC];
-
 // Minimum time window for presale
 pub const MINIMUM_PRESALE_DURATION: u64 = 60; // 1 minutes
 
@@ -24,9 +17,5 @@ pub mod seeds {
     pub const FIXED_PRICE_PRESALE_PARAM_PREFIX: &[u8] = b"fixed_price_param";
     pub const ESCROW_PREFIX: &[u8] = b"escrow";
     pub const MERKLE_ROOT_CONFIG_PREFIX: &[u8] = b"merkle_root";
+    pub const OPERATOR_PREFIX: &[u8] = b"operator";
 }
-
-pub const MAX_DEPOSIT_FEE_BPS: u64 = 1000; // 10%
-
-// DLMM seems doing well with 5%, let's follow 5% too?
-pub const PROTOCOL_FEE_BPS: u64 = 500; // 5%

@@ -15,17 +15,21 @@ pub struct InitializePresaleVaultAccountPubkeys {
     pub base_token_vault: Pubkey,
     pub quote_token_vault: Pubkey,
     pub owner: Pubkey,
+    pub base: Pubkey,
+    pub base_token_program: Pubkey,
+    pub quote_token_program: Pubkey,
 }
 
 pub trait PresaleModeHandler {
-    fn initialize_presale<'c: 'info, 'info>(
+    fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
+        presale_pubkey: Pubkey,
         presale: &mut Presale,
         tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        remaining_accounts: &'c [AccountInfo<'info>],
+        remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()>;
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64>;
     fn end_presale_if_max_cap_reached(
@@ -39,7 +43,7 @@ pub trait PresaleModeHandler {
         presale: &mut Presale,
         escrow: &mut Escrow,
         amount: u64,
-    ) -> Result<u64>;
+    ) -> Result<()>;
     fn update_pending_claim_amount(
         &self,
         presale: &Presale,

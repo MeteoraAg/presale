@@ -4,12 +4,13 @@ use anchor_client::solana_sdk::{
 use anchor_lang::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use litesvm::LiteSVM;
-use presale::Presale;
+use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
 use crate::helpers::{
-    create_permissionless_escrow_ix, derive_escrow, derive_event_authority, process_transaction,
-    LiteSVMExt,
+    create_permissionless_escrow_ix, derive_escrow, derive_event_authority,
+    get_extra_account_metas_for_transfer_hook, process_transaction,
+    token::get_program_id_from_token_flag, LiteSVMExt,
 };
 
 pub struct HandleEscrowDepositArgs {
@@ -54,8 +55,27 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
         &quote_token_program,
     );
 
-    let ix_data = presale::instruction::Deposit { max_amount }.data();
-    let accounts = presale::accounts::DepositCtx {
+    let transfer_hook_account = get_extra_account_metas_for_transfer_hook(
+        &get_program_id_from_token_flag(presale_state.quote_token_program_flag),
+        &payer_quote_token,
+        &presale_state.quote_mint,
+        &presale_state.quote_token_vault,
+        &owner.pubkey(),
+        lite_svm,
+    );
+
+    let ix_data = presale::instruction::Deposit {
+        max_amount,
+        remaining_account_info: RemainingAccountsInfo {
+            slices: vec![RemainingAccountsSlice {
+                accounts_type: AccountsType::TransferHookQuote,
+                length: transfer_hook_account.len() as u8,
+            }],
+        },
+    }
+    .data();
+
+    let mut accounts = presale::accounts::DepositCtx {
         quote_mint: presale_state.quote_mint,
         quote_token_vault: presale_state.quote_token_vault,
         payer_quote_token,
@@ -67,6 +87,8 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
         event_authority: derive_event_authority(&presale::ID),
     }
     .to_account_metas(None);
+
+    accounts.extend(transfer_hook_account);
 
     let instruction = Instruction {
         program_id: presale::ID,

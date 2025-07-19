@@ -109,10 +109,6 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
 }
 
 fn ensure_escrow_no_deposit(escrow: &Escrow) -> Result<()> {
-    require!(
-        escrow.total_deposit == 0 && escrow.deposit_fee == 0,
-        PresaleError::EscrowNotEmpty
-    );
-
+    require!(escrow.total_deposit == 0, PresaleError::EscrowNotEmpty);
     Ok(())
 }

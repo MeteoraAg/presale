@@ -9,3 +9,6 @@ pub use escrow::*;
 
 mod merkle_root_config;
 pub use merkle_root_config::*;
+
+mod operator;
+pub use operator::*;

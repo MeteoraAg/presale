@@ -1,6 +1,7 @@
 use crate::*;
 use anchor_spl::{
-    token_2022::{burn, transfer_checked, Burn, TransferChecked},
+    memo::Memo,
+    token_2022::{burn, Burn},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
@@ -34,10 +35,13 @@ pub struct PerformUnsoldBaseTokenActionCtx<'info> {
     pub creator_base_token: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
+
+    pub memo_program: Program<'info, Memo>,
 }
 
-pub fn handle_perform_unsold_base_token_action(
-    ctx: Context<PerformUnsoldBaseTokenActionCtx>,
+pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, PerformUnsoldBaseTokenActionCtx<'info>>,
+    remaining_accounts_info: RemainingAccountsInfo,
 ) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
 
@@ -56,10 +60,6 @@ pub fn handle_perform_unsold_base_token_action(
     let presale_handler = get_presale_mode_handler(presale_mode);
 
     let total_token_unsold = presale.get_total_unsold_token(presale_handler.as_ref())?;
-    require!(
-        total_token_unsold > 0 && !presale.should_lock_unsold_token(),
-        PresaleError::NoUnsoldTokens
-    );
 
     presale.set_fixed_price_presale_unsold_token_action_performed()?;
 
@@ -83,22 +83,25 @@ pub fn handle_perform_unsold_base_token_action(
             total_token_unsold,
         )?,
         UnsoldTokenAction::Refund => {
-            if !presale.should_lock_unsold_token() {
-                transfer_checked(
-                    CpiContext::new_with_signer(
-                        ctx.accounts.token_program.to_account_info(),
-                        TransferChecked {
-                            from: ctx.accounts.base_token_vault.to_account_info(),
-                            to: ctx.accounts.creator_base_token.to_account_info(),
-                            authority: ctx.accounts.presale_authority.to_account_info(),
-                            mint: ctx.accounts.base_mint.to_account_info(),
-                        },
-                        signer_seeds,
-                    ),
-                    total_token_unsold,
-                    ctx.accounts.base_mint.decimals,
-                )?
-            }
+            let transfer_hook_account = parse_remaining_accounts_for_transfer_hook(
+                &mut &ctx.remaining_accounts[..],
+                &remaining_accounts_info.slices,
+                &[AccountsType::TransferHookBase],
+            )?;
+
+            transfer_from_presale_to_user(
+                &ctx.accounts.presale_authority,
+                &ctx.accounts.base_mint,
+                &ctx.accounts.base_token_vault,
+                &ctx.accounts.creator_base_token,
+                &ctx.accounts.token_program,
+                total_token_unsold,
+                Some(MemoTransferContext {
+                    memo_program: &ctx.accounts.memo_program,
+                    memo: PRESALE_MEMO,
+                }),
+                transfer_hook_account.transfer_hook_base,
+            )?;
         }
     }
 

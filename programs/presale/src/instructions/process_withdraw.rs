@@ -1,5 +1,5 @@
 use anchor_spl::{
-    token_2022::{transfer_checked, TransferChecked},
+    memo::Memo,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
@@ -14,6 +14,7 @@ pub struct WithdrawCtx {
         has_one = quote_mint,
     )]
     pub presale: AccountLoader<'info, Presale>,
+
     #[account(mut)]
     pub quote_token_vault: Box<InterfaceAccount<'info, TokenAccount>>,
     pub quote_mint: Box<InterfaceAccount<'info, Mint>>,
@@ -24,8 +25,9 @@ pub struct WithdrawCtx {
     /// CHECK: The presale authority is the PDA of the presale.
     pub presale_authority: UncheckedAccount<'info>,
 
-    #[account(mut, 
-        has_one = presale, 
+    #[account(
+        mut,
+        has_one = presale,
         has_one = owner
     )]
     pub escrow: AccountLoader<'info, Escrow>,
@@ -35,9 +37,14 @@ pub struct WithdrawCtx {
     pub owner: Signer<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
+    pub memo_program: Program<'info, Memo>,
 }
 
-pub fn handle_withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
+pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, WithdrawCtx<'info>>,
+    amount: u64,
+    remaining_accounts_info: RemainingAccountsInfo,
+) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
@@ -67,27 +74,30 @@ pub fn handle_withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
     );
 
     // 5. Update escrow and presale state
-    let amount_withdrawn =
-        presale_mode_handler.process_withdraw(&mut presale, &mut escrow, amount)?;
+    presale_mode_handler.process_withdraw(&mut presale, &mut escrow, amount)?;
+
+    let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
+        &mut &ctx.remaining_accounts[..],
+        &remaining_accounts_info.slices,
+        &[AccountsType::TransferHookQuote],
+    )?;
+
+    transfer_from_presale_to_user(
+        &ctx.accounts.presale_authority,
+        &ctx.accounts.quote_mint,
+        &ctx.accounts.quote_token_vault,
+        &ctx.accounts.owner_quote_token,
+        &ctx.accounts.token_program,
+        amount,
+        Some(MemoTransferContext {
+            memo_program: &ctx.accounts.memo_program,
+            memo: PRESALE_MEMO,
+        }),
+        transfer_hook_accounts.transfer_hook_quote,
+    )?;
 
     let exclude_transfer_fee_amount_withdrawn =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, amount_withdrawn)?.amount;
-
-    let signer_seeds = &[&presale_authority_seeds!()[..]];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.quote_token_vault.to_account_info(),
-                mint: ctx.accounts.quote_mint.to_account_info(),
-                to: ctx.accounts.owner_quote_token.to_account_info(),
-                authority: ctx.accounts.presale_authority.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        amount_withdrawn,
-        ctx.accounts.quote_mint.decimals,
-    )?;
+        calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, amount)?.amount;
 
     emit_cpi!(EvtWithdraw {
         presale: ctx.accounts.presale.key(),
@@ -95,9 +105,7 @@ pub fn handle_withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
         owner: ctx.accounts.owner.key(),
         withdraw_amount: exclude_transfer_fee_amount_withdrawn,
         escrow_total_deposit_amount: escrow.total_deposit,
-        escrow_total_deposit_fee: escrow.deposit_fee,
         presale_total_deposit_amount: presale.total_deposit,
-        presale_total_deposit_fee: presale.total_deposit_fee
     });
 
     Ok(())

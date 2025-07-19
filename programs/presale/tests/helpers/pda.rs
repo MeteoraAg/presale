@@ -1,9 +1,10 @@
 use anchor_client::solana_sdk::pubkey::Pubkey;
 
-pub fn derive_presale(mint: &Pubkey, quote: &Pubkey, program_id: &Pubkey) -> Pubkey {
+pub fn derive_presale(mint: &Pubkey, quote: &Pubkey, base: &Pubkey, program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[
             presale::seeds::PRESALE_PREFIX.as_ref(),
+            base.as_ref(),
             mint.as_ref(),
             quote.as_ref(),
         ],
@@ -38,9 +39,10 @@ pub fn derive_event_authority(program_id: &Pubkey) -> Pubkey {
 pub fn derive_fixed_price_presale_args(
     mint: &Pubkey,
     quote: &Pubkey,
+    base: &Pubkey,
     program_id: &Pubkey,
 ) -> Pubkey {
-    let presale = derive_presale(mint, quote, program_id);
+    let presale = derive_presale(mint, quote, base, program_id);
     Pubkey::find_program_address(
         &[
             presale::seeds::FIXED_PRICE_PRESALE_PARAM_PREFIX.as_ref(),

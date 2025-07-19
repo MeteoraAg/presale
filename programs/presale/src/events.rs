@@ -26,8 +26,6 @@ pub struct EvtPresaleVaultCreate {
     pub presale_end_time: u64,
     pub presale_maximum_cap: u64,
     pub presale_minimum_cap: u64,
-    pub max_deposit_fee: u64,
-    pub deposit_fee_bps: u16,
 }
 
 #[event]
@@ -52,11 +50,8 @@ pub struct EvtDeposit {
     pub presale: Pubkey,
     pub escrow: Pubkey,
     pub deposit_amount: u64,
-    pub deposit_fee: u64,
     pub escrow_total_deposit_amount: u64,
-    pub escrow_total_deposit_fee: u64,
     pub presale_total_deposit_amount: u64,
-    pub presale_total_deposit_fee: u64,
     pub owner: Pubkey,
 }
 
@@ -66,9 +61,7 @@ pub struct EvtWithdraw {
     pub escrow: Pubkey,
     pub withdraw_amount: u64,
     pub escrow_total_deposit_amount: u64,
-    pub escrow_total_deposit_fee: u64,
     pub presale_total_deposit_amount: u64,
-    pub presale_total_deposit_fee: u64,
     pub owner: Pubkey,
 }
 
@@ -80,14 +73,6 @@ pub struct EvtClaim {
     pub escrow_total_claim_amount: u64,
     pub presale_total_claim_amount: u64,
     pub owner: Pubkey,
-}
-
-#[event]
-pub struct EvtCreatorClaim {
-    pub presale: Pubkey,
-    pub claim_amount: u64,
-    pub creator_total_claimed_amount: u64,
-    pub creator: Pubkey,
 }
 
 #[event]
@@ -117,10 +102,9 @@ pub struct EvtEscrowClose {
 #[event]
 pub struct EvtCreatorWithdraw {
     pub presale: Pubkey,
-    pub creator_withdraw_amount: u64,
-    pub protocol_fee_amount: u64,
-    pub creator_deposit_fee: u64,
+    pub amount: u64,
     pub creator: Pubkey,
+    pub presale_progress: u8,
 }
 
 #[event]
@@ -130,4 +114,11 @@ pub struct EvtEscrowRefresh {
     pub owner: Pubkey,
     pub current_timestamp: u64,
     pub pending_claim_token: u64,
+}
+
+#[event]
+pub struct EvtOperatorCreate {
+    pub creator: Pubkey,
+    pub operator: Pubkey,
+    pub operator_owner: Pubkey,
 }

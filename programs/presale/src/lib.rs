@@ -34,9 +34,6 @@ pub use presale_mode_handler::*;
 
 declare_id!("Ff7Lo7AsVxB4VtJH2Ajm7KLLVaVTGMV1W3ws2o5Eo2UT");
 
-pub const TREASURY_ID: Pubkey =
-    Pubkey::from_str_const("BJQbRiRWhJCyTYZcAuAL3ngDCx3AyFQGKDq8zhiZAKUw");
-
 #[program]
 pub mod presale {
     use super::*;
@@ -57,15 +54,9 @@ pub mod presale {
     pub fn initialize_presale<'a, 'b, 'c: 'info, 'info>(
         ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
         params: InitializePresaleArgs,
+        remaining_account_info: RemainingAccountsInfo,
     ) -> Result<()> {
-        instructions::handle_initialize_token_and_create_presale_vault(ctx, &params)
-    }
-
-    pub fn initialize_presale_token2022<'a, 'b, 'c: 'info, 'info>(
-        ctx: Context<'a, 'b, 'c, 'info, InitializePresaleToken2022Ctx<'info>>,
-        params: InitializePresaleArgs,
-    ) -> Result<()> {
-        instructions::handle_initialize_presale_token2022(ctx, &params)
+        instructions::handle_initialize_presale(ctx, &params, remaining_account_info)
     }
 
     pub fn create_merkle_root_config(
@@ -92,38 +83,60 @@ pub mod presale {
         instructions::handle_create_permissioned_escrow_with_merkle_proof(ctx, proof)
     }
 
-    pub fn deposit(ctx: Context<DepositCtx>, max_amount: u64) -> Result<()> {
-        instructions::handle_deposit(ctx, max_amount)
+    pub fn create_operator(ctx: Context<CreateOperatorCtx>) -> Result<()> {
+        instructions::handle_create_operator(ctx)
     }
 
-    pub fn withdraw(ctx: Context<WithdrawCtx>, amount: u64) -> Result<()> {
-        instructions::handle_withdraw(ctx, amount)
+    pub fn revoke_operator(_ctx: Context<RevokeOperatorCtx>) -> Result<()> {
+        Ok(())
     }
 
-    pub fn claim(ctx: Context<ClaimCtx>) -> Result<()> {
-        instructions::handle_claim(ctx)
-    }
-
-    pub fn withdraw_remaining_quote(ctx: Context<WithdrawRemainingQuoteCtx>) -> Result<()> {
-        instructions::handle_withdraw_remaining_quote(ctx)
-    }
-
-    pub fn perform_unsold_base_token_action(
-        ctx: Context<PerformUnsoldBaseTokenActionCtx>,
+    pub fn deposit<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, DepositCtx<'info>>,
+        max_amount: u64,
+        remaining_account_info: RemainingAccountsInfo,
     ) -> Result<()> {
-        instructions::handle_perform_unsold_base_token_action(ctx)
+        instructions::handle_deposit(ctx, max_amount, remaining_account_info)
+    }
+
+    pub fn withdraw<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, WithdrawCtx<'info>>,
+        amount: u64,
+        remaining_account_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_withdraw(ctx, amount, remaining_account_info)
+    }
+
+    pub fn claim<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, ClaimCtx<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_claim(ctx, remaining_accounts_info)
+    }
+
+    pub fn withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, WithdrawRemainingQuoteCtx<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_withdraw_remaining_quote(ctx, remaining_accounts_info)
+    }
+
+    pub fn perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, PerformUnsoldBaseTokenActionCtx<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_perform_unsold_base_token_action(ctx, remaining_accounts_info)
     }
 
     pub fn close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
         instructions::handle_close_escrow(ctx)
     }
 
-    pub fn creator_claim(ctx: Context<CreatorClaimCtx>) -> Result<()> {
-        instructions::handle_creator_claim(ctx)
-    }
-
-    pub fn creator_withdraw(ctx: Context<CreatorWithdrawCtx>) -> Result<()> {
-        instructions::handle_creator_withdraw(ctx)
+    pub fn creator_withdraw<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, CreatorWithdrawCtx<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_creator_withdraw(ctx, remaining_accounts_info)
     }
 
     pub fn refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {

@@ -12,6 +12,7 @@ use std::rc::Rc;
 
 use crate::helpers::{derive_event_authority, process_transaction, LiteSVMExt};
 
+// TODO: Handle presale progress
 pub struct HandleCreatorWithdrawTokenArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
@@ -46,19 +47,6 @@ pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreator
         &token_program,
     );
 
-    let treasury_quote_token = get_associated_token_address_with_program_id(
-        &presale::TREASURY_ID,
-        &presale_state.quote_mint,
-        &token_program,
-    );
-
-    let create_treasury_quote_token_ix = create_associated_token_account_idempotent(
-        &owner.pubkey(),
-        &presale::TREASURY_ID,
-        &presale_state.quote_mint,
-        &token_program,
-    );
-
     let accounts = presale::accounts::CreatorWithdrawCtx {
         presale,
         owner: owner_pubkey,
@@ -66,9 +54,6 @@ pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreator
         token_program,
         program: presale::ID,
         owner_token: owner_quote_token,
-        protocol_fee_vault: treasury_quote_token,
-        quote_mint: presale_state.quote_mint,
-        quote_token_vault: presale_state.quote_token_vault,
         presale_authority: presale::presale_authority::ID,
     }
     .to_account_metas(None);
@@ -81,11 +66,7 @@ pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreator
 
     process_transaction(
         lite_svm,
-        &[
-            create_owner_quote_token_ix,
-            create_treasury_quote_token_ix,
-            ix,
-        ],
+        &[create_owner_quote_token_ix, ix],
         Some(&owner_pubkey),
         &[&owner],
     )

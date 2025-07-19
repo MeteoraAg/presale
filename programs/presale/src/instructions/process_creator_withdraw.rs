@@ -1,4 +1,7 @@
+use std::collections::BTreeSet;
+
 use anchor_spl::{
+    memo::Memo,
     token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
@@ -10,8 +13,6 @@ use crate::*;
 pub struct CreatorWithdrawCtx<'info> {
     #[account(
         mut,
-        has_one = quote_token_vault,
-        has_one = quote_mint,
         has_one = owner,
     )]
     pub presale: AccountLoader<'info, Presale>,
@@ -23,24 +24,86 @@ pub struct CreatorWithdrawCtx<'info> {
     pub presale_authority: UncheckedAccount<'info>,
 
     #[account(mut)]
-    pub quote_token_vault: InterfaceAccount<'info, TokenAccount>,
-    pub quote_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = quote_mint,
-        associated_token::authority = crate::TREASURY_ID
-    )]
-    pub protocol_fee_vault: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(mut)]
     pub owner_token: InterfaceAccount<'info, TokenAccount>,
     pub owner: Signer<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
+
+    pub memo_program: Program<'info, Memo>,
 }
 
-pub fn handle_creator_withdraw(ctx: Context<CreatorWithdrawCtx>) -> Result<()> {
+#[derive(Accounts)]
+pub struct CreatorWithdrawQuoteCtx<'info> {
+    #[account(mut)]
+    pub quote_token_vault: InterfaceAccount<'info, TokenAccount>,
+    pub quote_mint: InterfaceAccount<'info, Mint>,
+}
+
+impl<'info> CreatorWithdrawQuoteCtx<'info> {
+    pub fn try_accounts_and_validate<'c: 'info>(
+        presale: &Presale,
+        remaining_accounts: &mut &'c [AccountInfo<'info>],
+    ) -> Result<Self> {
+        let accounts = Self::try_accounts(
+            &crate::ID,
+            remaining_accounts,
+            &[],
+            &mut CreatorWithdrawQuoteCtxBumps {},
+            &mut BTreeSet::new(),
+        )?;
+
+        require!(
+            accounts.quote_token_vault.key() == presale.quote_token_vault,
+            PresaleError::InvalidTokenVault
+        );
+
+        require!(
+            accounts.quote_mint.key() == presale.quote_mint,
+            PresaleError::InvalidQuoteMint
+        );
+
+        Ok(accounts)
+    }
+}
+
+#[derive(Accounts)]
+pub struct CreatorWithdrawBaseCtx<'info> {
+    #[account(mut)]
+    pub base_token_vault: InterfaceAccount<'info, TokenAccount>,
+    pub base_mint: InterfaceAccount<'info, Mint>,
+}
+
+impl<'info> CreatorWithdrawBaseCtx<'info> {
+    pub fn try_accounts_and_validate<'c: 'info>(
+        presale: &Presale,
+        remaining_accounts: &mut &'c [AccountInfo<'info>],
+    ) -> Result<Self> {
+        let accounts = Self::try_accounts(
+            &crate::ID,
+            remaining_accounts,
+            &[],
+            &mut CreatorWithdrawBaseCtxBumps {},
+            &mut BTreeSet::new(),
+        )?;
+
+        require!(
+            accounts.base_token_vault.key() == presale.base_token_vault,
+            PresaleError::InvalidTokenVault
+        );
+
+        require!(
+            accounts.base_mint.key() == presale.base_mint,
+            PresaleError::InvalidBaseMint
+        );
+
+        Ok(accounts)
+    }
+}
+
+pub fn handle_creator_withdraw<'a, 'b, 'c: 'info, 'info>(
+    ctx: Context<'a, 'b, 'c, 'info, CreatorWithdrawCtx<'info>>,
+    remaining_accounts_info: RemainingAccountsInfo,
+) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
 
     let current_timestamp = Clock::get()?.unix_timestamp as u64;
@@ -48,8 +111,9 @@ pub fn handle_creator_withdraw(ctx: Context<CreatorWithdrawCtx>) -> Result<()> {
 
     // 1. Ensure presale is completed
     require!(
-        presale_progress == PresaleProgress::Completed,
-        PresaleError::PresaleNotCompleted
+        presale_progress == PresaleProgress::Completed
+            || presale_progress == PresaleProgress::Failed,
+        PresaleError::PresaleNotOpenForWithdraw
     );
 
     // 2. Ensure creator haven't withdrawn yet
@@ -60,53 +124,80 @@ pub fn handle_creator_withdraw(ctx: Context<CreatorWithdrawCtx>) -> Result<()> {
 
     presale.update_creator_withdrawn()?;
 
-    let protocol_charged_deposit_fee =
-        calculate_fee_amount(presale.total_deposit_fee, presale.deposit_fee_bps)?;
-    let creator_deposit_fee = presale
-        .total_deposit_fee
-        .checked_sub(protocol_charged_deposit_fee)
-        .unwrap();
-    let creator_withdraw_amount = presale
-        .total_deposit
-        .checked_add(creator_deposit_fee)
-        .unwrap();
+    let mut remaining_account_slice = &ctx.remaining_accounts[..];
 
-    let signer_seeds = &[&presale_authority_seeds!()[..]];
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.quote_token_vault.to_account_info(),
-                to: ctx.accounts.owner_token.to_account_info(),
-                mint: ctx.accounts.quote_mint.to_account_info(),
-                authority: ctx.accounts.presale_authority.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        creator_withdraw_amount,
-        ctx.accounts.quote_mint.decimals,
+    let (amount, from, mint, valid_accounts_type_list) = match presale_progress {
+        PresaleProgress::Completed => {
+            // 3. Presale is completed, withdraw quote token
+            let CreatorWithdrawQuoteCtx {
+                quote_mint,
+                quote_token_vault,
+            } = CreatorWithdrawQuoteCtx::try_accounts_and_validate(
+                &presale,
+                &mut remaining_account_slice,
+            )?;
+
+            (
+                presale.total_deposit,
+                quote_token_vault,
+                quote_mint,
+                [AccountsType::TransferHookQuote],
+            )
+        }
+        PresaleProgress::Failed => {
+            // 4. Presale failed, withdraw base token
+            let CreatorWithdrawBaseCtx {
+                base_mint,
+                base_token_vault,
+            } = CreatorWithdrawBaseCtx::try_accounts_and_validate(
+                &presale,
+                &mut remaining_account_slice,
+            )?;
+
+            (
+                presale.presale_supply,
+                base_token_vault,
+                base_mint,
+                [AccountsType::TransferHookBase],
+            )
+        }
+        _ => {
+            return Err(PresaleError::UndeterminedError.into());
+        }
+    };
+
+    let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
+        &mut remaining_account_slice,
+        &remaining_accounts_info.slices,
+        &valid_accounts_type_list,
     )?;
 
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            TransferChecked {
-                from: ctx.accounts.quote_token_vault.to_account_info(),
-                to: ctx.accounts.protocol_fee_vault.to_account_info(),
-                mint: ctx.accounts.quote_mint.to_account_info(),
-                authority: ctx.accounts.presale_authority.to_account_info(),
-            },
-            signer_seeds,
-        ),
-        protocol_charged_deposit_fee,
-        ctx.accounts.quote_mint.decimals,
+    let transfer_hook_accounts = if presale_progress == PresaleProgress::Completed {
+        transfer_hook_accounts.transfer_hook_quote
+    } else {
+        transfer_hook_accounts.transfer_hook_base
+    };
+
+    transfer_from_presale_to_user(
+        &ctx.accounts.presale_authority,
+        &mint,
+        &from,
+        &ctx.accounts.owner_token,
+        &ctx.accounts.token_program,
+        amount,
+        Some(MemoTransferContext {
+            memo_program: &ctx.accounts.memo_program,
+            memo: PRESALE_MEMO,
+        }),
+        transfer_hook_accounts,
     )?;
+
+    let exclude_fee_amount = calculate_transfer_fee_excluded_amount(&mint, amount)?.amount;
 
     emit_cpi!(EvtCreatorWithdraw {
         presale: ctx.accounts.presale.key(),
-        creator_withdraw_amount,
-        protocol_fee_amount: protocol_charged_deposit_fee,
-        creator_deposit_fee,
+        amount: exclude_fee_amount,
+        presale_progress: presale_progress.into(),
         creator: ctx.accounts.owner.key(),
     });
 

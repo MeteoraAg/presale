@@ -7,6 +7,7 @@ pub struct FixedPricePresaleExtraArgs {
     pub padding0: [u8; 15],
     pub q_price: u128,
     pub owner: Pubkey,
+    pub presale: Pubkey,
     pub padding1: [u128; 4],
 }
 
@@ -23,11 +24,13 @@ impl FixedPricePresaleExtraArgs {
         unsold_token_action: u8,
         q_price: u128,
         owner: Pubkey,
+        presale: Pubkey,
     ) -> Result<()> {
         Self::validate(unsold_token_action, q_price).unwrap();
         self.unsold_token_action = unsold_token_action;
         self.q_price = q_price;
         self.owner = owner;
+        self.presale = presale;
 
         Ok(())
     }

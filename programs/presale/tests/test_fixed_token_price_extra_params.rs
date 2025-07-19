@@ -28,11 +28,12 @@ pub fn test_initialize_fixed_token_price_extra_params() {
             unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 
     let fixed_price_args_pubkey =
-        derive_fixed_price_presale_args(&base_mint_pubkey, &quote_mint, &presale::ID);
+        derive_fixed_price_presale_args(&base_mint_pubkey, &quote_mint, &user_pubkey, &presale::ID);
     let fixed_price_args: FixedPricePresaleExtraArgs = lite_svm
         .get_deserialized_zc_account(&fixed_price_args_pubkey)
         .unwrap();
@@ -72,6 +73,7 @@ pub fn test_close_fixed_token_price_extra_params() {
             unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 
@@ -81,6 +83,7 @@ pub fn test_close_fixed_token_price_extra_params() {
             base_mint: base_mint_pubkey,
             quote_mint,
             owner: Rc::clone(&user),
+            base: user_pubkey,
         },
     );
 }

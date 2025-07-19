@@ -11,8 +11,6 @@ pub struct Escrow {
     pub owner: Pubkey,
     // Total deposited quote token
     pub total_deposit: u64,
-    // Deposit fee
-    pub deposit_fee: u64,
     // Total claimed base token
     pub total_claimed_token: u64,
     // Determine whether user withdrawn remaining quote token
@@ -49,35 +47,14 @@ impl Escrow {
         Ok(remaining_quota)
     }
 
-    pub fn deposit(&mut self, deposit_fee_excluded_amount: u64, deposit_fee: u64) -> Result<()> {
-        self.total_deposit = self
-            .total_deposit
-            .checked_add(deposit_fee_excluded_amount)
-            .unwrap();
-        self.deposit_fee = self.deposit_fee.checked_add(deposit_fee).unwrap();
-
+    pub fn deposit(&mut self, deposit_amount: u64) -> Result<()> {
+        self.total_deposit = self.total_deposit.checked_add(deposit_amount).unwrap();
         Ok(())
     }
 
-    pub fn withdraw(&mut self, amount: u64) -> Result<u64> {
-        // TODO: Test this whether if repeatly deposit and withdraw will causes the amount + fee > reserve amount
-        let mut fee_amount = self
-            .deposit_fee
-            .checked_mul(amount)
-            .unwrap()
-            .checked_div(self.total_deposit)
-            .unwrap();
-
+    pub fn withdraw(&mut self, amount: u64) -> Result<()> {
         self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
-
-        // Withdraw all
-        if self.total_deposit == 0 {
-            fee_amount = self.deposit_fee;
-        }
-
-        self.deposit_fee = self.deposit_fee.checked_sub(fee_amount).unwrap();
-
-        Ok(fee_amount)
+        Ok(())
     }
 
     pub fn claim(&mut self) -> Result<()> {
@@ -96,11 +73,6 @@ impl Escrow {
 
     pub fn is_remaining_quote_withdrawn(&self) -> bool {
         self.is_remaining_quote_withdrawn == 1
-    }
-
-    pub fn get_total_deposit_amount_with_fees(&self) -> Result<u64> {
-        let total_deposit_with_fees = self.total_deposit.checked_add(self.deposit_fee).unwrap();
-        Ok(total_deposit_with_fees)
     }
 
     pub fn sum_claimed_and_pending_claim_amount(&self) -> Result<u64> {

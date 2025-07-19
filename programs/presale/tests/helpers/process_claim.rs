@@ -7,10 +7,13 @@ use anchor_spl::associated_token::{
     spl_associated_token_account::instruction::create_associated_token_account_idempotent,
 };
 use litesvm::LiteSVM;
-use presale::Presale;
+use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
-use crate::helpers::{derive_escrow, derive_event_authority, process_transaction, LiteSVMExt};
+use crate::helpers::{
+    derive_escrow, derive_event_authority, get_extra_account_metas_for_transfer_hook,
+    process_transaction, LiteSVMExt,
+};
 
 pub struct HandleEscrowClaimArgs {
     pub presale: Pubkey,
@@ -32,8 +35,6 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
         .unwrap()
         .owner;
 
-    let ix_data = presale::instruction::Claim {}.data();
-
     let owner_base_token = get_associated_token_address_with_program_id(
         &owner.pubkey(),
         &presale_state.base_mint,
@@ -47,7 +48,26 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
         &token_program,
     );
 
-    let accounts = presale::accounts::ClaimCtx {
+    let transfer_hook_accounts = get_extra_account_metas_for_transfer_hook(
+        &token_program,
+        &presale_state.base_token_vault,
+        &presale_state.base_mint,
+        &owner_base_token,
+        &owner_pubkey,
+        lite_svm,
+    );
+
+    let ix_data = presale::instruction::Claim {
+        remaining_accounts_info: RemainingAccountsInfo {
+            slices: vec![RemainingAccountsSlice {
+                accounts_type: AccountsType::TransferHookBase,
+                length: transfer_hook_accounts.len() as u8,
+            }],
+        },
+    }
+    .data();
+
+    let mut accounts = presale::accounts::ClaimCtx {
         presale,
         escrow,
         owner: owner_pubkey,
@@ -58,8 +78,11 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
         base_token_vault: presale_state.base_token_vault,
         presale_authority: presale::presale_authority::ID,
         owner_base_token,
+        memo_program: anchor_spl::memo::ID,
     }
     .to_account_metas(None);
+
+    accounts.extend(transfer_hook_accounts);
 
     let claim_ix = Instruction {
         program_id: presale::ID,

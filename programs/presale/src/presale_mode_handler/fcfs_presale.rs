@@ -4,24 +4,17 @@ use crate::*;
 pub struct FcfsPresaleHandler;
 
 impl PresaleModeHandler for FcfsPresaleHandler {
-    fn initialize_presale<'c: 'info, 'info>(
+    fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
+        _presale_pubkey: Pubkey,
         presale: &mut Presale,
         tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        _remaining_accounts: &'c [AccountInfo<'info>],
+        _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
-
-        if let Some(lock) = locked_vesting_params {
-            // Ensure cannot lock unsold token since prorata presale will sold all supply
-            require!(
-                lock.lock_unsold_token == 0,
-                PresaleError::InvalidUnsoldTokenAction
-            );
-        }
 
         let InitializePresaleVaultAccountPubkeys {
             base_mint,
@@ -29,6 +22,9 @@ impl PresaleModeHandler for FcfsPresaleHandler {
             base_token_vault,
             quote_token_vault,
             owner,
+            base,
+            base_token_program,
+            quote_token_program,
         } = mint_pubkeys;
 
         presale.initialize(PresaleInitializeArgs {
@@ -42,11 +38,15 @@ impl PresaleModeHandler for FcfsPresaleHandler {
             quote_token_vault,
             owner,
             current_timestamp,
+            base,
+            base_token_program,
+            quote_token_program,
         })?;
 
         Ok(())
     }
 
+    /// FCFS presale cannot deposit more than the presale maximum cap.
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         let global_remaining_quota = presale.get_remaining_deposit_quota()?;
         let personal_remaining_quota =
@@ -77,7 +77,7 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         _presale: &mut Presale,
         _escrow: &mut Escrow,
         _amount: u64,
-    ) -> Result<u64> {
+    ) -> Result<()> {
         unreachable!("FCFS presale does not support withdraw");
     }
 
