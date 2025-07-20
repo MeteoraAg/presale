@@ -21,7 +21,7 @@ use presale::{
 
 pub fn create_tokenomic_args(decimals: u8) -> TokenomicArgs {
     TokenomicArgs {
-        presale_pool_supply: 100_000_000_000 * 10u64.pow(decimals as u32), // 100 million with specified decimals
+        presale_pool_supply: 1_000_000_000 * 10u64.pow(decimals as u32), // 100 million with specified decimals
     }
 }
 
@@ -33,11 +33,11 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
     PresaleArgs {
         presale_start_time,
         presale_end_time,
-        presale_maximum_cap: 1 * LAMPORTS_PER_SOL,
+        presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
-        buyer_maximum_deposit_cap: u64::MAX,
-        buyer_minimum_deposit_cap: 1000, // 0.0000001 SOL
+        buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
+        buyer_minimum_deposit_cap: 1000,
         whitelist_mode: WhitelistMode::Permissionless.into(),
     }
 }

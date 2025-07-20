@@ -1,6 +1,5 @@
 use anchor_spl::{
     memo::Memo,
-    token_2022::{transfer_checked, TransferChecked},
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 

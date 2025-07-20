@@ -62,8 +62,8 @@ pub fn create_token(args: CreateTokenArgs) {
 
 pub fn get_program_id_from_token_flag(token_flag: u8) -> Pubkey {
     match token_flag {
-        0 => anchor_spl::token_2022::ID,
-        1 => anchor_spl::token_interface::ID,
+        0 => anchor_spl::token::ID,
+        1 => anchor_spl::token_2022::ID,
         _ => panic!("Unsupported token flag"),
     }
 }

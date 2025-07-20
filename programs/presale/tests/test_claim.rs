@@ -9,23 +9,18 @@ use std::rc::Rc;
 
 #[test]
 fn test_claim() {
-    let SetupContext { mut lite_svm, user } = SetupContext::initialize();
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
 
-    let token_decimals = 6;
-    let mint = Rc::new(Keypair::new());
-
-    create_token(CreateTokenArgs {
-        lite_svm: &mut lite_svm,
-        mint: Rc::clone(&mint),
-        mint_authority: Rc::clone(&user),
-        payer: Rc::clone(&user),
-        decimals: token_decimals,
-    });
+    let SetupContext { mut lite_svm, user } = setup_context;
 
     let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissionless_fixed_price_presale(
             &mut lite_svm,
-            mint.pubkey(),
+            mint,
             anchor_spl::token::spl_token::native_mint::ID,
             Rc::clone(&user),
         );

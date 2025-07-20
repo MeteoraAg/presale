@@ -17,11 +17,23 @@ use anchor_spl::associated_token::{
     get_associated_token_address, get_associated_token_address_with_program_id,
 };
 use anchor_spl::token::spl_token::state::AccountState;
+use anchor_spl::token_2022::spl_token_2022::instruction::mint_to;
 use litesvm::types::{FailedTransactionMetadata, SimulatedTransactionInfo};
 use litesvm::LiteSVM;
+use mpl_token_metadata::accounts::Metadata;
+use mpl_token_metadata::instructions::CreateMetadataAccountV3Builder;
+use mpl_token_metadata::types::DataV2;
+
+use crate::helpers::{
+    create_token, create_token_2022, get_token_metadata_extension_type_with_instructions,
+    CreateToken2022Args, CreateTokenArgs,
+};
 
 const NATIVE_SOL_MINT: Pubkey =
     Pubkey::from_str_const("So11111111111111111111111111111111111111112");
+
+pub const DEFAULT_BASE_TOKEN_DECIMALS: u8 = 6;
+pub const DEFAULT_QUOTE_TOKEN_DECIMALS: u8 = 9;
 
 pub struct SetupContext {
     pub lite_svm: LiteSVM,
@@ -52,6 +64,117 @@ impl SetupContext {
             lite_svm: svm,
             user,
         }
+    }
+
+    pub fn setup_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let user_pubkey = self.user.pubkey();
+
+        create_token(CreateTokenArgs {
+            lite_svm: &mut self.lite_svm,
+            mint: Rc::clone(&mint),
+            mint_authority: Rc::clone(&self.user),
+            payer: Rc::clone(&self.user),
+            decimals: token_decimals,
+        });
+
+        let user_ata = get_associated_token_address(&user_pubkey, &mint.pubkey());
+
+        let create_user_ata_ix = create_associated_token_account_idempotent(
+            &user_pubkey,
+            &user_pubkey,
+            &mint.pubkey(),
+            &anchor_spl::token::ID,
+        );
+
+        let mint_ix = mint_to(
+            &anchor_spl::token::ID,
+            &mint.pubkey(),
+            &user_ata,
+            &user_pubkey,
+            &[&user_pubkey],
+            supply,
+        )
+        .unwrap();
+
+        let mut builder = CreateMetadataAccountV3Builder::new();
+        builder.data(DataV2 {
+            name: "Test Mint".to_string(),
+            symbol: "TEST".to_string(),
+            uri: "https://example.com/metadata.json".to_string(),
+            seller_fee_basis_points: 500,
+            creators: None,
+            collection: None,
+            uses: None,
+        });
+        builder.mint(mint.pubkey());
+        builder.update_authority(user_pubkey, true);
+        builder.is_mutable(false);
+        builder.payer(user_pubkey);
+        builder.metadata(Metadata::find_pda(&mint.pubkey()).0);
+        builder.mint_authority(user_pubkey);
+        let create_metadata_ix = builder.instruction();
+
+        process_transaction(
+            &mut self.lite_svm,
+            &[create_user_ata_ix, mint_ix, create_metadata_ix],
+            Some(&user_pubkey),
+            &[&self.user],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    pub fn setup_token_2022_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        create_token_2022(CreateToken2022Args {
+            lite_svm: &mut self.lite_svm,
+            mint: Rc::clone(&mint),
+            mint_authority: Rc::clone(&self.user),
+            payer: Rc::clone(&self.user),
+            decimals: token_decimals,
+            extension_type_with_instructions: get_token_metadata_extension_type_with_instructions(
+                mint_pubkey,
+                self.user.pubkey(),
+            ),
+        });
+
+        let user_pubkey = self.user.pubkey();
+        let user_ata = get_associated_token_address_with_program_id(
+            &user_pubkey,
+            &mint_pubkey,
+            &anchor_spl::token_2022::ID,
+        );
+
+        let create_user_ata_ix = create_associated_token_account_idempotent(
+            &user_pubkey,
+            &user_pubkey,
+            &mint_pubkey,
+            &anchor_spl::token_2022::ID,
+        );
+
+        let mint_ix = mint_to(
+            &anchor_spl::token_2022::ID,
+            &mint.pubkey(),
+            &user_ata,
+            &user_pubkey,
+            &[&user_pubkey],
+            supply,
+        )
+        .unwrap();
+
+        process_transaction(
+            &mut self.lite_svm,
+            &[create_user_ata_ix, mint_ix],
+            Some(&user_pubkey),
+            &[&self.user],
+        )
+        .unwrap();
+
+        mint_pubkey
     }
 }
 

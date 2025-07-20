@@ -1,15 +1,14 @@
-use anchor_client::solana_sdk::address_lookup_table::program;
 use anchor_client::solana_sdk::instruction::Instruction;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Keypair;
-use anchor_client::solana_sdk::{program_pack::Pack, system_instruction::create_account};
+use anchor_client::solana_sdk::system_instruction::{create_account, transfer};
 use anchor_lang::prelude::{AccountMeta, Rent};
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent;
-use anchor_spl::token_2022::spl_token_2022::instruction::{
-    initialize_mint, mint_to, transfer_checked,
-};
+use anchor_spl::token_2022::spl_token_2022::extension::ExtensionType;
+use anchor_spl::token_2022::spl_token_2022::instruction::{initialize_mint, transfer_checked};
+use anchor_spl::token_2022::spl_token_2022::state::Mint;
+use anchor_spl::token_interface::spl_pod::optional_keys::OptionalNonZeroPubkey;
 use anchor_spl::token_interface::spl_pod::slice::PodSlice;
+use anchor_spl::token_interface::spl_token_metadata_interface;
 use litesvm::LiteSVM;
 use spl_discriminator::SplDiscriminate;
 use spl_tlv_account_resolution::account::ExtraAccountMeta;
@@ -19,15 +18,68 @@ use spl_type_length_value::state::{TlvState, TlvStateBorrowed};
 
 use crate::*;
 
+pub struct ExtensionTypeWithInstructions {
+    pub extension_type: ExtensionType,
+    pub instructions: Vec<Instruction>,
+    pub before_init_mint_ix: bool,
+}
+
+pub fn get_token_metadata_extension_type_with_instructions(
+    mint_pubkey: Pubkey,
+    mint_authority_pubkey: Pubkey,
+) -> Vec<ExtensionTypeWithInstructions> {
+    let mut instructions = vec![];
+
+    let initialize_token_metadata_pointer_ix = anchor_spl::token_2022::spl_token_2022::extension::metadata_pointer::instruction::initialize(
+        &anchor_spl::token_2022::spl_token_2022::ID,
+        &mint_pubkey,
+        Some(mint_authority_pubkey),
+        Some(mint_pubkey),
+    )
+    .unwrap();
+
+    instructions.push(ExtensionTypeWithInstructions {
+        extension_type: ExtensionType::MetadataPointer,
+        instructions: vec![initialize_token_metadata_pointer_ix],
+        before_init_mint_ix: true,
+    });
+
+    let initialize_token_metadata_ix = spl_token_metadata_interface::instruction::initialize(
+        &anchor_spl::token_2022::spl_token_2022::ID,
+        &mint_pubkey,
+        &mint_authority_pubkey,
+        &mint_pubkey,
+        &mint_authority_pubkey,
+        "TOKEN NAME".to_string(),
+        "TOKEN".to_string(),
+        "https://token-uri.com".to_string(),
+    );
+
+    let revoke_update_authority_ix = spl_token_metadata_interface::instruction::update_authority(
+        &anchor_spl::token_2022::spl_token_2022::ID,
+        &mint_pubkey,
+        &mint_authority_pubkey,
+        OptionalNonZeroPubkey::try_from(Option::<Pubkey>::None).unwrap(),
+    );
+
+    instructions.push(ExtensionTypeWithInstructions {
+        extension_type: ExtensionType::TokenMetadata,
+        instructions: vec![initialize_token_metadata_ix, revoke_update_authority_ix],
+        before_init_mint_ix: false,
+    });
+
+    instructions
+}
+
 pub struct CreateToken2022Args<'a> {
     pub lite_svm: &'a mut LiteSVM,
     pub mint: Rc<Keypair>,
     pub mint_authority: Rc<Keypair>,
     pub payer: Rc<Keypair>,
     pub decimals: u8,
+    pub extension_type_with_instructions: Vec<ExtensionTypeWithInstructions>,
 }
 
-// TODO: Support extension
 pub fn create_token_2022(args: CreateToken2022Args) {
     let CreateToken2022Args {
         lite_svm,
@@ -35,6 +87,7 @@ pub fn create_token_2022(args: CreateToken2022Args) {
         mint_authority,
         payer,
         decimals,
+        extension_type_with_instructions,
     } = args;
 
     let mint_pubkey = mint.pubkey();
@@ -43,7 +96,16 @@ pub fn create_token_2022(args: CreateToken2022Args) {
 
     let rent = lite_svm.get_sysvar::<Rent>();
 
-    let space = anchor_spl::token_2022::spl_token_2022::state::Mint::LEN;
+    let before_init_mint_ix_extensions_type = extension_type_with_instructions
+        .iter()
+        .filter(|ext| ext.before_init_mint_ix)
+        .map(|ext| ext.extension_type)
+        .collect::<Vec<_>>();
+
+    let space =
+        ExtensionType::try_calculate_account_len::<Mint>(&before_init_mint_ix_extensions_type)
+            .unwrap();
+
     let lamports = rent.minimum_balance(space);
 
     let create_account_ix = create_account(
@@ -63,64 +125,44 @@ pub fn create_token_2022(args: CreateToken2022Args) {
     )
     .expect("Failed to create initialize_mint instruction");
 
+    let mut instructions = vec![create_account_ix];
+
+    for ix in extension_type_with_instructions
+        .iter()
+        .filter(|ext| ext.before_init_mint_ix)
+        .map(|ext| ext.instructions.clone())
+    {
+        instructions.extend_from_slice(&ix);
+    }
+
+    instructions.push(initialize_mint_ix);
+
+    for ix in extension_type_with_instructions
+        .iter()
+        .filter(|ext| !ext.before_init_mint_ix)
+        .map(|ext| ext.instructions.clone())
+    {
+        instructions.extend_from_slice(&ix);
+    }
+
+    // TODO: Should calculate variable length extension types require how many extra lamports
+    instructions.push(transfer(&payer_pubkey, &mint_pubkey, 10_000_000));
+
     process_transaction(
         lite_svm,
-        &[create_account_ix, initialize_mint_ix],
+        &instructions,
         Some(&payer_pubkey),
         &[&payer, &mint],
     )
     .unwrap();
 }
 
-pub struct MintToken2022ToArgs<'a> {
+pub struct MintTokenArgs<'a> {
     pub lite_svm: &'a mut LiteSVM,
     pub mint: Pubkey,
     pub amount: u64,
     pub destination: Pubkey,
     pub mint_authority: Rc<Keypair>,
-}
-
-fn mint_token2022_to(args: MintToken2022ToArgs) {
-    let MintToken2022ToArgs {
-        lite_svm,
-        mint,
-        amount,
-        destination,
-        mint_authority,
-    } = args;
-
-    let mint_authority_pubkey = mint_authority.pubkey();
-
-    let destination_ata = get_associated_token_address_with_program_id(
-        &destination,
-        &mint,
-        &anchor_spl::token_2022::spl_token_2022::ID,
-    );
-
-    let create_ata_ix = create_associated_token_account_idempotent(
-        &mint_authority_pubkey,
-        &destination,
-        &mint,
-        &anchor_spl::token_2022::spl_token_2022::ID,
-    );
-
-    let mint_ix = mint_to(
-        &anchor_spl::token_2022::spl_token_2022::ID,
-        &mint,
-        &destination_ata,
-        &mint_authority_pubkey,
-        &[&mint_authority_pubkey],
-        amount,
-    )
-    .expect("Failed to create mint_to instruction");
-
-    process_transaction(
-        lite_svm,
-        &[create_ata_ix, mint_ix],
-        Some(&mint_authority_pubkey),
-        &[&mint_authority],
-    )
-    .unwrap();
 }
 
 pub fn get_extra_account_metas_for_transfer_hook(
@@ -136,7 +178,7 @@ pub fn get_extra_account_metas_for_transfer_hook(
     }
 
     let mut dummy_transfer_ix = transfer_checked(
-        &program_id,
+        program_id,
         source_pubkey,
         mint_pubkey,
         destination_pubkey,

@@ -1,29 +1,23 @@
 pub mod helpers;
 
-use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
+use anchor_client::solana_sdk::signer::Signer;
 use helpers::*;
 use presale::Presale;
 use std::rc::Rc;
 
 #[test]
 fn test_unsold_token_action() {
-    let SetupContext { mut lite_svm, user } = SetupContext::initialize();
-
-    let token_decimals = 6;
-    let base_mint = Rc::new(Keypair::new());
-
-    create_token(CreateTokenArgs {
-        lite_svm: &mut lite_svm,
-        mint: Rc::clone(&base_mint),
-        mint_authority: Rc::clone(&user),
-        payer: Rc::clone(&user),
-        decimals: token_decimals,
-    });
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
 
     let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissionless_fixed_price_presale(
             &mut lite_svm,
-            base_mint.pubkey(),
+            mint,
             anchor_spl::token::spl_token::native_mint::ID,
             Rc::clone(&user),
         );

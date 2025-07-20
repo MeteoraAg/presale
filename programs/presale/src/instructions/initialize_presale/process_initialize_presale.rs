@@ -100,7 +100,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     // 2. Ensure metadata is created
     match ctx.accounts.base_token_program.key() {
         anchor_spl::token::ID => {
-            ensure_mint_metadata_initialized(
+            ensure_mint_metadata_initialized_and_immutable(
                 &mut remaining_account_slice,
                 &ctx.accounts.presale_mint.key(),
             )?;
@@ -197,7 +197,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     Ok(())
 }
 
-fn ensure_mint_metadata_initialized<'a, 'info>(
+fn ensure_mint_metadata_initialized_and_immutable<'a, 'info>(
     remaining_accounts: &mut &[AccountInfo<'info>],
     mint_key: &Pubkey,
 ) -> Result<()> {
@@ -216,9 +216,15 @@ fn ensure_mint_metadata_initialized<'a, 'info>(
     );
 
     // Make sure metadata is initialized by deserialize and check the content
-    let metadata_state = Metadata::safe_deserialize(&mpl_token_metadata_ai.try_borrow_data()?)?;
+    let metadata_state = Metadata::safe_deserialize(&mpl_token_metadata_ai.try_borrow_data()?)
+        .map_err(|_| PresaleError::InvalidMintMetadata)?;
     require!(
         metadata_state.mint == *mint_key,
+        PresaleError::InvalidMintMetadata
+    );
+
+    require!(
+        !metadata_state.is_mutable,
         PresaleError::InvalidMintMetadata
     );
 
@@ -230,7 +236,14 @@ fn ensure_mint_metadata_initialized_token_2022<'a, 'info>(
 ) -> Result<()> {
     let buffer = mint.try_borrow_data()?;
     let mint = PodStateWithExtensions::<PodMint>::unpack(&buffer)?;
-    mint.get_variable_len_extension::<TokenMetadata>()
+    let token_metadata = mint
+        .get_variable_len_extension::<TokenMetadata>()
         .map_err(|_| PresaleError::InvalidMintMetadata)?;
+
+    require!(
+        Option::<Pubkey>::from(token_metadata.update_authority).is_none(),
+        PresaleError::InvalidMintMetadata
+    );
+
     Ok(())
 }

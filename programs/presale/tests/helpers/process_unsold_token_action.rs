@@ -7,10 +7,13 @@ use anchor_spl::associated_token::{
     spl_associated_token_account::instruction::create_associated_token_account_idempotent,
 };
 use litesvm::LiteSVM;
-use presale::Presale;
+use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
-use crate::helpers::{derive_event_authority, process_transaction, LiteSVMExt};
+use crate::helpers::{
+    derive_event_authority, get_extra_account_metas_for_transfer_hook,
+    get_program_id_from_token_flag, process_transaction, LiteSVMExt,
+};
 
 pub struct HandlePerformUnsoldTokenActionArgs {
     pub presale: Pubkey,
@@ -29,12 +32,7 @@ pub fn handle_perform_unsold_token_action(
         .get_deserialized_zc_account::<Presale>(&presale)
         .unwrap();
 
-    let token_program = lite_svm
-        .get_account(&presale_state.base_mint)
-        .unwrap()
-        .owner;
-
-    let ix_data = presale::instruction::PerformUnsoldBaseTokenAction {}.data();
+    let token_program = get_program_id_from_token_flag(presale_state.base_token_program_flag);
 
     let creator_base_token = get_associated_token_address_with_program_id(
         &creator_pubkey,
@@ -49,7 +47,26 @@ pub fn handle_perform_unsold_token_action(
         &token_program,
     );
 
-    let accounts = presale::accounts::PerformUnsoldBaseTokenActionCtx {
+    let transfer_hook_accounts = get_extra_account_metas_for_transfer_hook(
+        &token_program,
+        &presale_state.base_token_vault,
+        &presale_state.base_mint,
+        &creator_base_token,
+        &creator_pubkey,
+        lite_svm,
+    );
+
+    let ix_data = presale::instruction::PerformUnsoldBaseTokenAction {
+        remaining_accounts_info: RemainingAccountsInfo {
+            slices: vec![RemainingAccountsSlice {
+                accounts_type: AccountsType::TransferHookBase,
+                length: transfer_hook_accounts.len() as u8,
+            }],
+        },
+    }
+    .data();
+
+    let mut accounts = presale::accounts::PerformUnsoldBaseTokenActionCtx {
         presale,
         creator_base_token,
         event_authority: derive_event_authority(&presale::ID),
@@ -58,8 +75,11 @@ pub fn handle_perform_unsold_token_action(
         base_mint: presale_state.base_mint,
         base_token_vault: presale_state.base_token_vault,
         presale_authority: presale::presale_authority::ID,
+        memo_program: anchor_spl::memo::ID,
     }
     .to_account_metas(None);
+
+    accounts.extend(transfer_hook_accounts);
 
     let ix = Instruction {
         program_id: presale::ID,
