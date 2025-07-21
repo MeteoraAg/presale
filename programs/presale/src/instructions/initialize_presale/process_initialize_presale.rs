@@ -106,7 +106,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
             )?;
         }
         anchor_spl::token_2022::ID => {
-            ensure_mint_metadata_initialized_token_2022(
+            ensure_mint_metadata_initialized_and_immutable_token_2022(
                 &ctx.accounts.presale_mint.to_account_info(),
             )?;
         }
@@ -126,6 +126,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         tokenomic,
         presale_params,
         locked_vesting_params,
+        ..
     } = args;
 
     // 4. Initialize vault
@@ -231,7 +232,7 @@ fn ensure_mint_metadata_initialized_and_immutable<'a, 'info>(
     Ok(())
 }
 
-fn ensure_mint_metadata_initialized_token_2022<'a, 'info>(
+fn ensure_mint_metadata_initialized_and_immutable_token_2022<'a, 'info>(
     mint: &'a AccountInfo<'info>,
 ) -> Result<()> {
     let buffer = mint.try_borrow_data()?;

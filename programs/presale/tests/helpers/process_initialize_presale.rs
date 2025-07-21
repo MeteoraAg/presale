@@ -22,6 +22,7 @@ use presale::{
 pub fn create_tokenomic_args(decimals: u8) -> TokenomicArgs {
     TokenomicArgs {
         presale_pool_supply: 1_000_000_000 * 10u64.pow(decimals as u32), // 100 million with specified decimals
+        ..Default::default()
     }
 }
 
@@ -39,6 +40,7 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
         buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
         buyer_minimum_deposit_cap: 1000,
         whitelist_mode: WhitelistMode::Permissionless.into(),
+        ..Default::default()
     }
 }
 
@@ -46,6 +48,7 @@ fn create_locked_vesting_args() -> LockedVestingArgs {
     LockedVestingArgs {
         lock_duration: 3600,  // 1 hour
         vest_duration: 86400, // 1 day
+        ..Default::default()
     }
 }
 
@@ -136,6 +139,7 @@ pub fn create_initialize_presale_ix(
             tokenomic,
             presale_params,
             locked_vesting_params,
+            ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {
             slices: vec![RemainingAccountsSlice {

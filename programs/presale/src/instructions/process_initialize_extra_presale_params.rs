@@ -24,11 +24,12 @@ pub struct InitializeFixedPricePresaleArgsCtx {
     pub system_program: Program<'info, System>,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Default)]
 pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
     pub unsold_token_action: u8,
     pub q_price: u128,
+    pub padding: [u64; 4],
 }
 
 pub fn handle_initialize_fixed_price_presale_args(
@@ -39,6 +40,7 @@ pub fn handle_initialize_fixed_price_presale_args(
         presale,
         unsold_token_action,
         q_price,
+        ..
     } = params;
 
     let fixed_price_presale_params = &mut ctx.accounts.fixed_price_presale_params.load_init()?;

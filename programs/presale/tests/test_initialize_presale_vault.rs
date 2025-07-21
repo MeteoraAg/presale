@@ -41,6 +41,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
 
     let tokenomic = TokenomicArgs {
         presale_pool_supply: presale_pool_supply * 10u64.pow(6),
+        ..Default::default()
     };
 
     let token_per_sol = 1.0 / price;
@@ -71,6 +72,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
         buyer_maximum_deposit_cap,
         buyer_minimum_deposit_cap: 0,
         whitelist_mode: WhitelistMode::Permissionless.into(),
+        ..Default::default()
     };
 
     let err = handle_initialize_presale_err(
@@ -136,6 +138,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
 
     let tokenomic = TokenomicArgs {
         presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
+        ..Default::default()
     };
 
     let clock: Clock = lite_svm.get_sysvar();
@@ -149,6 +152,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
         buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
         whitelist_mode: WhitelistMode::Permissionless.into(),
+        ..Default::default()
     };
 
     handle_initialize_presale(
@@ -204,6 +208,7 @@ fn test_initialize_presale_vault_token_2022() {
 
     let tokenomic = TokenomicArgs {
         presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
+        ..Default::default()
     };
 
     let clock: Clock = lite_svm.get_sysvar();
@@ -217,6 +222,7 @@ fn test_initialize_presale_vault_token_2022() {
         buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
         buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
         whitelist_mode: WhitelistMode::Permissionless.into(),
+        ..Default::default()
     };
 
     handle_initialize_presale(

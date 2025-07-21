@@ -38,6 +38,7 @@ declare_id!("Ff7Lo7AsVxB4VtJH2Ajm7KLLVaVTGMV1W3ws2o5Eo2UT");
 pub mod presale {
     use super::*;
 
+    /// Create presale vault related functions
     pub fn initialize_fixed_price_presale_args(
         ctx: Context<InitializeFixedPricePresaleArgsCtx>,
         params: InitializeFixedPricePresaleExtraArgs,

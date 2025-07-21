@@ -184,6 +184,7 @@ impl Presale {
 
         let TokenomicArgs {
             presale_pool_supply,
+            ..
         } = tokenomic_params;
 
         self.presale_supply = presale_pool_supply;
@@ -197,6 +198,7 @@ impl Presale {
             presale_end_time,
             whitelist_mode,
             presale_mode,
+            ..
         } = presale_params;
 
         self.presale_maximum_cap = presale_maximum_cap;
@@ -212,6 +214,7 @@ impl Presale {
         if let Some(LockedVestingArgs {
             lock_duration,
             vest_duration,
+            ..
         }) = locked_vesting_params
         {
             self.lock_duration = lock_duration;

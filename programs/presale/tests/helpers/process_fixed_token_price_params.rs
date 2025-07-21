@@ -43,6 +43,7 @@ pub fn handle_initialize_fixed_token_price_presale_params(
             q_price,
             presale,
             unsold_token_action: unsold_token_action.into(),
+            ..Default::default()
         },
     }
     .data();

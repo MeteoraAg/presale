@@ -1,11 +1,13 @@
 use crate::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct InitializePresaleArgs {
     pub tokenomic: TokenomicArgs,
     pub presale_params: PresaleArgs,
     pub locked_vesting_params: Option<LockedVestingArgs>,
+    pub padding: [u64; 4],
 }
+
 impl InitializePresaleArgs {
     pub fn validate(&self) -> Result<()> {
         self.tokenomic.validate()?;
@@ -20,9 +22,10 @@ impl InitializePresaleArgs {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, Default)]
 pub struct TokenomicArgs {
     pub presale_pool_supply: u64,
+    pub padding: [u64; 4],
 }
 
 impl TokenomicArgs {
@@ -37,7 +40,7 @@ impl TokenomicArgs {
 }
 
 /// Presale parameters
-#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, Default)]
 pub struct PresaleArgs {
     pub presale_maximum_cap: u64,
     pub presale_minimum_cap: u64,
@@ -47,6 +50,7 @@ pub struct PresaleArgs {
     pub presale_end_time: u64,
     pub whitelist_mode: u8,
     pub presale_mode: u8,
+    pub padding: [u64; 4],
 }
 
 impl PresaleArgs {
@@ -114,12 +118,13 @@ impl PresaleArgs {
 }
 
 /// Vest user bought token
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Default)]
 pub struct LockedVestingArgs {
     /// Lock duration until buyer can claim the token
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
     pub vest_duration: u64,
+    pub padding: [u64; 4],
 }
 
 impl LockedVestingArgs {
