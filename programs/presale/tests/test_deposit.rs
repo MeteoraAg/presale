@@ -1,6 +1,6 @@
 pub mod helpers;
 
-use anchor_client::solana_sdk::{native_token::LAMPORTS_PER_SOL, signer::Signer};
+use anchor_client::solana_sdk::native_token::LAMPORTS_PER_SOL;
 use helpers::*;
 use presale::Presale;
 use std::rc::Rc;

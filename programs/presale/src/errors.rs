@@ -3,7 +3,7 @@ use crate::*;
 #[error_code]
 #[derive(PartialEq)]
 pub enum PresaleError {
-    #[msg("Invalid metaplex metadata")]
+    #[msg("Invalid mint metadata")]
     InvalidMintMetadata,
 
     #[msg("Invalid token info")]

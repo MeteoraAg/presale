@@ -5,7 +5,7 @@ use anchor_client::solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
 use anchor_lang::*;
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::UnsoldTokenAction;
 
 #[derive(Clone)]
@@ -66,6 +66,7 @@ pub fn handle_initialize_fixed_token_price_presale_params(
     process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
 }
 
+#[derive(Clone)]
 pub struct HandleCloseFixedTokenPricePresaleParamsArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
@@ -73,10 +74,9 @@ pub struct HandleCloseFixedTokenPricePresaleParamsArgs {
     pub base: Pubkey,
 }
 
-pub fn handle_close_fixed_token_price_presale_params(
-    lite_svm: &mut LiteSVM,
+pub fn create_close_fixed_token_price_presale_params_ix(
     args: HandleCloseFixedTokenPricePresaleParamsArgs,
-) {
+) -> Instruction {
     let HandleCloseFixedTokenPricePresaleParamsArgs {
         base_mint,
         quote_mint,
@@ -97,11 +97,27 @@ pub fn handle_close_fixed_token_price_presale_params(
         program: presale::ID,
     };
 
-    let instruction = Instruction {
+    Instruction {
         program_id: presale::ID,
         accounts: accounts.to_account_metas(None),
         data: ix_data,
-    };
+    }
+}
 
+pub fn handle_close_fixed_token_price_presale_params_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleCloseFixedTokenPricePresaleParamsArgs,
+) -> FailedTransactionMetadata {
+    let instruction = create_close_fixed_token_price_presale_params_ix(args.clone());
+    let HandleCloseFixedTokenPricePresaleParamsArgs { owner, .. } = args;
+    process_transaction(lite_svm, &[instruction], Some(&owner.pubkey()), &[&owner]).unwrap_err()
+}
+
+pub fn handle_close_fixed_token_price_presale_params(
+    lite_svm: &mut LiteSVM,
+    args: HandleCloseFixedTokenPricePresaleParamsArgs,
+) {
+    let instruction = create_close_fixed_token_price_presale_params_ix(args.clone());
+    let HandleCloseFixedTokenPricePresaleParamsArgs { owner, .. } = args;
     process_transaction(lite_svm, &[instruction], Some(&owner.pubkey()), &[&owner]).unwrap();
 }

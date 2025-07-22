@@ -13,7 +13,11 @@ pub struct FixedPricePresaleExtraArgs {
 
 impl FixedPricePresaleExtraArgs {
     fn validate(unsold_token_action: u8, q_price: u128) -> Result<()> {
-        UnsoldTokenAction::try_from(unsold_token_action).unwrap();
+        let unsold_token_action = UnsoldTokenAction::try_from(unsold_token_action);
+        require!(
+            unsold_token_action.is_ok(),
+            PresaleError::InvalidUnsoldTokenAction
+        );
         require!(q_price > 0, PresaleError::InvalidTokenPrice);
 
         Ok(())
@@ -26,7 +30,7 @@ impl FixedPricePresaleExtraArgs {
         owner: Pubkey,
         presale: Pubkey,
     ) -> Result<()> {
-        Self::validate(unsold_token_action, q_price).unwrap();
+        Self::validate(unsold_token_action, q_price)?;
         self.unsold_token_action = unsold_token_action;
         self.q_price = q_price;
         self.owner = owner;

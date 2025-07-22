@@ -54,6 +54,10 @@ pub struct PresaleArgs {
 }
 
 impl PresaleArgs {
+    pub fn get_presale_start_time_without_going_backwards(&self, current_timestamp: u64) -> u64 {
+        self.presale_start_time.max(current_timestamp)
+    }
+
     pub fn validate(&self, current_timestamp: u64) -> Result<()> {
         require!(
             self.presale_maximum_cap >= self.presale_minimum_cap,
@@ -80,20 +84,15 @@ impl PresaleArgs {
             PresaleError::InvalidPresaleInfo
         );
 
+        let presale_start_time =
+            self.get_presale_start_time_without_going_backwards(current_timestamp);
+
         require!(
-            self.presale_start_time >= current_timestamp,
+            self.presale_end_time > presale_start_time,
             PresaleError::InvalidPresaleInfo
         );
 
-        require!(
-            self.presale_end_time > self.presale_start_time,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        let presale_duration = self
-            .presale_end_time
-            .checked_sub(self.presale_start_time)
-            .unwrap();
+        let presale_duration = self.presale_end_time.safe_sub(presale_start_time)?;
 
         require!(
             presale_duration >= MINIMUM_PRESALE_DURATION
@@ -101,17 +100,20 @@ impl PresaleArgs {
             PresaleError::InvalidPresaleInfo
         );
 
-        let duration_until_presale = current_timestamp
-            .checked_sub(self.presale_start_time)
-            .unwrap();
+        let duration_until_presale = presale_start_time.safe_sub(current_timestamp)?;
 
         require!(
             duration_until_presale <= MAXIMUM_DURATION_UNTIL_PRESALE,
             PresaleError::InvalidPresaleInfo
         );
 
-        WhitelistMode::try_from(self.whitelist_mode).unwrap();
-        PresaleMode::try_from(self.presale_mode).unwrap();
+        let maybe_whitelist_mode = WhitelistMode::try_from(self.whitelist_mode);
+        require!(
+            maybe_whitelist_mode.is_ok(),
+            PresaleError::InvalidPresaleInfo
+        );
+        let maybe_presale_mode = PresaleMode::try_from(self.presale_mode);
+        require!(maybe_presale_mode.is_ok(), PresaleError::InvalidPresaleInfo);
 
         Ok(())
     }

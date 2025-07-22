@@ -1,9 +1,14 @@
+use std::rc::Rc;
+
 use anchor_client::solana_sdk::instruction::Instruction;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signature::Keypair;
+use anchor_client::solana_sdk::signer::Signer;
 use anchor_client::solana_sdk::system_instruction::{create_account, transfer};
 use anchor_lang::prelude::{AccountMeta, Rent};
-use anchor_spl::token_2022::spl_token_2022::extension::ExtensionType;
+use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_spl::associated_token;
+use anchor_spl::token_2022::spl_token_2022::extension::{ExtensionType, StateWithExtensions};
 use anchor_spl::token_2022::spl_token_2022::instruction::{initialize_mint, transfer_checked};
 use anchor_spl::token_2022::spl_token_2022::state::Mint;
 use anchor_spl::token_interface::spl_pod::optional_keys::OptionalNonZeroPubkey;
@@ -16,17 +21,108 @@ use spl_transfer_hook_interface::get_extra_account_metas_address;
 use spl_transfer_hook_interface::instruction::{execute, ExecuteInstruction};
 use spl_type_length_value::state::{TlvState, TlvStateBorrowed};
 
-use crate::*;
+use crate::helpers::process_transaction;
+use crate::helpers::transfer_hook_counter::transfer_hook_counter;
 
+pub const TRANSFER_HOOK_COUNTER_PROGRAM_ID: Pubkey =
+    Pubkey::from_str_const("abcSyangMHdGzUGKhBhKoQzSFdJKUdkPGf5cbXVHpEw");
+
+#[derive(Clone)]
 pub struct ExtensionTypeWithInstructions {
     pub extension_type: ExtensionType,
     pub instructions: Vec<Instruction>,
     pub before_init_mint_ix: bool,
 }
 
+pub fn get_transfer_hook_extension_type_with_instructions(
+    mint_pubkey: Pubkey,
+    authority: Pubkey,
+    transfer_hook_program_id: Pubkey,
+) -> Vec<ExtensionTypeWithInstructions> {
+    let mut instructions = vec![];
+
+    let init_transfer_hook_ix =
+        anchor_spl::token_2022::spl_token_2022::extension::transfer_hook::instruction::initialize(
+            &anchor_spl::token_2022::spl_token_2022::ID,
+            &mint_pubkey,
+            Some(authority),
+            Some(transfer_hook_program_id),
+        )
+        .unwrap();
+
+    let extra_account_meta_list =
+        get_extra_account_metas_address(&mint_pubkey, &transfer_hook_program_id);
+
+    let counter = Pubkey::find_program_address(
+        &[b"counter", mint_pubkey.as_ref()],
+        &transfer_hook_program_id,
+    )
+    .0;
+
+    let accounts = transfer_hook_counter::client::accounts::InitializeExtraAccountMetaList {
+        extra_account_meta_list,
+        counter_account: counter,
+        token_program: anchor_spl::token_2022::spl_token_2022::ID,
+        associated_token_program: associated_token::ID,
+        system_program: anchor_client::solana_sdk::system_program::ID,
+        mint: mint_pubkey,
+        payer: authority,
+    }
+    .to_account_metas(None);
+
+    let ix = transfer_hook_counter::client::args::InitializeExtraAccountMetaList {}.data();
+
+    let initialize_extra_account_meta_list_ix = Instruction {
+        program_id: transfer_hook_counter::ID,
+        accounts,
+        data: ix,
+    };
+
+    instructions.push(ExtensionTypeWithInstructions {
+        extension_type: ExtensionType::TransferHook,
+        instructions: vec![init_transfer_hook_ix],
+        before_init_mint_ix: true,
+    });
+
+    instructions.push(ExtensionTypeWithInstructions {
+        extension_type: ExtensionType::TransferHook,
+        instructions: vec![initialize_extra_account_meta_list_ix],
+        before_init_mint_ix: false,
+    });
+
+    instructions
+}
+
+pub fn get_transfer_fee_extension_type_with_instructions(
+    mint_pubkey: Pubkey,
+    transfer_fee_config_authority: Pubkey,
+    transfer_fee_basis_points: u16,
+    maximum_fee: u64,
+) -> Vec<ExtensionTypeWithInstructions> {
+    let mut instructions = vec![];
+
+    let init_transfer_fee_ix = anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::instruction::initialize_transfer_fee_config(
+        &anchor_spl::token_2022::spl_token_2022::ID,
+        &mint_pubkey,
+        Some(&transfer_fee_config_authority),
+        Some(&transfer_fee_config_authority),
+        transfer_fee_basis_points,
+        maximum_fee
+    ).unwrap();
+
+    instructions.push(ExtensionTypeWithInstructions {
+        extension_type: ExtensionType::TransferFeeConfig,
+        instructions: vec![init_transfer_fee_ix],
+        before_init_mint_ix: true,
+    });
+
+    instructions
+}
+
 pub fn get_token_metadata_extension_type_with_instructions(
     mint_pubkey: Pubkey,
     mint_authority_pubkey: Pubkey,
+    is_immutable: bool,
 ) -> Vec<ExtensionTypeWithInstructions> {
     let mut instructions = vec![];
 
@@ -55,24 +151,26 @@ pub fn get_token_metadata_extension_type_with_instructions(
         "https://token-uri.com".to_string(),
     );
 
-    let revoke_update_authority_ix = spl_token_metadata_interface::instruction::update_authority(
-        &anchor_spl::token_2022::spl_token_2022::ID,
-        &mint_pubkey,
-        &mint_authority_pubkey,
-        OptionalNonZeroPubkey::try_from(Option::<Pubkey>::None).unwrap(),
-    );
+    if is_immutable {
+        let revoke_update_authority_ix =
+            spl_token_metadata_interface::instruction::update_authority(
+                &anchor_spl::token_2022::spl_token_2022::ID,
+                &mint_pubkey,
+                &mint_authority_pubkey,
+                OptionalNonZeroPubkey::try_from(Option::<Pubkey>::None).unwrap(),
+            );
 
-    instructions.push(ExtensionTypeWithInstructions {
-        extension_type: ExtensionType::TokenMetadata,
-        instructions: vec![initialize_token_metadata_ix, revoke_update_authority_ix],
-        before_init_mint_ix: false,
-    });
+        instructions.push(ExtensionTypeWithInstructions {
+            extension_type: ExtensionType::TokenMetadata,
+            instructions: vec![initialize_token_metadata_ix, revoke_update_authority_ix],
+            before_init_mint_ix: false,
+        });
+    }
 
     instructions
 }
 
-pub struct CreateToken2022Args<'a> {
-    pub lite_svm: &'a mut LiteSVM,
+pub struct CreateToken2022Args {
     pub mint: Rc<Keypair>,
     pub mint_authority: Rc<Keypair>,
     pub payer: Rc<Keypair>,
@@ -80,9 +178,8 @@ pub struct CreateToken2022Args<'a> {
     pub extension_type_with_instructions: Vec<ExtensionTypeWithInstructions>,
 }
 
-pub fn create_token_2022(args: CreateToken2022Args) {
+pub fn create_token_2022_ix(lite_svm: &mut LiteSVM, args: CreateToken2022Args) -> Vec<Instruction> {
     let CreateToken2022Args {
-        lite_svm,
         mint,
         mint_authority,
         payer,
@@ -148,6 +245,31 @@ pub fn create_token_2022(args: CreateToken2022Args) {
     // TODO: Should calculate variable length extension types require how many extra lamports
     instructions.push(transfer(&payer_pubkey, &mint_pubkey, 10_000_000));
 
+    instructions
+}
+
+pub fn create_token_2022(lite_svm: &mut LiteSVM, args: CreateToken2022Args) {
+    let CreateToken2022Args {
+        mint,
+        mint_authority,
+        payer,
+        decimals,
+        extension_type_with_instructions,
+    } = args;
+
+    let instructions = create_token_2022_ix(
+        lite_svm,
+        CreateToken2022Args {
+            mint: Rc::clone(&mint),
+            mint_authority: Rc::clone(&mint_authority),
+            payer: Rc::clone(&payer),
+            decimals,
+            extension_type_with_instructions,
+        },
+    );
+
+    let payer_pubkey = payer.pubkey();
+
     process_transaction(
         lite_svm,
         &instructions,
@@ -177,6 +299,16 @@ pub fn get_extra_account_metas_for_transfer_hook(
         return vec![];
     }
 
+    let mint_account = lite_svm.get_account(mint_pubkey).unwrap();
+    let mint_state = StateWithExtensions::<Mint>::unpack(&mint_account.data).unwrap();
+    let Some(transfer_hook_program_id) =
+        anchor_spl::token_2022::spl_token_2022::extension::transfer_hook::get_program_id(
+            &mint_state,
+        )
+    else {
+        return vec![];
+    };
+
     let mut dummy_transfer_ix = transfer_checked(
         program_id,
         source_pubkey,
@@ -191,7 +323,7 @@ pub fn get_extra_account_metas_for_transfer_hook(
 
     add_extra_account_metas_for_execute(
         &mut dummy_transfer_ix,
-        program_id,
+        &transfer_hook_program_id,
         source_pubkey,
         mint_pubkey,
         destination_pubkey,
@@ -221,10 +353,10 @@ fn add_extra_account_metas_for_execute(
     lite_svm: &LiteSVM,
 ) {
     let validate_state_pubkey = get_extra_account_metas_address(mint_pubkey, program_id);
-    let validate_state_data = lite_svm
-        .get_account(&validate_state_pubkey)
-        .expect("Failed to get validate state account")
-        .data;
+    println!("Validate state pubkey: {}", validate_state_pubkey);
+    let Some(validate_state_account) = lite_svm.get_account(&validate_state_pubkey) else {
+        return;
+    };
 
     // Check to make sure the provided keys are in the instruction
     if [
@@ -255,7 +387,7 @@ fn add_extra_account_metas_for_execute(
     add_to_instruction::<ExecuteInstruction>(
         &mut execute_instruction,
         lite_svm,
-        &validate_state_data,
+        &validate_state_account.data,
     );
 
     // Add only the extra accounts resolved from the validation state

@@ -9,21 +9,16 @@ pub fn calculate_dripped_amount_for_user(
     total_deposit: u64,
 ) -> Result<u128> {
     let elapsed_seconds = current_timestamp
-        .checked_sub(vesting_start_time)
-        .unwrap()
+        .safe_sub(vesting_start_time)?
         .min(vest_duration);
 
     let dripped_total_sold_token = u128::from(total_sold_token)
-        .checked_mul(elapsed_seconds.into())
-        .unwrap()
-        .checked_div(vest_duration.into())
-        .unwrap();
+        .safe_mul(elapsed_seconds.into())?
+        .safe_div(vest_duration.into())?;
 
     let dripped_user_token = dripped_total_sold_token
-        .checked_mul(user_deposit.into())
-        .unwrap()
-        .checked_div(total_deposit.into())
-        .unwrap();
+        .safe_mul(user_deposit.into())?
+        .safe_div(total_deposit.into())?;
 
     Ok(dripped_user_token)
 }

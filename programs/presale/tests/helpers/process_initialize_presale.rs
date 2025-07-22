@@ -134,6 +134,15 @@ pub fn create_initialize_presale_ix(
         lite_svm,
     );
 
+    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
+
+    println!(
+        "Base token transfer hook accounts: {:?}",
+        base_token_transfer_hook_accounts.len()
+    );
+
+    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
+
     let ix_data = presale::instruction::InitializePresale {
         params: presale::InitializePresaleArgs {
             tokenomic,

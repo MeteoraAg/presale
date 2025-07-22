@@ -25,8 +25,10 @@ use mpl_token_metadata::instructions::CreateMetadataAccountV3Builder;
 use mpl_token_metadata::types::DataV2;
 
 use crate::helpers::{
-    create_token, create_token_2022, get_token_metadata_extension_type_with_instructions,
-    CreateToken2022Args, CreateTokenArgs,
+    create_token_2022_ix, create_token_ix, get_token_metadata_extension_type_with_instructions,
+    get_transfer_fee_extension_type_with_instructions,
+    get_transfer_hook_extension_type_with_instructions, CreateToken2022Args, CreateTokenArgs,
+    ExtensionTypeWithInstructions, TRANSFER_HOOK_COUNTER_PROGRAM_ID,
 };
 
 const NATIVE_SOL_MINT: Pubkey =
@@ -66,17 +68,23 @@ impl SetupContext {
         }
     }
 
-    pub fn setup_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
-        let mint = Rc::new(Keypair::new());
+    fn create_and_mint_token_ix(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+        mint: Rc<Keypair>,
+    ) -> Vec<Instruction> {
         let user_pubkey = self.user.pubkey();
 
-        create_token(CreateTokenArgs {
-            lite_svm: &mut self.lite_svm,
-            mint: Rc::clone(&mint),
-            mint_authority: Rc::clone(&self.user),
-            payer: Rc::clone(&self.user),
-            decimals: token_decimals,
-        });
+        let instructions = create_token_ix(
+            &mut self.lite_svm,
+            CreateTokenArgs {
+                mint: Rc::clone(&mint),
+                mint_authority: Rc::clone(&self.user),
+                payer: Rc::clone(&self.user),
+                decimals: token_decimals,
+            },
+        );
 
         let user_ata = get_associated_token_address(&user_pubkey, &mint.pubkey());
 
@@ -97,6 +105,15 @@ impl SetupContext {
         )
         .unwrap();
 
+        [instructions, vec![create_user_ata_ix, mint_ix]].concat()
+    }
+
+    fn create_metadata_ix(
+        &mut self,
+        is_immutable: bool,
+        mint: Pubkey,
+        user: Pubkey,
+    ) -> Instruction {
         let mut builder = CreateMetadataAccountV3Builder::new();
         builder.data(DataV2 {
             name: "Test Mint".to_string(),
@@ -107,40 +124,90 @@ impl SetupContext {
             collection: None,
             uses: None,
         });
-        builder.mint(mint.pubkey());
-        builder.update_authority(user_pubkey, true);
-        builder.is_mutable(false);
-        builder.payer(user_pubkey);
-        builder.metadata(Metadata::find_pda(&mint.pubkey()).0);
-        builder.mint_authority(user_pubkey);
-        let create_metadata_ix = builder.instruction();
+        builder.mint(mint);
+        builder.update_authority(user, true);
+        builder.is_mutable(!is_immutable);
+        builder.payer(user);
+        builder.metadata(Metadata::find_pda(&mint).0);
+        builder.mint_authority(user);
+        builder.instruction()
+    }
 
+    pub fn setup_mint_without_metadata(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let user_pubkey = self.user.pubkey();
+
+        let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
         process_transaction(
             &mut self.lite_svm,
-            &[create_user_ata_ix, mint_ix, create_metadata_ix],
+            &instructions,
             Some(&user_pubkey),
-            &[&self.user],
+            &[&self.user, &mint],
         )
         .unwrap();
 
         mint.pubkey()
     }
 
-    pub fn setup_token_2022_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+    pub fn setup_mint_with_mutable_metadata(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
         let mint = Rc::new(Keypair::new());
+        let user_pubkey = self.user.pubkey();
+
+        let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
+        let create_metadata_ix = self.create_metadata_ix(true, mint.pubkey(), user_pubkey);
+
+        let instructions = [instructions, vec![create_metadata_ix]].concat();
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&user_pubkey),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    pub fn setup_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let user_pubkey = self.user.pubkey();
+
+        let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
+        let create_metadata_ix = self.create_metadata_ix(true, mint.pubkey(), user_pubkey);
+
+        let instructions = [instructions, vec![create_metadata_ix]].concat();
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&user_pubkey),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    fn create_token_2022_and_mint_ix(
+        &mut self,
+        mint: Rc<Keypair>,
+        token_decimals: u8,
+        supply: u64,
+        extension_type_with_instructions: Vec<ExtensionTypeWithInstructions>,
+    ) -> Vec<Instruction> {
         let mint_pubkey = mint.pubkey();
 
-        create_token_2022(CreateToken2022Args {
-            lite_svm: &mut self.lite_svm,
-            mint: Rc::clone(&mint),
-            mint_authority: Rc::clone(&self.user),
-            payer: Rc::clone(&self.user),
-            decimals: token_decimals,
-            extension_type_with_instructions: get_token_metadata_extension_type_with_instructions(
-                mint_pubkey,
-                self.user.pubkey(),
-            ),
-        });
+        let create_token_ix = create_token_2022_ix(
+            &mut self.lite_svm,
+            CreateToken2022Args {
+                mint: Rc::clone(&mint),
+                mint_authority: Rc::clone(&self.user),
+                payer: Rc::clone(&self.user),
+                decimals: token_decimals,
+                extension_type_with_instructions,
+            },
+        );
 
         let user_pubkey = self.user.pubkey();
         let user_ata = get_associated_token_address_with_program_id(
@@ -166,15 +233,161 @@ impl SetupContext {
         )
         .unwrap();
 
+        [create_token_ix, vec![create_user_ata_ix, mint_ix]].concat()
+    }
+
+    pub fn setup_token_2022_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        let instructions = self.create_token_2022_and_mint_ix(
+            Rc::clone(&mint),
+            token_decimals,
+            supply,
+            get_token_metadata_extension_type_with_instructions(
+                mint_pubkey,
+                self.user.pubkey(),
+                true,
+            ),
+        );
+
         process_transaction(
             &mut self.lite_svm,
-            &[create_user_ata_ix, mint_ix],
-            Some(&user_pubkey),
-            &[&self.user],
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
         )
         .unwrap();
 
-        mint_pubkey
+        mint.pubkey()
+    }
+
+    pub fn setup_token_2022_mint_with_transfer_hook(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+    ) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        let instructions = self.create_token_2022_and_mint_ix(
+            Rc::clone(&mint),
+            token_decimals,
+            supply,
+            [
+                get_token_metadata_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    true,
+                ),
+                get_transfer_hook_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    TRANSFER_HOOK_COUNTER_PROGRAM_ID,
+                ),
+            ]
+            .concat(),
+        );
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    pub fn setup_token_2022_mint_with_transfer_fee(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+    ) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        let instructions = self.create_token_2022_and_mint_ix(
+            Rc::clone(&mint),
+            token_decimals,
+            supply,
+            [
+                get_token_metadata_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    true,
+                ),
+                get_transfer_fee_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    100,
+                    1_000_000,
+                ),
+            ]
+            .concat(),
+        );
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    pub fn setup_token_2022_mint_without_metadata(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+    ) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+
+        let instructions =
+            self.create_token_2022_and_mint_ix(Rc::clone(&mint), token_decimals, supply, vec![]);
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
+    pub fn setup_token_2022_mint_with_mutable_metadata(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+    ) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        let instructions = self.create_token_2022_and_mint_ix(
+            Rc::clone(&mint),
+            token_decimals,
+            supply,
+            get_token_metadata_extension_type_with_instructions(
+                mint_pubkey,
+                self.user.pubkey(),
+                false,
+            ),
+        );
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
     }
 }
 
