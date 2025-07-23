@@ -24,7 +24,7 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
     let HandleEscrowClaimArgs { owner, presale } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
 
     let presale_state = lite_svm
         .get_deserialized_zc_account::<Presale>(&presale)

@@ -8,7 +8,7 @@ pub struct CreateOperatorCtx<'info> {
         seeds = [
             crate::constants::seeds::OPERATOR_PREFIX,
             creator.key().as_ref(),
-            operator.key().as_ref()
+            operator_owner.key().as_ref()
         ],
         space = 8 + Operator::INIT_SPACE,
         payer = creator,

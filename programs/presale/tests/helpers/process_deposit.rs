@@ -48,7 +48,7 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
         .unwrap()
         .owner;
 
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
     let payer_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,
         &presale_state.quote_mint,

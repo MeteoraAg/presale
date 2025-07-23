@@ -31,7 +31,7 @@ pub fn handle_escrow_withdraw_remaining_quote(
     let quote_token_program =
         get_program_id_from_token_flag(presale_state.quote_token_program_flag);
 
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
     let owner_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,
         &presale_state.quote_mint,

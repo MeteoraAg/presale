@@ -16,7 +16,7 @@ pub fn handle_close_escrow(lite_svm: &mut LiteSVM, args: HandleCloseEscrowArgs) 
     let HandleCloseEscrowArgs { owner, presale } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
 
     let ix_data = presale::instruction::CloseEscrow {}.data();
 

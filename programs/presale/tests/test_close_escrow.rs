@@ -16,7 +16,7 @@ fn test_close_escrow() {
     );
     let SetupContext { mut lite_svm, user } = setup_context;
 
-    let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissionless_fixed_price_presale(
             &mut lite_svm,
             mint,

@@ -19,10 +19,9 @@ pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
     pub base: Pubkey,
 }
 
-pub fn handle_initialize_fixed_token_price_presale_params(
-    lite_svm: &mut LiteSVM,
+pub fn create_initialize_fixed_token_price_presale_params_args_ix(
     args: HandleInitializeFixedTokenPricePresaleParamsArgs,
-) {
+) -> Instruction {
     let HandleInitializeFixedTokenPricePresaleParamsArgs {
         base_mint,
         quote_mint,
@@ -63,6 +62,15 @@ pub fn handle_initialize_fixed_token_price_presale_params(
         data: ix_data,
     };
 
+    instruction
+}
+
+pub fn handle_initialize_fixed_token_price_presale_params(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeFixedTokenPricePresaleParamsArgs,
+) {
+    let instruction = create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
+    let HandleInitializeFixedTokenPricePresaleParamsArgs { payer, .. } = args;
     process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
 }
 
