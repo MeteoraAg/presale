@@ -56,13 +56,11 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         program: presale::ID,
     };
 
-    let instruction = Instruction {
+    Instruction {
         program_id: presale::ID,
         accounts: accounts.to_account_metas(None),
         data: ix_data,
-    };
-
-    instruction
+    }
 }
 
 pub fn handle_initialize_fixed_token_price_presale_params(

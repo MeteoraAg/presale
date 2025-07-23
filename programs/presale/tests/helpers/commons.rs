@@ -262,6 +262,50 @@ impl SetupContext {
         mint.pubkey()
     }
 
+    pub fn setup_token_2022_mint_with_transfer_hook_and_fee(
+        &mut self,
+        token_decimals: u8,
+        supply: u64,
+    ) -> Pubkey {
+        let mint = Rc::new(Keypair::new());
+        let mint_pubkey = mint.pubkey();
+
+        let instructions = self.create_token_2022_and_mint_ix(
+            Rc::clone(&mint),
+            token_decimals,
+            supply,
+            [
+                get_token_metadata_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    true,
+                ),
+                get_transfer_hook_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    TRANSFER_HOOK_COUNTER_PROGRAM_ID,
+                ),
+                get_transfer_fee_extension_type_with_instructions(
+                    mint_pubkey,
+                    self.user.pubkey(),
+                    100,
+                    1_000_000,
+                ),
+            ]
+            .concat(),
+        );
+
+        process_transaction(
+            &mut self.lite_svm,
+            &instructions,
+            Some(&self.user.pubkey()),
+            &[&self.user, &mint],
+        )
+        .unwrap();
+
+        mint.pubkey()
+    }
+
     pub fn setup_token_2022_mint_with_transfer_hook(
         &mut self,
         token_decimals: u8,
@@ -593,10 +637,6 @@ pub fn wrap_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, amount: u64) {
 
 pub fn warp_time(lite_svm: &mut LiteSVM, timestamp: u64) {
     let mut clock: Clock = lite_svm.get_sysvar();
-    assert!(
-        timestamp > clock.unix_timestamp as u64,
-        "Cannot warp to past time"
-    );
     clock.unix_timestamp = timestamp as i64;
     lite_svm.set_sysvar(&clock);
 }
