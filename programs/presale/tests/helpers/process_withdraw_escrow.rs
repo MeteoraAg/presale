@@ -3,7 +3,7 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
@@ -12,13 +12,17 @@ use crate::helpers::{
     get_program_id_from_token_flag, process_transaction, LiteSVMExt,
 };
 
+#[derive(Clone)]
 pub struct HandleEscrowWithdrawArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub amount: u64,
 }
 
-pub fn handle_escrow_withdraw(lite_svm: &mut LiteSVM, args: HandleEscrowWithdrawArgs) {
+pub fn create_escrow_withdraw_ix(
+    lite_svm: &LiteSVM,
+    args: HandleEscrowWithdrawArgs,
+) -> Vec<Instruction> {
     let HandleEscrowWithdrawArgs {
         owner,
         presale,
@@ -83,5 +87,22 @@ pub fn handle_escrow_withdraw(lite_svm: &mut LiteSVM, args: HandleEscrowWithdraw
     };
     instructions.push(instruction);
 
+    instructions
+}
+
+pub fn handle_escrow_withdraw(lite_svm: &mut LiteSVM, args: HandleEscrowWithdrawArgs) {
+    let instructions = create_escrow_withdraw_ix(&lite_svm, args.clone());
+    let HandleEscrowWithdrawArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
     process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
+}
+
+pub fn handle_escrow_withdraw_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowWithdrawArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_escrow_withdraw_ix(&lite_svm, args.clone());
+    let HandleEscrowWithdrawArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap_err()
 }
