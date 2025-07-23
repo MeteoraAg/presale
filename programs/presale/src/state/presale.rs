@@ -243,14 +243,6 @@ impl Presale {
             return PresaleProgress::Ongoing;
         }
 
-        // TODO: Remove debug
-        if self.total_deposit > self.presale_maximum_cap {
-            unreachable!(
-                "Total deposit {} is greater than presale maximum cap {}",
-                self.total_deposit, self.presale_maximum_cap
-            );
-        }
-
         if self.total_deposit >= self.presale_minimum_cap {
             PresaleProgress::Completed
         } else {
