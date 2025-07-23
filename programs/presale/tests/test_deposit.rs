@@ -210,7 +210,7 @@ fn test_deposit_with_max_buyer_cap() {
             Rc::clone(&user),
         );
 
-    let deposit_amount = u64::MAX;
+    let deposit_amount = 10 * LAMPORTS_PER_SOL;
 
     handle_escrow_deposit(
         &mut lite_svm,
