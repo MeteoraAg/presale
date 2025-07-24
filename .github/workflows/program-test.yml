@@ -31,12 +31,12 @@ jobs:
     needs: program_changed_files
     if: needs.program_changed_files.outputs.program == 'true'
     steps:
+      # Cache rust, cargo
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-solana
       - uses: ./.github/actions/setup-dep
       - uses: ./.github/actions/setup-anchor
-      # Cache rust, cargo
-      - uses: Swatinem/rust-cache@v2
       - run: anchor build
         shell: bash
       - run: cargo test --package presale
