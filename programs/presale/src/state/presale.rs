@@ -194,7 +194,6 @@ impl Presale {
             presale_minimum_cap,
             buyer_minimum_deposit_cap,
             buyer_maximum_deposit_cap,
-            presale_start_time,
             presale_end_time,
             whitelist_mode,
             presale_mode,
@@ -205,7 +204,8 @@ impl Presale {
         self.presale_minimum_cap = presale_minimum_cap;
         self.buyer_minimum_deposit_cap = buyer_minimum_deposit_cap;
         self.buyer_maximum_deposit_cap = buyer_maximum_deposit_cap;
-        self.presale_start_time = presale_start_time;
+        self.presale_start_time =
+            presale_params.get_presale_start_time_without_going_backwards(current_timestamp);
         self.presale_end_time = presale_end_time;
         self.whitelist_mode = whitelist_mode;
         self.presale_mode = presale_mode;
@@ -243,14 +243,6 @@ impl Presale {
             return PresaleProgress::Ongoing;
         }
 
-        // TODO: Remove debug
-        if self.total_deposit > self.presale_maximum_cap {
-            unreachable!(
-                "Total deposit {} is greater than presale maximum cap {}",
-                self.total_deposit, self.presale_maximum_cap
-            );
-        }
-
         if self.total_deposit >= self.presale_minimum_cap {
             PresaleProgress::Completed
         } else {
@@ -278,7 +270,10 @@ impl Presale {
             .unwrap();
 
         self.vesting_start_time = self.lock_end_time.checked_add(1).unwrap();
-        self.vesting_end_time = self.lock_end_time.checked_add(self.vest_duration).unwrap();
+        self.vesting_end_time = self
+            .vesting_start_time
+            .checked_add(self.vest_duration)
+            .unwrap();
 
         Ok(())
     }

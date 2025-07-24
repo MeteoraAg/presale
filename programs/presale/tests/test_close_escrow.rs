@@ -3,12 +3,13 @@ pub mod helpers;
 use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
+use anchor_lang::error::ERROR_CODE_OFFSET;
 use helpers::*;
 use presale::Presale;
 use std::rc::Rc;
 
 #[test]
-fn test_close_escrow() {
+fn test_close_escrow_with_deposit() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -16,7 +17,199 @@ fn test_close_escrow() {
     );
     let SetupContext { mut lite_svm, user } = setup_context;
 
-    let HandleCreatePredefinedPermissionlessFixedPricePresaleResponse { presale_pubkey, .. } =
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: presale_state.presale_maximum_cap,
+        },
+    );
+
+    let err = handle_close_escrow_err(
+        &mut lite_svm,
+        HandleCloseEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::EscrowNotEmpty;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}
+
+#[test]
+fn test_close_escrow_with_unclaimed_token() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: presale_state.presale_maximum_cap,
+        },
+    );
+
+    warp_time(
+        &mut lite_svm,
+        presale_state.vesting_start_time + presale_state.vest_duration / 2,
+    );
+
+    let err = handle_close_escrow_err(
+        &mut lite_svm,
+        HandleCloseEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::EscrowNotEmpty;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}
+
+#[test]
+fn test_close_escrow_presale_ongoing() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let user_1 = Rc::new(Keypair::new());
+    let funding_amount = LAMPORTS_PER_SOL * 3;
+    transfer_sol(
+        &mut lite_svm,
+        Rc::clone(&user),
+        user_1.pubkey(),
+        funding_amount,
+    );
+    wrap_sol(
+        &mut lite_svm,
+        Rc::clone(&user_1),
+        funding_amount - LAMPORTS_PER_SOL,
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let amount_0 = presale_state.presale_maximum_cap / 2;
+    let amount_1 = presale_state.presale_maximum_cap - amount_0;
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: amount_0,
+        },
+    );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            max_amount: amount_1,
+        },
+    );
+
+    handle_escrow_withdraw(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: amount_0,
+        },
+    );
+
+    handle_escrow_withdraw(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            amount: amount_1,
+        },
+    );
+
+    handle_close_escrow(
+        &mut lite_svm,
+        HandleCloseEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    handle_close_escrow(
+        &mut lite_svm,
+        HandleCloseEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    assert_eq!(presale_state.total_escrow, 0);
+}
+
+#[test]
+fn test_close_escrow_presale_completed() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissionless_fixed_price_presale(
             &mut lite_svm,
             mint,
@@ -67,16 +260,14 @@ fn test_close_escrow() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(
-        &mut lite_svm,
-        presale_state.vesting_end_time - presale_state.vest_duration / 2,
-    );
+    warp_time(&mut lite_svm, presale_state.vesting_end_time + 1);
 
     handle_escrow_claim(
         &mut lite_svm,
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            refresh_escrow: true,
         },
     );
 
@@ -85,24 +276,7 @@ fn test_close_escrow() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
-        },
-    );
-
-    warp_time(&mut lite_svm, presale_state.vesting_end_time);
-
-    handle_escrow_claim(
-        &mut lite_svm,
-        HandleEscrowClaimArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user),
-        },
-    );
-
-    handle_escrow_claim(
-        &mut lite_svm,
-        HandleEscrowClaimArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user_1),
+            refresh_escrow: true,
         },
     );
 
@@ -125,5 +299,6 @@ fn test_close_escrow() {
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
-    println!("Presale state after claim: {:?}", presale_state);
+
+    assert_eq!(presale_state.total_escrow, 0);
 }

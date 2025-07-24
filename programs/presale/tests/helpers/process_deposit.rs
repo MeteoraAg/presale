@@ -1,9 +1,16 @@
 use anchor_client::solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
+    system_instruction,
 };
 use anchor_lang::*;
-use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use litesvm::LiteSVM;
+use anchor_spl::{
+    associated_token::{
+        get_associated_token_address_with_program_id,
+        spl_associated_token_account::instruction::create_associated_token_account_idempotent,
+    },
+    token_2022::spl_token_2022::instruction::sync_native,
+};
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
@@ -13,13 +20,17 @@ use crate::helpers::{
     token::get_program_id_from_token_flag, LiteSVMExt,
 };
 
+#[derive(Clone)]
 pub struct HandleEscrowDepositArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub max_amount: u64,
 }
 
-pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositArgs) {
+pub fn create_deposit_ix(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowDepositArgs,
+) -> Vec<Instruction> {
     let HandleEscrowDepositArgs {
         owner,
         presale,
@@ -48,12 +59,31 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
         .unwrap()
         .owner;
 
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+
     let payer_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,
         &presale_state.quote_mint,
         &quote_token_program,
     );
+
+    let create_payer_quote_token_ix = create_associated_token_account_idempotent(
+        &owner_pubkey,
+        &owner_pubkey,
+        &presale_state.quote_mint,
+        &quote_token_program,
+    );
+    instructions.push(create_payer_quote_token_ix);
+
+    if presale_state.quote_mint == anchor_spl::token::spl_token::native_mint::ID {
+        instructions.push(system_instruction::transfer(
+            &owner.pubkey(),
+            &payer_quote_token,
+            max_amount,
+        ));
+
+        instructions.push(sync_native(&quote_token_program, &payer_quote_token).unwrap());
+    }
 
     let transfer_hook_account = get_extra_account_metas_for_transfer_hook(
         &get_program_id_from_token_flag(presale_state.quote_token_program_flag),
@@ -97,5 +127,20 @@ pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositAr
     };
     instructions.push(instruction);
 
-    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
+    instructions
+}
+
+pub fn handle_escrow_deposit(lite_svm: &mut LiteSVM, args: HandleEscrowDepositArgs) {
+    let instructions = create_deposit_ix(lite_svm, args.clone());
+    let HandleEscrowDepositArgs { owner, .. } = args;
+    process_transaction(lite_svm, &instructions, Some(&owner.pubkey()), &[&owner]).unwrap();
+}
+
+pub fn handle_escrow_deposit_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowDepositArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_deposit_ix(lite_svm, args.clone());
+    let HandleEscrowDepositArgs { owner, .. } = args;
+    process_transaction(lite_svm, &instructions, Some(&owner.pubkey()), &[&owner]).unwrap_err()
 }

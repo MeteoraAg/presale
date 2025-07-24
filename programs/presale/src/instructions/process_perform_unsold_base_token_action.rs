@@ -50,9 +50,13 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
 
     // 1. Ensure the presale is completed
     require!(
-        presale_progress == PresaleProgress::Completed
-            && !presale.is_fixed_price_presale_unsold_token_action_performed(),
+        presale_progress == PresaleProgress::Completed,
         PresaleError::PresaleNotCompleted
+    );
+
+    require!(
+        !presale.is_fixed_price_presale_unsold_token_action_performed(),
+        PresaleError::UnsoldBaseTokenActionAlreadyPerformed
     );
 
     // 2. Compute the total unsold base tokens
@@ -60,6 +64,7 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
     let presale_handler = get_presale_mode_handler(presale_mode);
 
     let total_token_unsold = presale.get_total_unsold_token(presale_handler.as_ref())?;
+    require!(total_token_unsold > 0, PresaleError::NoUnsoldBaseTokens);
 
     presale.set_fixed_price_presale_unsold_token_action_performed()?;
 

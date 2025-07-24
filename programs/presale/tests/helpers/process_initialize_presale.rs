@@ -134,6 +134,10 @@ pub fn create_initialize_presale_ix(
         lite_svm,
     );
 
+    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
+
+    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
+
     let ix_data = presale::instruction::InitializePresale {
         params: presale::InitializePresaleArgs {
             tokenomic,
@@ -159,6 +163,159 @@ pub fn create_initialize_presale_ix(
     vec![init_presale_ix]
 }
 
+pub struct HandleCreatePredefinedPresaleResponse {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub presale_pubkey: Pubkey,
+}
+
+pub fn create_predefined_fixed_price_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
+    let user_pubkey = user.pubkey();
+
+    let args = HandleInitializeFixedTokenPricePresaleParamsArgs {
+        base_mint,
+        quote_mint,
+        q_price: calculate_q_price_from_ui_price(
+            0.01,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        ),
+        unsold_token_action,
+        owner: user_pubkey,
+        payer: Rc::clone(&user),
+        base: user_pubkey,
+    };
+    let init_fixed_token_price_presale_args_ix =
+        create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
+
+    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+
+    let mut presale_params = create_presale_args(&lite_svm);
+    presale_params.presale_mode = PresaleMode::FixedPrice.into();
+    presale_params.whitelist_mode = whitelist_mode.into();
+
+    let locked_vesting_params = create_locked_vesting_args();
+
+    let init_presale_ix = create_initialize_presale_ix(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint,
+            quote_mint,
+            tokenomic,
+            presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![AccountMeta {
+                pubkey: derive_fixed_price_presale_args(
+                    &base_mint,
+                    &quote_mint,
+                    &user_pubkey,
+                    &presale::ID,
+                ),
+                is_signer: false,
+                is_writable: false,
+            }],
+        },
+    );
+
+    [
+        vec![init_fixed_token_price_presale_args_ix],
+        init_presale_ix,
+    ]
+    .concat()
+}
+
+fn create_predefined_prorata_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let user_pubkey = user.pubkey();
+
+    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+
+    let mut presale_params = create_presale_args(&lite_svm);
+    presale_params.presale_mode = PresaleMode::Prorata.into();
+    presale_params.whitelist_mode = whitelist_mode.into();
+
+    let locked_vesting_params = create_locked_vesting_args();
+
+    create_initialize_presale_ix(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint,
+            quote_mint,
+            tokenomic,
+            presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![],
+        },
+    )
+}
+
+fn create_predefined_fcfs_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let user_pubkey = user.pubkey();
+
+    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+
+    let mut presale_params = create_presale_args(&lite_svm);
+    presale_params.presale_mode = PresaleMode::Fcfs.into();
+    presale_params.whitelist_mode = whitelist_mode.into();
+
+    let locked_vesting_params = create_locked_vesting_args();
+
+    create_initialize_presale_ix(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint,
+            quote_mint,
+            tokenomic,
+            presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![],
+        },
+    )
+}
+
 pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
     let HandleInitializePresaleArgs { payer, .. } = args.clone();
     let instructions = create_initialize_presale_ix(lite_svm, args);
@@ -174,86 +331,29 @@ pub fn handle_initialize_presale_err(
     process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap_err()
 }
 
-pub struct HandleCreatePredefinedPermissionlessFixedPricePresaleResponse {
-    pub base_mint: Pubkey,
-    pub quote_mint: Pubkey,
-    pub presale_pubkey: Pubkey,
-}
-
-pub fn handle_create_predefined_permissionless_fixed_price_presale(
+pub fn handle_create_predefined_permissionless_prorata_presale(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
     user: Rc<Keypair>,
-) -> HandleCreatePredefinedPermissionlessFixedPricePresaleResponse {
-    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
-    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_prorata_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+    );
 
-    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
-        .expect("Failed to deserialize base mint state");
-
-    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
-        .expect("Failed to deserialize quote mint state");
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
-    let unsold_token_action = UnsoldTokenAction::Burn;
-    let args = HandleInitializeFixedTokenPricePresaleParamsArgs {
-        base_mint,
-        quote_mint,
-        q_price: calculate_q_price_from_ui_price(
-            0.01,
-            base_mint_state.decimals,
-            quote_mint_state.decimals,
-        ),
-        unsold_token_action,
-        owner: user_pubkey,
-        payer: Rc::clone(&user),
-        base: user_pubkey,
-    };
-    handle_initialize_fixed_token_price_presale_params(lite_svm, args.clone());
-
-    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
-
-    let mut presale_params = create_presale_args(&lite_svm);
-    presale_params.presale_mode = PresaleMode::FixedPrice.into();
-
-    let locked_vesting_params = create_locked_vesting_args();
-
-    handle_initialize_presale(
-        lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint,
-            quote_mint,
-            tokenomic,
-            presale_params,
-            locked_vesting_params: Some(locked_vesting_params),
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![AccountMeta {
-                pubkey: derive_fixed_price_presale_args(
-                    &base_mint,
-                    &quote_mint,
-                    &user_pubkey,
-                    &presale::ID,
-                ),
-                is_signer: false,
-                is_writable: false,
-            }],
-        },
-    );
-
-    HandleCreatePredefinedPermissionlessFixedPricePresaleResponse {
+    HandleCreatePredefinedPresaleResponse {
         base_mint,
         quote_mint,
         presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
     }
-}
-
-pub struct HandleCreatePredefinedPermissionlessFcfsPresaleResponse {
-    pub base_mint: Pubkey,
-    pub quote_mint: Pubkey,
-    pub presale_pubkey: Pubkey,
 }
 
 pub fn handle_create_predefined_permissionless_fcfs_presale(
@@ -261,45 +361,98 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
     base_mint: Pubkey,
     quote_mint: Pubkey,
     user: Rc<Keypair>,
-) -> HandleCreatePredefinedPermissionlessFcfsPresaleResponse {
-    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fcfs_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+    );
 
-    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
-        .expect("Failed to deserialize base mint state");
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
-    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
 
-    let mut presale_params = create_presale_args(&lite_svm);
-    presale_params.presale_mode = PresaleMode::Fcfs.into();
-
-    let locked_vesting_params = create_locked_vesting_args();
-
-    handle_initialize_presale(
+pub fn handle_create_predefined_permissionless_fixed_price_presale(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix(
         lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint,
-            quote_mint,
-            tokenomic,
-            presale_params,
-            locked_vesting_params: Some(locked_vesting_params),
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![AccountMeta {
-                pubkey: derive_fixed_price_presale_args(
-                    &base_mint,
-                    &quote_mint,
-                    &user_pubkey,
-                    &presale::ID,
-                ),
-                is_signer: false,
-                is_writable: false,
-            }],
-        },
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+        UnsoldTokenAction::Burn,
     );
 
-    HandleCreatePredefinedPermissionlessFcfsPresaleResponse {
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_authority_fixed_price_presale(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithAuthority,
+        UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
+        UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
         base_mint,
         quote_mint,
         presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),

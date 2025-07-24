@@ -2,21 +2,22 @@ use anchor_client::solana_sdk::{
     instruction::Instruction, pubkey::Pubkey, signature::Keypair, signer::Signer,
 };
 use anchor_lang::*;
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use std::rc::Rc;
 
 use crate::helpers::{derive_escrow, derive_event_authority, process_transaction};
 
+#[derive(Clone)]
 pub struct HandleCloseEscrowArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
 }
 
-pub fn handle_close_escrow(lite_svm: &mut LiteSVM, args: HandleCloseEscrowArgs) {
+pub fn handle_close_escrow_ix(args: HandleCloseEscrowArgs) -> Vec<Instruction> {
     let HandleCloseEscrowArgs { owner, presale } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
 
     let ix_data = presale::instruction::CloseEscrow {}.data();
 
@@ -36,5 +37,22 @@ pub fn handle_close_escrow(lite_svm: &mut LiteSVM, args: HandleCloseEscrowArgs) 
         data: ix_data,
     };
 
-    process_transaction(lite_svm, &[ix], Some(&owner_pubkey), &[&owner]).unwrap();
+    vec![ix]
+}
+
+pub fn handle_close_escrow(lite_svm: &mut LiteSVM, args: HandleCloseEscrowArgs) {
+    let instructions = handle_close_escrow_ix(args.clone());
+    let HandleCloseEscrowArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
+}
+
+pub fn handle_close_escrow_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleCloseEscrowArgs,
+) -> FailedTransactionMetadata {
+    let instructions = handle_close_escrow_ix(args.clone());
+    let HandleCloseEscrowArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap_err()
 }

@@ -53,12 +53,36 @@ pub fn derive_fixed_price_presale_args(
     .0
 }
 
-pub fn derive_escrow(presale: Pubkey, owner: Pubkey, program_id: &Pubkey) -> Pubkey {
+pub fn derive_escrow(presale: &Pubkey, owner: &Pubkey, program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[
             presale::seeds::ESCROW_PREFIX.as_ref(),
             presale.as_ref(),
             owner.as_ref(),
+        ],
+        program_id,
+    )
+    .0
+}
+
+pub fn derive_operator(creator: &Pubkey, operator: &Pubkey, program_id: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            presale::seeds::OPERATOR_PREFIX.as_ref(),
+            creator.as_ref(),
+            operator.as_ref(),
+        ],
+        program_id,
+    )
+    .0
+}
+
+pub fn derive_merkle_root_config(presale: &Pubkey, version: u64, program_id: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(
+        &[
+            presale::seeds::MERKLE_ROOT_CONFIG_PREFIX.as_ref(),
+            presale.as_ref(),
+            version.to_le_bytes().as_ref(),
         ],
         program_id,
     )

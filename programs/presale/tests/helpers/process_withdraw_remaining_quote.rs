@@ -3,7 +3,7 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
@@ -12,15 +12,16 @@ use crate::helpers::{
     get_program_id_from_token_flag, process_transaction, LiteSVMExt,
 };
 
+#[derive(Clone)]
 pub struct HandleEscrowWithdrawRemainingQuoteArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
 }
 
-pub fn handle_escrow_withdraw_remaining_quote(
+pub fn create_escrow_withdraw_remaining_quote_ix(
     lite_svm: &mut LiteSVM,
     args: HandleEscrowWithdrawRemainingQuoteArgs,
-) {
+) -> Vec<Instruction> {
     let HandleEscrowWithdrawRemainingQuoteArgs { owner, presale } = args;
     let owner_pubkey = owner.pubkey();
 
@@ -31,7 +32,7 @@ pub fn handle_escrow_withdraw_remaining_quote(
     let quote_token_program =
         get_program_id_from_token_flag(presale_state.quote_token_program_flag);
 
-    let escrow = derive_escrow(presale, owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
     let owner_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,
         &presale_state.quote_mint,
@@ -80,5 +81,25 @@ pub fn handle_escrow_withdraw_remaining_quote(
     };
     instructions.push(instruction);
 
+    instructions
+}
+
+pub fn handle_escrow_withdraw_remaining_quote(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowWithdrawRemainingQuoteArgs,
+) {
+    let instructions = create_escrow_withdraw_remaining_quote_ix(lite_svm, args.clone());
+    let HandleEscrowWithdrawRemainingQuoteArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
     process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
+}
+
+pub fn handle_escrow_withdraw_remaining_quote_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowWithdrawRemainingQuoteArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_escrow_withdraw_remaining_quote_ix(lite_svm, args.clone());
+    let HandleEscrowWithdrawRemainingQuoteArgs { owner, .. } = args;
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap_err()
 }

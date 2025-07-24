@@ -10,6 +10,8 @@ pub struct EvtFixedPricePresaleArgsCreate {
 #[event]
 pub struct EvtFixedPricePresaleArgsClose {
     pub presale: Pubkey,
+    pub owner: Pubkey,
+    pub fixed_price_presale_args: Pubkey,
 }
 
 #[event]

@@ -99,6 +99,8 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     let exclude_transfer_fee_amount_withdrawn =
         calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, amount)?.amount;
 
+    // TODO: Should we ensure that the total deposit amount can buy at least one token after withdraw?
+
     emit_cpi!(EvtWithdraw {
         presale: ctx.accounts.presale.key(),
         escrow: ctx.accounts.escrow.key(),

@@ -1,24 +1,24 @@
 use crate::helpers::process_transaction;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::{
-    program_pack::Pack, signature::Keypair, signer::Signer, system_instruction::create_account,
+    instruction::Instruction, program_pack::Pack, signature::Keypair, signer::Signer,
+    system_instruction::create_account,
 };
 use anchor_lang::prelude::Rent;
 use anchor_spl::token::spl_token::instruction::initialize_mint;
 use litesvm::LiteSVM;
 use std::rc::Rc;
 
-pub struct CreateTokenArgs<'a> {
-    pub lite_svm: &'a mut LiteSVM,
+#[derive(Clone)]
+pub struct CreateTokenArgs {
     pub mint: Rc<Keypair>,
     pub mint_authority: Rc<Keypair>,
     pub payer: Rc<Keypair>,
     pub decimals: u8,
 }
 
-pub fn create_token(args: CreateTokenArgs) {
+pub fn create_token_ix(lite_svm: &mut LiteSVM, args: CreateTokenArgs) -> Vec<Instruction> {
     let CreateTokenArgs {
-        lite_svm,
         mint,
         mint_authority,
         payer,
@@ -51,10 +51,16 @@ pub fn create_token(args: CreateTokenArgs) {
     )
     .expect("Failed to create initialize_mint instruction");
 
+    vec![create_account_ix, initialize_mint_ix]
+}
+
+pub fn create_token(lite_svm: &mut LiteSVM, args: CreateTokenArgs) {
+    let instructions = create_token_ix(lite_svm, args.clone());
+    let CreateTokenArgs { mint, payer, .. } = args;
     process_transaction(
         lite_svm,
-        &[create_account_ix, initialize_mint_ix],
-        Some(&payer_pubkey),
+        &instructions,
+        Some(&payer.pubkey()),
         &[&payer, &mint],
     )
     .unwrap();
