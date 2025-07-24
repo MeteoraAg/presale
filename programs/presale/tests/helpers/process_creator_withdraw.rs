@@ -9,7 +9,7 @@ use anchor_spl::associated_token::{
     get_associated_token_address_with_program_id,
     spl_associated_token_account::instruction::create_associated_token_account_idempotent,
 };
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{
     AccountsType, Presale, PresaleProgress, RemainingAccountsInfo, RemainingAccountsSlice,
 };
@@ -20,13 +20,16 @@ use crate::helpers::{
     get_program_id_from_token_flag, process_transaction, LiteSVMExt,
 };
 
-// TODO: Handle presale progress
+#[derive(Clone)]
 pub struct HandleCreatorWithdrawTokenArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
 }
 
-pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreatorWithdrawTokenArgs) {
+pub fn create_creator_withdraw_token_ix(
+    lite_svm: &mut LiteSVM,
+    args: HandleCreatorWithdrawTokenArgs,
+) -> Vec<Instruction> {
     let HandleCreatorWithdrawTokenArgs { owner, presale } = args;
 
     let owner_pubkey = owner.pubkey();
@@ -159,11 +162,20 @@ pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreator
         data: ix_data,
     };
 
-    process_transaction(
-        lite_svm,
-        &[create_owner_token_ix, ix],
-        Some(&owner_pubkey),
-        &[&owner],
-    )
-    .unwrap();
+    vec![create_owner_token_ix, ix]
+}
+
+pub fn handle_creator_withdraw_token(lite_svm: &mut LiteSVM, args: HandleCreatorWithdrawTokenArgs) {
+    let instructions = create_creator_withdraw_token_ix(lite_svm, args.clone());
+    let HandleCreatorWithdrawTokenArgs { owner, .. } = args;
+    process_transaction(lite_svm, &instructions, Some(&owner.pubkey()), &[&owner]).unwrap();
+}
+
+pub fn handle_creator_withdraw_token_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleCreatorWithdrawTokenArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_creator_withdraw_token_ix(lite_svm, args.clone());
+    let HandleCreatorWithdrawTokenArgs { owner, .. } = args;
+    process_transaction(lite_svm, &instructions, Some(&owner.pubkey()), &[&owner]).unwrap_err()
 }
