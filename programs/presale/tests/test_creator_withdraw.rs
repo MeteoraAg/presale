@@ -124,14 +124,14 @@ fn test_creator_withdraw_presale_token_2022_failed() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    let creator_quote_token_address = get_associated_token_address_with_program_id(
+    let creator_base_token_address = get_associated_token_address_with_program_id(
         &user.pubkey(),
-        &presale_state.quote_mint,
-        &get_program_id_from_token_flag(presale_state.quote_token_program_flag),
+        &presale_state.base_mint,
+        &get_program_id_from_token_flag(presale_state.base_token_program_flag),
     );
 
-    let before_creator_quote_account: TokenAccount = lite_svm
-        .get_deserialized_account(&creator_quote_token_address)
+    let before_creator_base_account: TokenAccount = lite_svm
+        .get_deserialized_account(&creator_base_token_address)
         .unwrap();
 
     handle_creator_withdraw_token(
@@ -142,11 +142,11 @@ fn test_creator_withdraw_presale_token_2022_failed() {
         },
     );
 
-    let after_creator_quote_account: TokenAccount = lite_svm
-        .get_deserialized_account(&creator_quote_token_address)
+    let after_creator_base_account: TokenAccount = lite_svm
+        .get_deserialized_account(&creator_base_token_address)
         .unwrap();
 
-    assert!(after_creator_quote_account.amount > before_creator_quote_account.amount);
+    assert!(after_creator_base_account.amount > before_creator_base_account.amount);
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -309,10 +309,6 @@ fn test_creator_withdraw_when_presale_ongoing() {
             anchor_spl::token::spl_token::native_mint::ID,
             Rc::clone(&user),
         );
-
-    let presale_state: Presale = lite_svm
-        .get_deserialized_zc_account(&presale_pubkey)
-        .unwrap();
 
     let err = handle_creator_withdraw_token_err(
         &mut lite_svm,
