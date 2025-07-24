@@ -6,7 +6,7 @@ use anchor_spl::associated_token::{
     get_associated_token_address_with_program_id,
     spl_associated_token_account::instruction::create_associated_token_account_idempotent,
 };
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
@@ -15,15 +15,16 @@ use crate::helpers::{
     get_program_id_from_token_flag, process_transaction, LiteSVMExt,
 };
 
+#[derive(Clone)]
 pub struct HandlePerformUnsoldTokenActionArgs {
     pub presale: Pubkey,
     pub creator: Rc<Keypair>,
 }
 
-pub fn handle_perform_unsold_token_action(
+pub fn create_perform_unsold_token_action_ix(
     lite_svm: &mut LiteSVM,
     args: HandlePerformUnsoldTokenActionArgs,
-) {
+) -> Vec<Instruction> {
     let HandlePerformUnsoldTokenActionArgs { creator, presale } = args;
 
     let creator_pubkey = creator.pubkey();
@@ -87,11 +88,25 @@ pub fn handle_perform_unsold_token_action(
         data: ix_data,
     };
 
-    process_transaction(
-        lite_svm,
-        &[create_creator_base_token_ix, ix],
-        Some(&creator_pubkey),
-        &[&creator],
-    )
-    .unwrap();
+    vec![create_creator_base_token_ix, ix]
+}
+
+pub fn handle_perform_unsold_token_action(
+    lite_svm: &mut LiteSVM,
+    args: HandlePerformUnsoldTokenActionArgs,
+) {
+    let instructions = create_perform_unsold_token_action_ix(lite_svm, args.clone());
+    let HandlePerformUnsoldTokenActionArgs { creator, .. } = args;
+    let creator_pubkey = creator.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&creator_pubkey), &[&creator]).unwrap();
+}
+
+pub fn handle_perform_unsold_token_action_err(
+    lite_svm: &mut LiteSVM,
+    args: HandlePerformUnsoldTokenActionArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_perform_unsold_token_action_ix(lite_svm, args.clone());
+    let HandlePerformUnsoldTokenActionArgs { creator, .. } = args;
+    let creator_pubkey = creator.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&creator_pubkey), &[&creator]).unwrap_err()
 }

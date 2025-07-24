@@ -110,4 +110,10 @@ pub enum PresaleError {
 
     #[msg("Invalid operator")]
     InvalidOperator,
+
+    #[msg("No unsold base tokens")]
+    NoUnsoldBaseTokens,
+
+    #[msg("Unsold base token action already performed")]
+    UnsoldBaseTokenActionAlreadyPerformed,
 }

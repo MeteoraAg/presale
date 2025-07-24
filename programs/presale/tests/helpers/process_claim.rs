@@ -116,7 +116,7 @@ pub fn create_escrow_claim_ix(
     };
 
     if refresh_escrow {
-        vec![create_owner_base_token_ix, claim_ix, refresh_ix]
+        vec![create_owner_base_token_ix, refresh_ix, claim_ix]
     } else {
         vec![create_owner_base_token_ix, claim_ix]
     }

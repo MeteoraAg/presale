@@ -169,12 +169,13 @@ pub struct HandleCreatePredefinedPresaleResponse {
     pub presale_pubkey: Pubkey,
 }
 
-fn create_predefined_fixed_price_presale_ix(
+pub fn create_predefined_fixed_price_presale_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
@@ -187,7 +188,6 @@ fn create_predefined_fixed_price_presale_ix(
 
     let user_pubkey = user.pubkey();
 
-    let unsold_token_action = UnsoldTokenAction::Burn;
     let args = HandleInitializeFixedTokenPricePresaleParamsArgs {
         base_mint,
         quote_mint,
@@ -393,6 +393,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::Permissionless,
+        UnsoldTokenAction::Burn,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
@@ -418,6 +419,7 @@ pub fn handle_create_predefined_permissioned_with_authority_fixed_price_presale(
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::PermissionWithAuthority,
+        UnsoldTokenAction::Burn,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
@@ -443,6 +445,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::PermissionWithMerkleProof,
+        UnsoldTokenAction::Burn,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
