@@ -136,11 +136,6 @@ pub fn create_initialize_presale_ix(
 
     accounts.extend_from_slice(&base_token_transfer_hook_accounts);
 
-    println!(
-        "Base token transfer hook accounts: {:?}",
-        base_token_transfer_hook_accounts.len()
-    );
-
     accounts.extend_from_slice(&base_token_transfer_hook_accounts);
 
     let ix_data = presale::instruction::InitializePresale {

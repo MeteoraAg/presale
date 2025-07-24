@@ -6,7 +6,7 @@ use anchor_spl::associated_token::{
     get_associated_token_address_with_program_id,
     spl_associated_token_account::instruction::create_associated_token_account_idempotent,
 };
-use litesvm::LiteSVM;
+use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{AccountsType, Presale, RemainingAccountsInfo, RemainingAccountsSlice};
 use std::rc::Rc;
 
@@ -15,13 +15,22 @@ use crate::helpers::{
     process_transaction, LiteSVMExt,
 };
 
+#[derive(Clone)]
 pub struct HandleEscrowClaimArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
+    pub refresh_escrow: bool,
 }
 
-pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) {
-    let HandleEscrowClaimArgs { owner, presale } = args;
+pub fn create_escrow_claim_ix(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowClaimArgs,
+) -> Vec<Instruction> {
+    let HandleEscrowClaimArgs {
+        owner,
+        presale,
+        refresh_escrow,
+    } = args;
 
     let owner_pubkey = owner.pubkey();
     let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
@@ -106,11 +115,26 @@ pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) 
         data: ix_data,
     };
 
-    process_transaction(
-        lite_svm,
-        &[create_owner_base_token_ix, refresh_ix, claim_ix],
-        Some(&owner_pubkey),
-        &[&owner],
-    )
-    .unwrap();
+    if refresh_escrow {
+        vec![create_owner_base_token_ix, claim_ix, refresh_ix]
+    } else {
+        vec![create_owner_base_token_ix, claim_ix]
+    }
+}
+
+pub fn handle_escrow_claim(lite_svm: &mut LiteSVM, args: HandleEscrowClaimArgs) {
+    let instructions = create_escrow_claim_ix(lite_svm, args.clone());
+    let owner = Rc::clone(&args.owner);
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap();
+}
+
+pub fn handle_escrow_claim_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleEscrowClaimArgs,
+) -> FailedTransactionMetadata {
+    let instructions = create_escrow_claim_ix(lite_svm, args.clone());
+    let owner = Rc::clone(&args.owner);
+    let owner_pubkey = owner.pubkey();
+    process_transaction(lite_svm, &instructions, Some(&owner_pubkey), &[&owner]).unwrap_err()
 }

@@ -17,7 +17,12 @@ use anchor_spl::associated_token::{
     get_associated_token_address, get_associated_token_address_with_program_id,
 };
 use anchor_spl::token::spl_token::state::AccountState;
-use anchor_spl::token_2022::spl_token_2022::instruction::mint_to;
+use anchor_spl::token_2022::spl_token_2022::extension::transfer_hook::TransferHook;
+use anchor_spl::token_2022::spl_token_2022::extension::{
+    BaseStateWithExtensions, StateWithExtensions,
+};
+use anchor_spl::token_2022::spl_token_2022::instruction::{mint_to, transfer_checked};
+use anchor_spl::token_2022::spl_token_2022::state::Mint;
 use litesvm::types::{FailedTransactionMetadata, SimulatedTransactionInfo};
 use litesvm::LiteSVM;
 use mpl_token_metadata::accounts::Metadata;
@@ -25,7 +30,8 @@ use mpl_token_metadata::instructions::CreateMetadataAccountV3Builder;
 use mpl_token_metadata::types::DataV2;
 
 use crate::helpers::{
-    create_token_2022_ix, create_token_ix, get_token_metadata_extension_type_with_instructions,
+    add_extra_account_metas_for_execute, create_token_2022_ix, create_token_ix,
+    get_token_metadata_extension_type_with_instructions,
     get_transfer_fee_extension_type_with_instructions,
     get_transfer_hook_extension_type_with_instructions, CreateToken2022Args, CreateTokenArgs,
     ExtensionTypeWithInstructions, TRANSFER_HOOK_COUNTER_PROGRAM_ID,
@@ -37,6 +43,7 @@ const NATIVE_SOL_MINT: Pubkey =
 pub const DEFAULT_BASE_TOKEN_DECIMALS: u8 = 6;
 pub const DEFAULT_QUOTE_TOKEN_DECIMALS: u8 = 9;
 
+// TODO: Refactor this to allow setup user, and user struct can interact with the program
 pub struct SetupContext {
     pub lite_svm: LiteSVM,
     pub user: Rc<Keypair>,
@@ -610,6 +617,67 @@ pub fn transfer_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, destination: Pubk
     );
 
     process_transaction(lite_svm, &[transfer_ix], Some(&user.pubkey()), &[&user]).unwrap();
+}
+
+pub fn transfer_token(
+    lite_svm: &mut LiteSVM,
+    user: Rc<Keypair>,
+    destination: Pubkey,
+    mint: Pubkey,
+    amount: u64,
+) {
+    let mint_account = lite_svm.get_account(&mint).unwrap();
+    let mint_owner = mint_account.owner;
+
+    let mint_state = StateWithExtensions::<Mint>::unpack(mint_account.data.as_slice()).unwrap();
+
+    let create_ata_ix = create_associated_token_account_idempotent(
+        &user.pubkey(),
+        &destination,
+        &mint,
+        &mint_owner,
+    );
+
+    let from_ata = get_associated_token_address_with_program_id(&user.pubkey(), &mint, &mint_owner);
+    let to_ata = get_associated_token_address_with_program_id(&destination, &mint, &mint_owner);
+
+    let mut transfer_ix = transfer_checked(
+        &mint_owner,
+        &from_ata,
+        &mint,
+        &to_ata,
+        &user.pubkey(),
+        &[&user.pubkey()],
+        amount,
+        mint_state.base.decimals,
+    )
+    .unwrap();
+
+    if let Some(transfer_hook_program_id) = mint_state
+        .get_extension::<TransferHook>()
+        .map(|ext| Option::<Pubkey>::from(ext.program_id))
+        .ok()
+        .flatten()
+    {
+        add_extra_account_metas_for_execute(
+            &mut transfer_ix,
+            &transfer_hook_program_id,
+            &from_ata,
+            &mint,
+            &to_ata,
+            &user.pubkey(),
+            amount,
+            lite_svm,
+        );
+    };
+
+    process_transaction(
+        lite_svm,
+        &[create_ata_ix, transfer_ix],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 }
 
 pub fn wrap_sol(lite_svm: &mut LiteSVM, user: Rc<Keypair>, amount: u64) {

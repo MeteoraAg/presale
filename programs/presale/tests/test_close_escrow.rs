@@ -77,6 +77,7 @@ fn test_close_escrow() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            refresh_escrow: true,
         },
     );
 
@@ -85,6 +86,7 @@ fn test_close_escrow() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
+            refresh_escrow: true,
         },
     );
 
@@ -95,6 +97,7 @@ fn test_close_escrow() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            refresh_escrow: true,
         },
     );
 
@@ -103,6 +106,7 @@ fn test_close_escrow() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
+            refresh_escrow: true,
         },
     );
 

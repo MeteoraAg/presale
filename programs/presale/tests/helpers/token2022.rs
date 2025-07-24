@@ -342,7 +342,7 @@ pub fn get_extra_account_metas_for_transfer_hook(
     extra_account_metas_slice
 }
 
-fn add_extra_account_metas_for_execute(
+pub fn add_extra_account_metas_for_execute(
     instruction: &mut Instruction,
     program_id: &Pubkey,
     source_pubkey: &Pubkey,
@@ -353,7 +353,6 @@ fn add_extra_account_metas_for_execute(
     lite_svm: &LiteSVM,
 ) {
     let validate_state_pubkey = get_extra_account_metas_address(mint_pubkey, program_id);
-    println!("Validate state pubkey: {}", validate_state_pubkey);
     let Some(validate_state_account) = lite_svm.get_account(&validate_state_pubkey) else {
         return;
     };

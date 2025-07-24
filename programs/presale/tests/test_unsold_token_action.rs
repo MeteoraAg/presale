@@ -41,6 +41,7 @@ fn test_unsold_token_action() {
         HandleEscrowClaimArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            refresh_escrow: true,
         },
     );
 
