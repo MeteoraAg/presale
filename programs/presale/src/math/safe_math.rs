@@ -87,7 +87,7 @@ macro_rules! checked_impl {
                 }
             }
 
-            #[inline(always)]
+            #[track_caller]
             fn safe_shr(self, v: $offset) -> Result<$t, PresaleError> {
                 match self.checked_shr(v) {
                     Some(result) => Ok(result),
@@ -110,3 +110,27 @@ checked_impl!(i64, u32);
 checked_impl!(u128, u32);
 checked_impl!(i128, u32);
 checked_impl!(usize, u32);
+
+pub trait SafeCast<T>: Sized {
+    fn safe_cast(self) -> Result<T, PresaleError>;
+}
+
+macro_rules! try_into_impl {
+    ($t:ty, $v:ty) => {
+        impl SafeCast<$v> for $t {
+            #[track_caller]
+            fn safe_cast(self) -> Result<$v, PresaleError> {
+                match self.try_into() {
+                    Ok(result) => Ok(result),
+                    Err(_) => {
+                        let caller = Location::caller();
+                        msg!("Math error thrown at {}:{}", caller.file(), caller.line());
+                        Err(PresaleError::MathOverflow)
+                    }
+                }
+            }
+        }
+    };
+}
+
+try_into_impl!(u128, u64);

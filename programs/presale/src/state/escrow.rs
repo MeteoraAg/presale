@@ -40,28 +40,24 @@ impl Escrow {
             return Ok(0);
         }
 
-        let remaining_quota = buyer_maximum_buy_cap
-            .checked_sub(self.total_deposit)
-            .unwrap();
-
+        let remaining_quota = buyer_maximum_buy_cap.safe_sub(self.total_deposit)?;
         Ok(remaining_quota)
     }
 
     pub fn deposit(&mut self, deposit_amount: u64) -> Result<()> {
-        self.total_deposit = self.total_deposit.checked_add(deposit_amount).unwrap();
+        self.total_deposit = self.total_deposit.safe_add(deposit_amount)?;
         Ok(())
     }
 
     pub fn withdraw(&mut self, amount: u64) -> Result<()> {
-        self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
+        self.total_deposit = self.total_deposit.safe_sub(amount)?;
         Ok(())
     }
 
     pub fn claim(&mut self) -> Result<()> {
         self.total_claimed_token = self
             .total_claimed_token
-            .checked_add(self.pending_claim_token)
-            .unwrap();
+            .safe_add(self.pending_claim_token)?;
         self.pending_claim_token = 0;
         Ok(())
     }
@@ -78,15 +74,11 @@ impl Escrow {
     pub fn sum_claimed_and_pending_claim_amount(&self) -> Result<u64> {
         Ok(self
             .total_claimed_token
-            .checked_add(self.pending_claim_token)
-            .unwrap())
+            .safe_add(self.pending_claim_token)?)
     }
 
     pub fn accumulate_pending_claim_token(&mut self, pending_claim_token: u64) -> Result<()> {
-        self.pending_claim_token = self
-            .pending_claim_token
-            .checked_add(pending_claim_token)
-            .unwrap();
+        self.pending_claim_token = self.pending_claim_token.safe_add(pending_claim_token)?;
         Ok(())
     }
 

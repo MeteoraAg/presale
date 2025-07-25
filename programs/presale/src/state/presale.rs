@@ -251,29 +251,23 @@ impl Presale {
     }
 
     pub fn increase_escrow_count(&mut self) -> Result<()> {
-        self.total_escrow = self.total_escrow.checked_add(1).unwrap();
+        self.total_escrow = self.total_escrow.safe_add(1)?;
         Ok(())
     }
 
     pub fn decrease_escrow_count(&mut self) -> Result<()> {
-        self.total_escrow = self.total_escrow.checked_sub(1).unwrap();
+        self.total_escrow = self.total_escrow.safe_sub(1)?;
         Ok(())
     }
 
     fn recalculate_presale_timing(&mut self, new_presale_end_time: u64) -> Result<()> {
         self.presale_end_time = new_presale_end_time;
 
-        self.lock_start_time = self.presale_end_time.checked_add(1).unwrap();
-        self.lock_end_time = self
-            .lock_start_time
-            .checked_add(self.lock_duration)
-            .unwrap();
+        self.lock_start_time = self.presale_end_time.safe_add(1)?;
+        self.lock_end_time = self.lock_start_time.safe_add(self.lock_duration)?;
 
-        self.vesting_start_time = self.lock_end_time.checked_add(1).unwrap();
-        self.vesting_end_time = self
-            .vesting_start_time
-            .checked_add(self.vest_duration)
-            .unwrap();
+        self.vesting_start_time = self.lock_end_time.safe_add(1)?;
+        self.vesting_end_time = self.vesting_start_time.safe_add(self.vest_duration)?;
 
         Ok(())
     }
@@ -283,23 +277,19 @@ impl Presale {
     }
 
     pub fn get_remaining_deposit_quota(&self) -> Result<u64> {
-        let remaining_quota = self
-            .presale_maximum_cap
-            .checked_sub(self.total_deposit)
-            .unwrap();
-
+        let remaining_quota = self.presale_maximum_cap.safe_sub(self.total_deposit)?;
         Ok(remaining_quota)
     }
 
     pub fn deposit(&mut self, escrow: &mut Escrow, deposit_amount: u64) -> Result<()> {
-        self.total_deposit = self.total_deposit.checked_add(deposit_amount).unwrap();
+        self.total_deposit = self.total_deposit.safe_add(deposit_amount)?;
         escrow.deposit(deposit_amount)?;
         Ok(())
     }
 
     pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
         escrow.withdraw(amount)?;
-        self.total_deposit = self.total_deposit.checked_sub(amount).unwrap();
+        self.total_deposit = self.total_deposit.safe_sub(amount)?;
         Ok(())
     }
 
@@ -308,8 +298,7 @@ impl Presale {
     }
 
     pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
-        self.total_refunded_quote_token =
-            self.total_refunded_quote_token.checked_add(amount).unwrap();
+        self.total_refunded_quote_token = self.total_refunded_quote_token.safe_add(amount)?;
 
         Ok(())
     }
@@ -352,12 +341,9 @@ impl Presale {
                 self.total_deposit.saturating_sub(self.presale_maximum_cap);
 
             u128::from(escrow.total_deposit)
-                .checked_mul(remaining_quote_amount.into())
-                .unwrap()
-                .checked_div(self.total_deposit.into())
-                .unwrap()
-                .try_into()
-                .unwrap()
+                .safe_mul(remaining_quote_amount.into())?
+                .safe_div(self.total_deposit.into())?
+                .safe_cast()?
         };
 
         Ok(refund_amount)
@@ -365,7 +351,7 @@ impl Presale {
 
     pub fn get_total_unsold_token(&self, presale_handler: &dyn PresaleModeHandler) -> Result<u64> {
         let total_token_sold = presale_handler.get_total_base_token_sold(self)?;
-        let total_token_unsold = self.presale_supply.checked_sub(total_token_sold).unwrap();
+        let total_token_unsold = self.presale_supply.safe_sub(total_token_sold)?;
 
         Ok(total_token_unsold)
     }
@@ -382,8 +368,7 @@ impl Presale {
     pub fn claim(&mut self, escrow: &mut Escrow) -> Result<()> {
         self.total_claimed_token = self
             .total_claimed_token
-            .checked_add(escrow.pending_claim_token)
-            .unwrap();
+            .safe_add(escrow.pending_claim_token)?;
 
         escrow.claim()
     }

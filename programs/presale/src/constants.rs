@@ -8,6 +8,8 @@ pub const MAXIMUM_DURATION_UNTIL_PRESALE: u64 = 60 * 60 * 24 * 30; // 30 days
 
 pub const MAXIMUM_LOCK_AND_VEST_DURATION: u64 = 60 * 60 * 24 * 365 * 10; // 10 year
 
+pub const SCALE_OFFSET: u32 = 64; // 2^64
+
 // PDA's seeds
 pub mod seeds {
     pub const PRESALE_AUTHORITY_PREFIX: &[u8] = b"presale_authority";
