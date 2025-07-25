@@ -131,7 +131,7 @@ pub struct LockedVestingArgs {
 
 impl LockedVestingArgs {
     pub fn validate(&self) -> Result<()> {
-        let total_duration = self.vest_duration.checked_add(self.lock_duration).unwrap();
+        let total_duration = self.vest_duration.safe_add(self.lock_duration)?;
         require!(
             total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
             PresaleError::InvalidLockVestingInfo

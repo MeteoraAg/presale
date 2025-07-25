@@ -82,10 +82,8 @@ pub fn process_claim_full_presale_supply_by_share(
     )?;
 
     let claimable_bought_token: u64 = dripped_escrow_bought_token
-        .checked_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())
-        .unwrap()
-        .try_into()
-        .unwrap();
+        .safe_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())?
+        .safe_cast()?;
 
     escrow.accumulate_pending_claim_token(claimable_bought_token)?;
     escrow.update_last_refreshed_at(current_timestamp)?;

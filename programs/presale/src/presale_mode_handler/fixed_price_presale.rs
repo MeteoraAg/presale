@@ -2,8 +2,8 @@ use crate::PresaleModeHandler;
 use crate::*;
 
 fn calculate_token_bought(q_price: u128, amount: u64) -> Result<u128> {
-    let q_amount = u128::from(amount).checked_shl(64).unwrap();
-    let token_bought = q_amount.checked_div(q_price).unwrap();
+    let q_amount = u128::from(amount).safe_shl(SCALE_OFFSET)?;
+    let token_bought = q_amount.safe_div(q_price)?;
 
     Ok(token_bought)
 }
@@ -156,10 +156,8 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             self.get_escrow_dripped_bought_token(presale, escrow, current_timestamp)?;
 
         let claimable_bought_token: u64 = dripped_escrow_bought_token
-            .checked_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())
-            .unwrap()
-            .try_into()
-            .unwrap();
+            .safe_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())?
+            .safe_cast()?;
 
         escrow.accumulate_pending_claim_token(claimable_bought_token)?;
         escrow.update_last_refreshed_at(current_timestamp)?;
@@ -168,12 +166,9 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     }
 
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
-        let q_total_deposit = u128::from(presale.total_deposit).checked_shl(64).unwrap();
-        let total_sold_token = q_total_deposit
-            .checked_div(presale.fixed_price_presale_q_price)
-            .unwrap();
-
-        Ok(total_sold_token.try_into().unwrap())
+        let q_total_deposit = u128::from(presale.total_deposit).safe_shl(SCALE_OFFSET)?;
+        let total_sold_token = q_total_deposit.safe_div(presale.fixed_price_presale_q_price)?;
+        Ok(total_sold_token.safe_cast()?)
     }
 
     fn get_escrow_dripped_bought_token(
