@@ -32,7 +32,7 @@ pub use token2022::*;
 mod presale_mode_handler;
 pub use presale_mode_handler::*;
 
-declare_id!("Ff7Lo7AsVxB4VtJH2Ajm7KLLVaVTGMV1W3ws2o5Eo2UT");
+declare_id!("2TEbURHCQNsVyGFUm2appkEsuSShKkUUdVqtC5Xn7zw9");
 
 #[program]
 pub mod presale {
