@@ -143,4 +143,15 @@ pub mod presale {
     pub fn refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {
         instructions::handle_refresh_escrow(ctx)
     }
+
+    pub fn create_merkle_proof_metadata(
+        ctx: Context<CreateMerkleProofMetadataCtx>,
+        proof_url: String,
+    ) -> Result<()> {
+        instructions::handle_create_merkle_proof_metadata(ctx, proof_url)
+    }
+
+    pub fn close_merkle_proof_metadata(ctx: Context<CloseMerkleProofMetadataCtx>) -> Result<()> {
+        instructions::handle_close_merkle_proof_metadata(ctx)
+    }
 }
