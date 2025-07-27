@@ -12,3 +12,6 @@ pub use merkle_root_config::*;
 
 mod operator;
 pub use operator::*;
+
+mod merkle_proof_metadata;
+pub use merkle_proof_metadata::*;

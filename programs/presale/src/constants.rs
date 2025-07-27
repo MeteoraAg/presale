@@ -20,4 +20,5 @@ pub mod seeds {
     pub const ESCROW_PREFIX: &[u8] = b"escrow";
     pub const MERKLE_ROOT_CONFIG_PREFIX: &[u8] = b"merkle_root";
     pub const OPERATOR_PREFIX: &[u8] = b"operator";
+    pub const MERKLE_PROOF_METADATA_PREFIX: &[u8] = b"merkle_proof";
 }
