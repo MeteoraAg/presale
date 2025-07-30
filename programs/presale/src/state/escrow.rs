@@ -1,7 +1,5 @@
 use crate::*;
 
-// TODO: Assert account size to changes on padding have no effect on the account size.
-
 #[account(zero_copy)]
 #[derive(Debug, InitSpace)]
 pub struct Escrow {
@@ -22,7 +20,11 @@ pub struct Escrow {
     pub created_at: u64,
     // Timestamp of when the escrow was refreshed
     pub last_refreshed_at: u64,
+    pub padding: [u64; 8],
 }
+
+static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 176);
+static_assertions::assert_eq_align!(Escrow, u64);
 
 impl Escrow {
     pub fn initialize(&mut self, presale: Pubkey, owner: Pubkey, created_at: u64) -> Result<()> {

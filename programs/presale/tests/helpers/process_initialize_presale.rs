@@ -13,7 +13,6 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::Mint,
 };
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
-use mpl_token_metadata::accounts::Metadata;
 use presale::{
     AccountsType, LockedVestingArgs, PresaleArgs, PresaleMode, RemainingAccountsInfo,
     RemainingAccountsSlice, TokenomicArgs, UnsoldTokenAction, WhitelistMode,
@@ -114,15 +113,6 @@ pub fn create_initialize_presale_ix(
     }
     .to_account_metas(None);
 
-    if base_mint_owner == anchor_spl::token::ID {
-        let mint_metadata = Metadata::find_pda(&base_mint).0;
-        accounts.push(AccountMeta {
-            pubkey: mint_metadata,
-            is_signer: false,
-            is_writable: false,
-        });
-    }
-
     accounts.extend_from_slice(&remaining_accounts);
 
     let base_token_transfer_hook_accounts = get_extra_account_metas_for_transfer_hook(
@@ -136,13 +126,11 @@ pub fn create_initialize_presale_ix(
 
     accounts.extend_from_slice(&base_token_transfer_hook_accounts);
 
-    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
-
     let ix_data = presale::instruction::InitializePresale {
         params: presale::InitializePresaleArgs {
             tokenomic,
             presale_params,
-            locked_vesting_params,
+            locked_vesting_params: locked_vesting_params.try_into().unwrap(),
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {

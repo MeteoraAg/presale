@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize)]
+#[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct CreateMerkleRootConfigParams {
     /// The 256-bit merkle root.
     pub root: [u8; 32],

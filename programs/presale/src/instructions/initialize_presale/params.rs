@@ -4,7 +4,7 @@ use crate::*;
 pub struct InitializePresaleArgs {
     pub tokenomic: TokenomicArgs,
     pub presale_params: PresaleArgs,
-    pub locked_vesting_params: Option<LockedVestingArgs>,
+    pub locked_vesting_params: OptionalNonZeroLockedVestingArgs,
     pub padding: [u64; 4],
 }
 
@@ -15,9 +15,12 @@ impl InitializePresaleArgs {
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
         self.presale_params.validate(current_timestamp)?;
 
-        if let Some(locked_vesting) = &self.locked_vesting_params {
+        let locked_vesting_params: Option<LockedVestingArgs> = self.locked_vesting_params.into();
+
+        if let Some(locked_vesting) = locked_vesting_params {
             locked_vesting.validate()?;
         }
+
         Ok(())
     }
 }
@@ -120,7 +123,7 @@ impl PresaleArgs {
 }
 
 /// Vest user bought token
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LockedVestingArgs {
     /// Lock duration until buyer can claim the token
     pub lock_duration: u64,
@@ -138,5 +141,52 @@ impl LockedVestingArgs {
         );
 
         Ok(())
+    }
+}
+
+pub type OptionalNonZeroLockedVestingArgs = LockedVestingArgs;
+
+impl TryFrom<Option<LockedVestingArgs>> for OptionalNonZeroLockedVestingArgs {
+    type Error = anchor_lang::error::Error;
+    fn try_from(args: Option<LockedVestingArgs>) -> std::result::Result<Self, Self::Error> {
+        match args {
+            None => Ok(Self::default()),
+            Some(locked_vesting_args) => {
+                if locked_vesting_args == Self::default() {
+                    Err(PresaleError::InvalidLockVestingInfo.into())
+                } else {
+                    Ok(locked_vesting_args)
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_locked_vesting_args_size() {
+        let args = LockedVestingArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 48);
+    }
+
+    #[test]
+    fn test_ensure_initialize_presale_args_size() {
+        let args = InitializePresaleArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 202);
+    }
+
+    #[test]
+    fn test_ensure_presale_args_size() {
+        let args = PresaleArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 82);
+    }
+
+    #[test]
+    fn test_ensure_tokenomic_args_size() {
+        let args = TokenomicArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 40);
     }
 }

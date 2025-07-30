@@ -29,7 +29,7 @@ pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
     pub unsold_token_action: u8,
     pub q_price: u128,
-    pub padding: [u64; 4],
+    pub padding: [u64; 8],
 }
 
 pub fn handle_initialize_fixed_price_presale_args(
@@ -58,4 +58,15 @@ pub fn handle_initialize_fixed_price_presale_args(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_initialize_fixed_price_presale_extra_args_size() {
+        let args = InitializeFixedPricePresaleExtraArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 113);
+    }
 }
