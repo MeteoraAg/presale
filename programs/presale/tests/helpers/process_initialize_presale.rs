@@ -130,7 +130,7 @@ pub fn create_initialize_presale_ix(
         params: presale::InitializePresaleArgs {
             tokenomic,
             presale_params,
-            locked_vesting_params,
+            locked_vesting_params: locked_vesting_params.try_into().unwrap(),
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {

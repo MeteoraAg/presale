@@ -82,7 +82,7 @@ pub struct InitializePresaleCtx<'info> {
 
 pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
-    args: &InitializePresaleArgs,
+    args: InitializePresaleArgs,
     remaining_account_info: RemainingAccountsInfo,
 ) -> Result<()> {
     // 1. Validate params
@@ -113,10 +113,14 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         quote_token_program: ctx.accounts.quote_token_program.key(),
     };
 
+    let locked_vesting_params: Option<LockedVestingArgs> = locked_vesting_params
+        .try_into()
+        .map_err(|_| PresaleError::InvalidLockVestingInfo)?;
+
     process_create_presale_vault(ProcessCreatePresaleVaultArgs {
         presale: &ctx.accounts.presale,
-        tokenomic_params: tokenomic,
-        presale_params,
+        tokenomic_params: &tokenomic,
+        presale_params: &presale_params,
         locked_vesting_params: locked_vesting_params.as_ref(),
         mint_pubkeys,
         remaining_accounts: &mut remaining_account_slice,

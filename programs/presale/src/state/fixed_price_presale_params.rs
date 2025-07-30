@@ -11,6 +11,9 @@ pub struct FixedPricePresaleExtraArgs {
     pub padding1: [u128; 4],
 }
 
+static_assertions::const_assert_eq!(FixedPricePresaleExtraArgs::INIT_SPACE, 160);
+static_assertions::assert_eq_align!(FixedPricePresaleExtraArgs, u128);
+
 impl FixedPricePresaleExtraArgs {
     fn validate(unsold_token_action: u8, q_price: u128) -> Result<()> {
         let unsold_token_action = UnsoldTokenAction::try_from(unsold_token_action);

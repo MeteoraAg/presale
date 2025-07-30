@@ -13,8 +13,11 @@ pub struct MerkleRootConfig {
     /// Version
     pub version: u64,
     /// Padding for further use
-    pub _padding: [u128; 4],
+    pub padding1: [u128; 4],
 }
+
+static_assertions::const_assert_eq!(MerkleRootConfig::INIT_SPACE, 144);
+static_assertions::assert_eq_align!(MerkleRootConfig, u128);
 
 impl MerkleRootConfig {
     pub fn initialize(&mut self, presale: Pubkey, root: [u8; 32], version: u64) {

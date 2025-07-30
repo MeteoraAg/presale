@@ -127,7 +127,11 @@ pub struct Presale {
     pub padding2: [u8; 17],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
+    pub padding3: [u128; 6],
 }
+
+static_assertions::const_assert_eq!(Presale::INIT_SPACE, 480);
+static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs {
     pub tokenomic_params: TokenomicArgs,

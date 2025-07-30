@@ -57,7 +57,7 @@ pub mod presale {
         params: InitializePresaleArgs,
         remaining_account_info: RemainingAccountsInfo,
     ) -> Result<()> {
-        instructions::handle_initialize_presale(ctx, &params, remaining_account_info)
+        instructions::handle_initialize_presale(ctx, params, remaining_account_info)
     }
 
     pub fn create_merkle_root_config(
