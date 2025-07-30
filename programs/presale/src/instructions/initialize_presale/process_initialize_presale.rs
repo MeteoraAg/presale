@@ -4,14 +4,7 @@ use crate::{
     },
     *,
 };
-use anchor_spl::{
-    token_2022::spl_token_2022::{
-        extension::{BaseStateWithExtensions, PodStateWithExtensions},
-        pod::PodMint,
-    },
-    token_interface::{spl_token_metadata_interface::state::TokenMetadata, *},
-};
-use mpl_token_metadata::accounts::Metadata;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -97,28 +90,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
 
     let mut remaining_account_slice = &ctx.remaining_accounts[..];
 
-    // 2. Ensure metadata is created
-    match ctx.accounts.base_token_program.key() {
-        anchor_spl::token::ID => {
-            ensure_mint_metadata_initialized_and_immutable(
-                &mut remaining_account_slice,
-                &ctx.accounts.presale_mint.key(),
-            )?;
-        }
-        anchor_spl::token_2022::ID => {
-            ensure_mint_metadata_initialized_and_immutable_token_2022(
-                &ctx.accounts.presale_mint.to_account_info(),
-            )?;
-        }
-        _ => {
-            unreachable!(
-                "Unsupported token program: {}",
-                ctx.accounts.base_token_program.key()
-            );
-        }
-    }
-
-    // 3. Ensure base and quote token extensions are permissionless
+    // 2. Ensure base and quote token extensions are permissionless
     ensure_supported_token2022_extensions(&ctx.accounts.quote_token_mint)?;
     ensure_supported_token2022_extensions(&ctx.accounts.presale_mint)?;
 
@@ -129,7 +101,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         ..
     } = args;
 
-    // 4. Initialize vault
+    // 3. Initialize vault
     let mint_pubkeys = InitializePresaleVaultAccountPubkeys {
         base_mint: ctx.accounts.presale_mint.key(),
         quote_mint: ctx.accounts.quote_token_mint.key(),
@@ -162,7 +134,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         &[AccountsType::TransferHookBase],
     )?;
 
-    // 5. Transfer token to presale vault
+    // 4. Transfer token to presale vault
     transfer_from_user(
         &ctx.accounts.payer,
         &ctx.accounts.presale_mint,
@@ -194,57 +166,6 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         presale_maximum_cap: presale_params.presale_maximum_cap,
         presale_minimum_cap: presale_params.presale_minimum_cap,
     });
-
-    Ok(())
-}
-
-fn ensure_mint_metadata_initialized_and_immutable<'a, 'info>(
-    remaining_accounts: &mut &[AccountInfo<'info>],
-    mint_key: &Pubkey,
-) -> Result<()> {
-    let mpl_token_metadata_ai = remaining_accounts.split_first();
-
-    let Some((mpl_token_metadata_ai, new_remaining_account_slice)) = mpl_token_metadata_ai else {
-        return Err(PresaleError::InvalidMintMetadata.into());
-    };
-
-    *remaining_accounts = new_remaining_account_slice;
-
-    let expected_metadata_pubkey = Metadata::find_pda(mint_key).0;
-    require!(
-        expected_metadata_pubkey == mpl_token_metadata_ai.key(),
-        PresaleError::InvalidMintMetadata
-    );
-
-    // Make sure metadata is initialized by deserialize and check the content
-    let metadata_state = Metadata::safe_deserialize(&mpl_token_metadata_ai.try_borrow_data()?)
-        .map_err(|_| PresaleError::InvalidMintMetadata)?;
-    require!(
-        metadata_state.mint == *mint_key,
-        PresaleError::InvalidMintMetadata
-    );
-
-    require!(
-        !metadata_state.is_mutable,
-        PresaleError::InvalidMintMetadata
-    );
-
-    Ok(())
-}
-
-fn ensure_mint_metadata_initialized_and_immutable_token_2022<'a, 'info>(
-    mint: &'a AccountInfo<'info>,
-) -> Result<()> {
-    let buffer = mint.try_borrow_data()?;
-    let mint = PodStateWithExtensions::<PodMint>::unpack(&buffer)?;
-    let token_metadata = mint
-        .get_variable_len_extension::<TokenMetadata>()
-        .map_err(|_| PresaleError::InvalidMintMetadata)?;
-
-    require!(
-        Option::<Pubkey>::from(token_metadata.update_authority).is_none(),
-        PresaleError::InvalidMintMetadata
-    );
 
     Ok(())
 }

@@ -25,9 +25,6 @@ use anchor_spl::token_2022::spl_token_2022::instruction::{mint_to, transfer_chec
 use anchor_spl::token_2022::spl_token_2022::state::Mint;
 use litesvm::types::{FailedTransactionMetadata, SimulatedTransactionInfo};
 use litesvm::LiteSVM;
-use mpl_token_metadata::accounts::Metadata;
-use mpl_token_metadata::instructions::CreateMetadataAccountV3Builder;
-use mpl_token_metadata::types::DataV2;
 
 use crate::helpers::{
     add_extra_account_metas_for_execute, create_token_2022_ix, create_token_ix,
@@ -115,75 +112,11 @@ impl SetupContext {
         [instructions, vec![create_user_ata_ix, mint_ix]].concat()
     }
 
-    fn create_metadata_ix(
-        &mut self,
-        is_immutable: bool,
-        mint: Pubkey,
-        user: Pubkey,
-    ) -> Instruction {
-        let mut builder = CreateMetadataAccountV3Builder::new();
-        builder.data(DataV2 {
-            name: "Test Mint".to_string(),
-            symbol: "TEST".to_string(),
-            uri: "https://example.com/metadata.json".to_string(),
-            seller_fee_basis_points: 500,
-            creators: None,
-            collection: None,
-            uses: None,
-        });
-        builder.mint(mint);
-        builder.update_authority(user, true);
-        builder.is_mutable(!is_immutable);
-        builder.payer(user);
-        builder.metadata(Metadata::find_pda(&mint).0);
-        builder.mint_authority(user);
-        builder.instruction()
-    }
-
-    pub fn setup_mint_without_metadata(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
-        let mint = Rc::new(Keypair::new());
-        let user_pubkey = self.user.pubkey();
-
-        let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
-        process_transaction(
-            &mut self.lite_svm,
-            &instructions,
-            Some(&user_pubkey),
-            &[&self.user, &mint],
-        )
-        .unwrap();
-
-        mint.pubkey()
-    }
-
-    pub fn setup_mint_with_mutable_metadata(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
-        let mint = Rc::new(Keypair::new());
-        let user_pubkey = self.user.pubkey();
-
-        let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
-        let create_metadata_ix = self.create_metadata_ix(true, mint.pubkey(), user_pubkey);
-
-        let instructions = [instructions, vec![create_metadata_ix]].concat();
-
-        process_transaction(
-            &mut self.lite_svm,
-            &instructions,
-            Some(&user_pubkey),
-            &[&self.user, &mint],
-        )
-        .unwrap();
-
-        mint.pubkey()
-    }
-
     pub fn setup_mint(&mut self, token_decimals: u8, supply: u64) -> Pubkey {
         let mint = Rc::new(Keypair::new());
         let user_pubkey = self.user.pubkey();
 
         let instructions = self.create_and_mint_token_ix(token_decimals, supply, Rc::clone(&mint));
-        let create_metadata_ix = self.create_metadata_ix(true, mint.pubkey(), user_pubkey);
-
-        let instructions = [instructions, vec![create_metadata_ix]].concat();
 
         process_transaction(
             &mut self.lite_svm,

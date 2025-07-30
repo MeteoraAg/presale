@@ -444,61 +444,6 @@ fn test_initialize_fixed_token_price_presale_vault_missing_fixed_price_extra_arg
 }
 
 #[test]
-fn test_initialize_presale_vault_with_missing_metadata() {
-    let mut setup_context = SetupContext::initialize();
-    let mint_without_metadata = setup_context.setup_mint_without_metadata(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-    let mint_with_mutable_metadata = setup_context.setup_mint_without_metadata(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-
-    let SetupContext { mut lite_svm, user } = setup_context;
-    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-    let user_pubkey = user.pubkey();
-
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
-    let presale_params = create_presale_args(&lite_svm);
-
-    let err_0 = handle_initialize_presale_err(
-        &mut lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: mint_without_metadata,
-            quote_mint,
-            tokenomic,
-            presale_params,
-            locked_vesting_params: None,
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    let err_1 = handle_initialize_presale_err(
-        &mut lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: mint_with_mutable_metadata,
-            quote_mint,
-            tokenomic,
-            presale_params,
-            locked_vesting_params: None,
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    let expected_err = presale::errors::PresaleError::InvalidMintMetadata;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-
-    assert!(err_0.meta.logs.iter().any(|log| log.contains(&err_str)));
-    assert!(err_1.meta.logs.iter().any(|log| log.contains(&err_str)));
-}
-
-#[test]
 fn test_initialize_presale_vault_with_invalid_parameters() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(

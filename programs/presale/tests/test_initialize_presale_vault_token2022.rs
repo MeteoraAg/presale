@@ -1,102 +1,21 @@
 use std::rc::Rc;
 
 use anchor_client::solana_sdk::signer::Signer;
-use anchor_lang::{error::ERROR_CODE_OFFSET, prelude::AccountMeta};
+use anchor_lang::prelude::AccountMeta;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
-use presale::{LockedVestingArgs, Presale, UnsoldTokenAction};
+use presale::{Presale, UnsoldTokenAction};
 
 use crate::helpers::{
     calculate_q_price_from_ui_price, create_presale_args, create_tokenomic_args,
     derive_fixed_price_presale_args, derive_presale,
     handle_initialize_fixed_token_price_presale_params, handle_initialize_presale,
-    handle_initialize_presale_err, HandleInitializeFixedTokenPricePresaleParamsArgs,
-    HandleInitializePresaleArgs, LiteSVMExt, SetupContext, DEFAULT_BASE_TOKEN_DECIMALS,
-    DEFAULT_QUOTE_TOKEN_DECIMALS,
+    HandleInitializeFixedTokenPricePresaleParamsArgs, HandleInitializePresaleArgs, LiteSVMExt,
+    SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_QUOTE_TOKEN_DECIMALS,
 };
 
 pub mod helpers;
-
-#[test]
-fn test_initialize_presale_vault_token_2022_without_metadata() {
-    let mut setup_context = SetupContext::initialize();
-    let base_mint_pubkey = setup_context.setup_token_2022_mint_without_metadata(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-
-    let SetupContext { mut lite_svm, user } = setup_context;
-
-    let quote_mint_pubkey = anchor_spl::token::spl_token::native_mint::ID;
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
-    let presale_args = create_presale_args(&lite_svm);
-    let locked_vesting_params = Some(LockedVestingArgs {
-        vest_duration: 0,
-        lock_duration: 3600,
-        ..Default::default()
-    });
-
-    let err = handle_initialize_presale_err(
-        &mut lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: base_mint_pubkey,
-            quote_mint: quote_mint_pubkey,
-            tokenomic,
-            presale_params: presale_args,
-            locked_vesting_params,
-            creator: user.pubkey(),
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    let expected_err = presale::errors::PresaleError::InvalidMintMetadata;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-
-    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
-}
-
-#[test]
-fn test_initialize_presale_vault_token_2022_with_mutable_metadata() {
-    let mut setup_context = SetupContext::initialize();
-    let base_mint_pubkey = setup_context.setup_token_2022_mint_with_mutable_metadata(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-
-    let SetupContext { mut lite_svm, user } = setup_context;
-
-    let quote_mint_pubkey = anchor_spl::token::spl_token::native_mint::ID;
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
-    let presale_args = create_presale_args(&lite_svm);
-    let locked_vesting_params = Some(LockedVestingArgs {
-        vest_duration: 0,
-        lock_duration: 3600,
-        ..Default::default()
-    });
-
-    let err = handle_initialize_presale_err(
-        &mut lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: base_mint_pubkey,
-            quote_mint: quote_mint_pubkey,
-            tokenomic,
-            presale_params: presale_args,
-            locked_vesting_params,
-            creator: user.pubkey(),
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    let expected_err = presale::errors::PresaleError::InvalidMintMetadata;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-
-    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
-}
 
 #[test]
 fn test_initialize_presale_vault_token_2022() {
