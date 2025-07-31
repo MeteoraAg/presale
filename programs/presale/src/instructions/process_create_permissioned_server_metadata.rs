@@ -3,7 +3,7 @@ use crate::*;
 #[event_cpi]
 #[derive(Accounts)]
 #[instruction(proof_url: String)]
-pub struct CreateMerkleProofMetadataCtx<'info> {
+pub struct CreatePermissionedServerMetadataCtx<'info> {
     #[account(
         has_one = owner,
     )]
@@ -12,29 +12,30 @@ pub struct CreateMerkleProofMetadataCtx<'info> {
     #[account(
         init,
         seeds = [
-            crate::constants::seeds::MERKLE_PROOF_METADATA_PREFIX.as_ref(),
+            crate::constants::seeds::PERMISSIONED_SERVER_METADATA_PREFIX.as_ref(),
             presale.key().as_ref(),
         ],
         payer = owner,
         bump,
-        space = 8 + MerkleProofMetadata::space(proof_url)
+        space = 8 + PermissionedServerMetadata::space(proof_url)
     )]
-    pub merkle_proof_metadata: Account<'info, MerkleProofMetadata>,
+    pub permissioned_server_metadata: Account<'info, PermissionedServerMetadata>,
 
     #[account(mut)]
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_create_merkle_proof_metadata(
-    ctx: Context<CreateMerkleProofMetadataCtx>,
-    proof_url: String,
+pub fn handle_create_permissioned_server_metadata(
+    ctx: Context<CreatePermissionedServerMetadataCtx>,
+    server_url: String,
 ) -> Result<()> {
     let presale = ctx.accounts.presale.load()?;
 
     let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
     require!(
-        whitelist_mode == WhitelistMode::PermissionWithMerkleProof,
+        whitelist_mode == WhitelistMode::PermissionWithMerkleProof
+            || whitelist_mode == WhitelistMode::PermissionWithAuthority,
         PresaleError::InvalidPresaleWhitelistMode
     );
 
@@ -47,13 +48,13 @@ pub fn handle_create_merkle_proof_metadata(
     );
 
     ctx.accounts
-        .merkle_proof_metadata
-        .initialize(ctx.accounts.presale.key(), proof_url.clone())?;
+        .permissioned_server_metadata
+        .initialize(ctx.accounts.presale.key(), server_url.clone())?;
 
-    emit_cpi!(EvtMerkleProofMetadataCreate {
+    emit_cpi!(EvtPermissionedServerMetadataCreate {
         presale: ctx.accounts.presale.key(),
-        merkle_proof_metadata: ctx.accounts.merkle_proof_metadata.key(),
-        proof_url
+        permissioned_server_metadata: ctx.accounts.permissioned_server_metadata.key(),
+        server_url
     });
 
     Ok(())

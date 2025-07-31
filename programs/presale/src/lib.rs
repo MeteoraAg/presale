@@ -144,14 +144,16 @@ pub mod presale {
         instructions::handle_refresh_escrow(ctx)
     }
 
-    pub fn create_merkle_proof_metadata(
-        ctx: Context<CreateMerkleProofMetadataCtx>,
-        proof_url: String,
+    pub fn create_permissioned_server_metadata(
+        ctx: Context<CreatePermissionedServerMetadataCtx>,
+        server_url: String,
     ) -> Result<()> {
-        instructions::handle_create_merkle_proof_metadata(ctx, proof_url)
+        instructions::handle_create_permissioned_server_metadata(ctx, server_url)
     }
 
-    pub fn close_merkle_proof_metadata(ctx: Context<CloseMerkleProofMetadataCtx>) -> Result<()> {
-        instructions::handle_close_merkle_proof_metadata(ctx)
+    pub fn close_permissioned_server_metadata(
+        ctx: Context<ClosePermissionedServerMetadataCtx>,
+    ) -> Result<()> {
+        instructions::handle_close_permissioned_server_metadata(ctx)
     }
 }

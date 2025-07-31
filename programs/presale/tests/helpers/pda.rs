@@ -89,10 +89,10 @@ pub fn derive_merkle_root_config(presale: &Pubkey, version: u64, program_id: &Pu
     .0
 }
 
-pub fn derive_merkle_proof_metadata(presale: &Pubkey, program_id: &Pubkey) -> Pubkey {
+pub fn derive_permissioned_server_metadata(presale: &Pubkey, program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[
-            presale::seeds::MERKLE_PROOF_METADATA_PREFIX.as_ref(),
+            presale::seeds::PERMISSIONED_SERVER_METADATA_PREFIX.as_ref(),
             presale.as_ref(),
         ],
         program_id,
