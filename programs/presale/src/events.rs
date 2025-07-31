@@ -126,14 +126,14 @@ pub struct EvtOperatorCreate {
 }
 
 #[event]
-pub struct EvtMerkleProofMetadataCreate {
+pub struct EvtPermissionedServerMetadataCreate {
     pub presale: Pubkey,
-    pub merkle_proof_metadata: Pubkey,
-    pub proof_url: String,
+    pub permissioned_server_metadata: Pubkey,
+    pub server_url: String,
 }
 
 #[event]
-pub struct EvtMerkleProofMetadataClose {
+pub struct EvtPermissionedServerMetadataClose {
     pub presale: Pubkey,
-    pub merkle_proof_metadata: Pubkey,
+    pub permissioned_server_metadata: Pubkey,
 }

@@ -2,7 +2,7 @@ use crate::*;
 
 #[event_cpi]
 #[derive(Accounts)]
-pub struct CloseMerkleProofMetadataCtx<'info> {
+pub struct ClosePermissionedServerMetadataCtx<'info> {
     #[account(
         has_one = owner,
     )]
@@ -13,7 +13,7 @@ pub struct CloseMerkleProofMetadataCtx<'info> {
         has_one = presale,
         close = rent_receiver,
     )]
-    pub merkle_proof_metadata: Account<'info, MerkleProofMetadata>,
+    pub permissioned_server_metadata: Account<'info, PermissionedServerMetadata>,
 
     /// CHECK: Rent receiver account, which will receive the remaining rent after closing the metadata.
     #[account(mut)]
@@ -22,7 +22,9 @@ pub struct CloseMerkleProofMetadataCtx<'info> {
     pub owner: Signer<'info>,
 }
 
-pub fn handle_close_merkle_proof_metadata(ctx: Context<CloseMerkleProofMetadataCtx>) -> Result<()> {
+pub fn handle_close_permissioned_server_metadata(
+    ctx: Context<ClosePermissionedServerMetadataCtx>,
+) -> Result<()> {
     let presale = ctx.accounts.presale.load()?;
 
     let current_timestamp = Clock::get()?.unix_timestamp as u64;
@@ -33,9 +35,9 @@ pub fn handle_close_merkle_proof_metadata(ctx: Context<CloseMerkleProofMetadataC
         PresaleError::PresaleEnded
     );
 
-    emit_cpi!(EvtMerkleProofMetadataClose {
+    emit_cpi!(EvtPermissionedServerMetadataClose {
         presale: ctx.accounts.presale.key(),
-        merkle_proof_metadata: ctx.accounts.merkle_proof_metadata.key(),
+        permissioned_server_metadata: ctx.accounts.permissioned_server_metadata.key(),
     });
 
     Ok(())

@@ -43,8 +43,8 @@ pub use process_create_operator::*;
 mod process_revoke_operator;
 pub use process_revoke_operator::*;
 
-mod process_create_merkle_proof_metadata;
-pub use process_create_merkle_proof_metadata::*;
+mod process_create_permissioned_server_metadata;
+pub use process_create_permissioned_server_metadata::*;
 
 mod process_close_merkle_proof_metadata;
 pub use process_close_merkle_proof_metadata::*;

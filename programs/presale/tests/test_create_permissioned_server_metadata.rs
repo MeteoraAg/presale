@@ -2,21 +2,21 @@ use std::rc::Rc;
 
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_lang::error::ERROR_CODE_OFFSET;
-use presale::MerkleProofMetadata;
+use presale::PermissionedServerMetadata;
 
 use crate::helpers::{
-    derive_merkle_proof_metadata, handle_close_merkle_proof_metadata,
-    handle_create_merkle_proof_metadata, handle_create_merkle_proof_metadata_err,
+    derive_permissioned_server_metadata, handle_close_permissioned_server_metadata,
+    handle_create_permissioned_server_metadata, handle_create_permissioned_server_metadata_err,
     handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale,
-    handle_create_predefined_permissionless_fixed_price_presale, CloseMerkleProofMetadataArgs,
-    CreateMerkleProofMetadataArgs, HandleCreatePredefinedPresaleResponse, LiteSVMExt, SetupContext,
-    DEFAULT_BASE_TOKEN_DECIMALS,
+    handle_create_predefined_permissionless_fixed_price_presale,
+    ClosePermissionedServerMetadataArgs, CreatePermissionedServerProofMetadataArgs,
+    HandleCreatePredefinedPresaleResponse, LiteSVMExt, SetupContext, DEFAULT_BASE_TOKEN_DECIMALS,
 };
 
 pub mod helpers;
 
 #[test]
-fn test_create_merkle_proof_metadata() {
+fn test_create_permissioned_server_metadata() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -34,29 +34,30 @@ fn test_create_merkle_proof_metadata() {
             Rc::clone(&user),
         );
 
-    handle_create_merkle_proof_metadata(
+    handle_create_permissioned_server_metadata(
         &mut lite_svm,
-        CreateMerkleProofMetadataArgs {
+        CreatePermissionedServerProofMetadataArgs {
             presale: presale_pubkey,
-            proof_url: "https://example.com/proof.json".to_string(),
+            server_url: "https://example.com/proof.json".to_string(),
             owner: Rc::clone(&user),
         },
     );
 
-    let merkle_proof_metadata = derive_merkle_proof_metadata(&presale_pubkey, &presale::ID);
-    let merkle_proof_metadata_state: MerkleProofMetadata = lite_svm
-        .get_deserialized_account(&merkle_proof_metadata)
+    let permissioned_server_metadata =
+        derive_permissioned_server_metadata(&presale_pubkey, &presale::ID);
+    let permissioned_server_metadata_state: PermissionedServerMetadata = lite_svm
+        .get_deserialized_account(&permissioned_server_metadata)
         .unwrap();
 
-    assert_eq!(merkle_proof_metadata_state.presale, presale_pubkey);
+    assert_eq!(permissioned_server_metadata_state.presale, presale_pubkey);
     assert_eq!(
-        merkle_proof_metadata_state.proof_url,
+        permissioned_server_metadata_state.server_url,
         "https://example.com/proof.json"
     );
 }
 
 #[test]
-fn test_create_merkle_proof_metadata_with_permissionless_presale() {
+fn test_create_permissioned_server_metadata_with_permissionless_presale() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -74,11 +75,11 @@ fn test_create_merkle_proof_metadata_with_permissionless_presale() {
             Rc::clone(&user),
         );
 
-    let err = handle_create_merkle_proof_metadata_err(
+    let err = handle_create_permissioned_server_metadata_err(
         &mut lite_svm,
-        CreateMerkleProofMetadataArgs {
+        CreatePermissionedServerProofMetadataArgs {
             presale: presale_pubkey,
-            proof_url: "https://example.com/proof.json".to_string(),
+            server_url: "https://example.com/proof.json".to_string(),
             owner: Rc::clone(&user),
         },
     );
@@ -90,7 +91,7 @@ fn test_create_merkle_proof_metadata_with_permissionless_presale() {
 }
 
 #[test]
-fn test_close_merkle_proof_metadata() {
+fn test_close_permissioned_server_metadata() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -108,28 +109,30 @@ fn test_close_merkle_proof_metadata() {
             Rc::clone(&user),
         );
 
-    handle_create_merkle_proof_metadata(
+    handle_create_permissioned_server_metadata(
         &mut lite_svm,
-        CreateMerkleProofMetadataArgs {
+        CreatePermissionedServerProofMetadataArgs {
             presale: presale_pubkey,
-            proof_url: "https://example.com/proof.json".to_string(),
+            server_url: "https://example.com/proof.json".to_string(),
             owner: Rc::clone(&user),
         },
     );
 
-    handle_close_merkle_proof_metadata(
+    handle_close_permissioned_server_metadata(
         &mut lite_svm,
-        CloseMerkleProofMetadataArgs {
+        ClosePermissionedServerMetadataArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
         },
     );
 
-    let merkle_proof_metadata = derive_merkle_proof_metadata(&presale_pubkey, &presale::ID);
-    let merkle_proof_metadata_account = lite_svm.get_account(&merkle_proof_metadata).unwrap();
+    let permissioned_server_metadata =
+        derive_permissioned_server_metadata(&presale_pubkey, &presale::ID);
+    let permissioned_server_metadata_account =
+        lite_svm.get_account(&permissioned_server_metadata).unwrap();
 
     assert_eq!(
-        merkle_proof_metadata_account.owner,
+        permissioned_server_metadata_account.owner,
         Pubkey::default() // Account should be closed, so owner is default
     );
 }

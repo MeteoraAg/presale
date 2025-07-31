@@ -57,8 +57,8 @@ pub use process_create_merkle_root_config::*;
 mod process_refresh_escrow;
 pub use process_refresh_escrow::*;
 
-mod process_create_merkle_proof_metadata;
-pub use process_create_merkle_proof_metadata::*;
+mod process_create_permissioned_server_metadata;
+pub use process_create_permissioned_server_metadata::*;
 
-mod process_close_merkle_proof_metadata;
-pub use process_close_merkle_proof_metadata::*;
+mod process_close_permissioned_server_metadata;
+pub use process_close_permissioned_server_metadata::*;
