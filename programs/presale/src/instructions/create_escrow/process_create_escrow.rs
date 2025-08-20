@@ -5,6 +5,7 @@ pub struct HandleCreateEscrowArgs<'a, 'b, 'c> {
     pub escrow: &'b AccountLoader<'c, Escrow>,
     pub presale_pubkey: Pubkey,
     pub owner_pubkey: Pubkey,
+    pub registry_index: u8,
 }
 
 pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
@@ -13,6 +14,7 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
         escrow,
         presale_pubkey,
         owner_pubkey,
+        registry_index,
     } = args;
 
     // 1. Ensure presale is open for deposit
@@ -25,10 +27,15 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
 
     // 2. Initialize the escrow account
     let mut escrow = escrow.load_init()?;
-    escrow.initialize(presale_pubkey, owner_pubkey, current_timestamp)?;
+    escrow.initialize(
+        presale_pubkey,
+        owner_pubkey,
+        current_timestamp,
+        registry_index,
+    )?;
 
     // 3. Update the presale state
-    presale.increase_escrow_count()?;
+    presale.increase_escrow_count(registry_index)?;
 
     Ok(())
 }

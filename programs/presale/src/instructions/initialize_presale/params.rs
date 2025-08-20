@@ -1,19 +1,62 @@
 use crate::*;
 
+fn validate_presale_registries(
+    presale_registries: &[PresaleRegistryArgs],
+    presale_params: &PresaleArgs,
+) -> Result<()> {
+    let mut initialized_count = 0;
+
+    for i in 0..MAX_PRESALE_REGISTRY_COUNT {
+        let current_registry = &presale_registries[i];
+        current_registry.validate(&presale_params)?;
+
+        if !current_registry.is_uninitialized() {
+            initialized_count += 1;
+
+            require!(
+                current_registry.presale_supply > 0,
+                PresaleError::InvalidTokenSupply
+            );
+
+            if i > 0 {
+                // Ensure presale registries are order from initialized to un-initialized
+                let previous_registry = &presale_registries[i - 1];
+                require!(
+                    previous_registry.is_uninitialized(),
+                    PresaleError::InvalidPresaleInfo
+                );
+            }
+        }
+    }
+
+    // If presale have multiple registries. Whitelist mode must be Permissioned mode.
+    // Reason: It make no sense for a single user to deposit to multiple registries which might have different price when it's dynamic price mode.
+    // Note: Presale creator have to make sure user doesn't duplicate across registries.
+    if initialized_count > 1 {
+        let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
+        require!(
+            whitelist_mode.is_permissioned(),
+            PresaleError::InvalidPresaleInfo
+        );
+    }
+
+    Ok(())
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct InitializePresaleArgs {
-    pub tokenomic: TokenomicArgs,
     pub presale_params: PresaleArgs,
+    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub locked_vesting_params: OptionalNonZeroLockedVestingArgs,
-    pub padding: [u64; 4],
+    pub padding: [u8; 32],
 }
 
 impl InitializePresaleArgs {
     pub fn validate(&self) -> Result<()> {
-        self.tokenomic.validate()?;
-
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
         self.presale_params.validate(current_timestamp)?;
+
+        validate_presale_registries(&self.presale_registries, &self.presale_params)?;
 
         let locked_vesting_params: Option<LockedVestingArgs> = self.locked_vesting_params.into();
 
@@ -26,16 +69,38 @@ impl InitializePresaleArgs {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, Default)]
-pub struct TokenomicArgs {
-    pub presale_pool_supply: u64,
-    pub padding: [u64; 4],
+pub struct PresaleRegistryArgs {
+    pub buyer_minimum_deposit_cap: u64,
+    pub buyer_maximum_deposit_cap: u64,
+    pub presale_supply: u64,
+    pub padding: [u8; 32],
 }
 
-impl TokenomicArgs {
-    pub fn validate(&self) -> Result<()> {
+impl PresaleRegistryArgs {
+    pub fn is_uninitialized(&self) -> bool {
+        self.buyer_minimum_deposit_cap == 0
+            && self.buyer_maximum_deposit_cap == 0
+            && self.presale_supply == 0
+    }
+
+    pub fn validate(&self, presale_args: &PresaleArgs) -> Result<()> {
+        if self.is_uninitialized() {
+            return Ok(());
+        }
+
         require!(
-            self.presale_pool_supply > 0,
-            PresaleError::InvalidTokenSupply
+            self.buyer_maximum_deposit_cap >= self.buyer_minimum_deposit_cap,
+            PresaleError::InvalidPresaleInfo
+        );
+
+        require!(
+            self.buyer_maximum_deposit_cap > 0,
+            PresaleError::InvalidPresaleInfo
+        );
+
+        require!(
+            self.buyer_maximum_deposit_cap <= presale_args.presale_maximum_cap,
+            PresaleError::InvalidPresaleInfo
         );
 
         Ok(())
@@ -47,13 +112,11 @@ impl TokenomicArgs {
 pub struct PresaleArgs {
     pub presale_maximum_cap: u64,
     pub presale_minimum_cap: u64,
-    pub buyer_minimum_deposit_cap: u64,
-    pub buyer_maximum_deposit_cap: u64,
     pub presale_start_time: u64,
     pub presale_end_time: u64,
     pub whitelist_mode: u8,
     pub presale_mode: u8,
-    pub padding: [u64; 4],
+    pub padding: [u8; 32],
 }
 
 impl PresaleArgs {
@@ -69,21 +132,6 @@ impl PresaleArgs {
 
         require!(
             self.presale_minimum_cap > 0,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        require!(
-            self.buyer_maximum_deposit_cap >= self.buyer_minimum_deposit_cap,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        require!(
-            self.buyer_maximum_deposit_cap > 0,
-            PresaleError::InvalidPresaleInfo
-        );
-
-        require!(
-            self.buyer_maximum_deposit_cap <= self.presale_maximum_cap,
             PresaleError::InvalidPresaleInfo
         );
 
@@ -129,7 +177,7 @@ pub struct LockedVestingArgs {
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
     pub vest_duration: u64,
-    pub padding: [u64; 4],
+    pub padding: [u8; 32],
 }
 
 impl LockedVestingArgs {
@@ -185,8 +233,8 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_tokenomic_args_size() {
-        let args = TokenomicArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 40);
+    fn test_ensure_presale_registry_args_size() {
+        let args = PresaleRegistryArgs::default();
+        assert_eq!(args.try_to_vec().unwrap().len(), 56);
     }
 }

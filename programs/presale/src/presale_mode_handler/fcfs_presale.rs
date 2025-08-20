@@ -8,8 +8,8 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         &self,
         _presale_pubkey: Pubkey,
         presale: &mut Presale,
-        tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
+        presale_registries: &[PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
@@ -28,9 +28,9 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         } = mint_pubkeys;
 
         presale.initialize(PresaleInitializeArgs {
-            tokenomic_params: *tokenomic_params,
             presale_params: *presale_params,
             locked_vesting_params: locked_vesting_params.cloned(),
+            presale_registries,
             fixed_price_presale_params: None,
             base_mint,
             quote_mint,
@@ -49,8 +49,9 @@ impl PresaleModeHandler for FcfsPresaleHandler {
     /// FCFS presale cannot deposit more than the presale maximum cap.
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         let global_remaining_quota = presale.get_remaining_deposit_quota()?;
+        let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         let personal_remaining_quota =
-            escrow.get_remaining_deposit_quota(presale.buyer_maximum_deposit_cap)?;
+            escrow.get_remaining_deposit_quota(presale_registry.buyer_maximum_deposit_cap)?;
 
         Ok(global_remaining_quota.min(personal_remaining_quota))
     }

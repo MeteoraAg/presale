@@ -16,7 +16,8 @@ pub struct CreatePermissionlessEscrowCtx<'info> {
         seeds = [
             crate::constants::seeds::ESCROW_PREFIX,
             presale.key().as_ref(),
-            owner.key().as_ref()
+            owner.key().as_ref(),
+            &crate::constants::DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.to_be_bytes(),
         ],
         bump,
         payer = payer,
@@ -41,7 +42,7 @@ pub fn handle_create_permissionless_escrow(
     // Ensure presale is permissionless
     let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
     require!(
-        whitelist_mode == WhitelistMode::Permissionless,
+        !whitelist_mode.is_permissioned(),
         PresaleError::InvalidPresaleWhitelistMode
     );
 
@@ -50,6 +51,7 @@ pub fn handle_create_permissionless_escrow(
         escrow: &ctx.accounts.escrow,
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
+        registry_index: crate::constants::DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
     })?;
 
     emit_cpi!(EvtEscrowCreate {

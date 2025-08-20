@@ -40,8 +40,8 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         &self,
         presale_pubkey: Pubkey,
         presale: &mut Presale,
-        tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
+        presale_registries: &[PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         remaining_accounts: &'e mut &'c [AccountInfo<'info>],
@@ -65,16 +65,25 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         );
 
         // 2. Validate fixed price presale parameters
-        ensure_token_buyable(
-            presale_extra_param.q_price,
-            presale_params.buyer_maximum_deposit_cap,
-        )?;
+        // TODO: Should we make sure there's no impossible to fill gap?
+        // For example: 1 token = 1 USDC, presale_maximum_cap = 100 USDC, buyer_minimum_deposit_cap = 20 USDC, buyer_maximum_deposit_cap = 90 USDC
+        // User 1 deposit 90 USDC, remaining_presale_cap = 100 - 90 = 10
+        // But buyer_minimum_deposit_cap = 20, thus it's impossible to fill the gap
+        // This might happen to both presale_minimum_cap and presale_maximum_cap
+        for registry in presale_registries {
+            if !registry.is_uninitialized() {
+                ensure_token_buyable(
+                    presale_extra_param.q_price,
+                    registry.buyer_maximum_deposit_cap,
+                )?;
 
-        ensure_enough_presale_supply(
-            presale_extra_param.q_price,
-            tokenomic_params.presale_pool_supply,
-            presale_params.presale_maximum_cap,
-        )?;
+                ensure_enough_presale_supply(
+                    presale_extra_param.q_price,
+                    registry.presale_supply,
+                    presale_params.presale_maximum_cap,
+                )?;
+            }
+        }
 
         let current_timestamp = Clock::get()?.unix_timestamp as u64;
 
@@ -91,8 +100,8 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
 
         // 3. Create presale vault
         presale.initialize(PresaleInitializeArgs {
-            tokenomic_params: *tokenomic_params,
             presale_params: *presale_params,
+            presale_registries,
             locked_vesting_params: locked_vesting_params.cloned(),
             fixed_price_presale_params: Some(*presale_extra_param),
             base_mint,
@@ -113,8 +122,9 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     /// Fixed price presale cannot deposit more than the presale maximum cap.
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         let global_remaining_quota = presale.get_remaining_deposit_quota()?;
+        let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         let personal_remaining_quota =
-            escrow.get_remaining_deposit_quota(presale.buyer_maximum_deposit_cap)?;
+            escrow.get_remaining_deposit_quota(presale_registry.buyer_maximum_deposit_cap)?;
 
         Ok(global_remaining_quota.min(personal_remaining_quota))
     }

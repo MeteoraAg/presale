@@ -18,8 +18,7 @@ pub struct EvtFixedPricePresaleArgsClose {
 pub struct EvtPresaleVaultCreate {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
-    pub buyer_maximum_deposit_cap: u64,
-    pub buyer_minimum_deposit_cap: u64,
+    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub lock_duration: u64,
     pub vest_duration: u64,
     pub whitelist_mode: u8,

@@ -116,4 +116,7 @@ pub enum PresaleError {
 
     #[msg("Unsold base token action already performed")]
     UnsoldBaseTokenActionAlreadyPerformed,
+
+    #[msg("Invalid presale registry index")]
+    InvalidPresaleRegistryIndex,
 }

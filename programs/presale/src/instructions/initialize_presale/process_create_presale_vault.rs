@@ -2,8 +2,8 @@ use crate::*;
 
 pub struct ProcessCreatePresaleVaultArgs<'a, 'c: 'info, 'd, 'e, 'info> {
     pub presale: &'a AccountLoader<'info, Presale>,
-    pub tokenomic_params: &'d TokenomicArgs,
     pub presale_params: &'d PresaleArgs,
+    pub presale_registries: &'d [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub locked_vesting_params: Option<&'d LockedVestingArgs>,
     pub remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     pub mint_pubkeys: InitializePresaleVaultAccountPubkeys,
@@ -12,8 +12,8 @@ pub struct ProcessCreatePresaleVaultArgs<'a, 'c: 'info, 'd, 'e, 'info> {
 pub fn process_create_presale_vault(params: ProcessCreatePresaleVaultArgs) -> Result<()> {
     let ProcessCreatePresaleVaultArgs {
         presale,
-        tokenomic_params,
         presale_params,
+        presale_registries,
         locked_vesting_params,
         remaining_accounts,
         mint_pubkeys,
@@ -26,8 +26,8 @@ pub fn process_create_presale_vault(params: ProcessCreatePresaleVaultArgs) -> Re
     presale_handler.initialize_presale(
         presale.key(),
         &mut presale_state,
-        tokenomic_params,
         presale_params,
+        presale_registries,
         locked_vesting_params,
         mint_pubkeys,
         remaining_accounts,

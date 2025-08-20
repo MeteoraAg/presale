@@ -63,7 +63,7 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
     require!(amount_to_refund > 0, PresaleError::ZeroTokenAmount);
 
     // 3. Update presale and escrow state
-    presale.update_total_refunded_quote_token(amount_to_refund)?;
+    presale.update_total_refunded_quote_token(amount_to_refund, escrow.registry_index)?;
     escrow.update_remaining_quote_withdrawn()?;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(

@@ -11,8 +11,16 @@ use anchor_lang::solana_program::hash::hashv;
 // https://flawed.net.nz/2018/02/21/attacking-merkle-trees-with-a-second-preimage-attack
 const LEAF_PREFIX: &[u8] = &[0];
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct CreatePermissionedEscrowWithMerkleProofParams {
+    pub proof: Vec<[u8; 32]>,
+    pub registry_index: u8,
+    pub padding: [u8; 32],
+}
+
 #[event_cpi]
 #[derive(Accounts)]
+#[instruction(params: CreatePermissionedEscrowWithMerkleProofParams)]
 pub struct CreatePermissionedEscrowWithMerkleProofCtx<'info> {
     #[account(mut)]
     pub presale: AccountLoader<'info, Presale>,
@@ -23,6 +31,7 @@ pub struct CreatePermissionedEscrowWithMerkleProofCtx<'info> {
             crate::constants::seeds::ESCROW_PREFIX,
             presale.key().as_ref(),
             owner.key().as_ref(),
+            params.registry_index.to_le_bytes().as_ref(),
         ],
         bump,
         payer = payer,
@@ -44,7 +53,7 @@ pub struct CreatePermissionedEscrowWithMerkleProofCtx<'info> {
 
 pub fn handle_create_permissioned_escrow_with_merkle_proof(
     ctx: Context<CreatePermissionedEscrowWithMerkleProofCtx>,
-    proof: Vec<[u8; 32]>,
+    params: CreatePermissionedEscrowWithMerkleProofParams,
 ) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
 
@@ -55,9 +64,18 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
         PresaleError::InvalidPresaleWhitelistMode
     );
 
+    let CreatePermissionedEscrowWithMerkleProofParams {
+        registry_index,
+        proof,
+        ..
+    } = params;
+
     // 2. Verify the merkle proof
     let merkle_root_config = ctx.accounts.merkle_root_config.load()?;
-    let node = hashv(&[&ctx.accounts.owner.key().to_bytes()]);
+    let node = hashv(&[
+        &ctx.accounts.owner.key().to_bytes(),
+        registry_index.to_le_bytes().as_ref(),
+    ]);
     let node = hashv(&[LEAF_PREFIX, &node.to_bytes()]);
     require!(
         verify(proof, merkle_root_config.root, node.to_bytes()),
@@ -69,6 +87,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
         escrow: &ctx.accounts.escrow,
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
+        registry_index,
     })?;
 
     emit_cpi!(EvtEscrowCreate {

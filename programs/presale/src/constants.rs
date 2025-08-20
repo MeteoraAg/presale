@@ -10,6 +10,11 @@ pub const MAXIMUM_LOCK_AND_VEST_DURATION: u64 = 60 * 60 * 24 * 365 * 10; // 10 y
 
 pub const SCALE_OFFSET: u32 = 64; // 2^64
 
+pub const MAX_PRESALE_REGISTRY_COUNT: usize = 5;
+
+// Only permissioned whitelist mode allowed to have multiple presale registries. The constant defined below is the default index for permissionless registries.
+pub const DEFAULT_PERMISSIONLESS_REGISTRY_INDEX: u8 = 0;
+
 // PDA's seeds
 pub mod seeds {
     pub const PRESALE_AUTHORITY_PREFIX: &[u8] = b"presale_authority";

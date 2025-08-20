@@ -47,7 +47,7 @@ pub fn handle_close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
         }
     }
 
-    presale.decrease_escrow_count()?;
+    presale.decrease_escrow_count(escrow.registry_index)?;
 
     emit_cpi!(EvtEscrowClose {
         presale: ctx.accounts.presale.key(),

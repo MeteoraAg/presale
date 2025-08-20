@@ -5,8 +5,15 @@ use crate::{
     *,
 };
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+pub struct CreatePermissionedEscrowWithCreatorParams {
+    pub registry_index: u8,
+    pub padding: [u8; 32],
+}
+
 #[event_cpi]
 #[derive(Accounts)]
+#[instruction(params: CreatePermissionedEscrowWithCreatorParams)]
 pub struct CreatePermissionedEscrowWithCreatorCtx<'info> {
     #[account(mut)]
     pub presale: AccountLoader<'info, Presale>,
@@ -16,7 +23,8 @@ pub struct CreatePermissionedEscrowWithCreatorCtx<'info> {
         seeds = [
             crate::constants::seeds::ESCROW_PREFIX,
             presale.key().as_ref(),
-            owner.key().as_ref()
+            owner.key().as_ref(),
+            params.registry_index.to_le_bytes().as_ref(),
         ],
         bump,
         payer = payer,
@@ -39,6 +47,7 @@ pub struct CreatePermissionedEscrowWithCreatorCtx<'info> {
 
 pub fn handle_create_permissioned_escrow_with_creator(
     ctx: Context<CreatePermissionedEscrowWithCreatorCtx>,
+    params: CreatePermissionedEscrowWithCreatorParams,
 ) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
 
@@ -57,11 +66,14 @@ pub fn handle_create_permissioned_escrow_with_creator(
         &ctx.accounts.operator_owner.key(),
     )?;
 
+    let CreatePermissionedEscrowWithCreatorParams { registry_index, .. } = params;
+
     process_create_escrow(HandleCreateEscrowArgs {
         presale: &mut presale,
         escrow: &ctx.accounts.escrow,
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
+        registry_index,
     })?;
 
     emit_cpi!(EvtEscrowCreate {

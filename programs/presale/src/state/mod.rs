@@ -15,3 +15,6 @@ pub use operator::*;
 
 mod permissioned_server_metadata;
 pub use permissioned_server_metadata::*;
+
+mod presale_registry;
+pub use presale_registry::*;

@@ -3,7 +3,7 @@ pub mod helpers;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
 use helpers::*;
-use presale::{FixedPricePresaleExtraArgs, UnsoldTokenAction};
+use presale::{FixedPricePresaleParameters, UnsoldTokenAction};
 use std::rc::Rc;
 
 #[test]
@@ -37,11 +37,11 @@ pub fn test_initialize_fixed_token_price_extra_params() {
 
     let fixed_price_args_pubkey =
         derive_fixed_price_presale_args(&base_mint_pubkey, &quote_mint, &user_pubkey, &presale::ID);
-    let fixed_price_args: FixedPricePresaleExtraArgs = lite_svm
+    let fixed_price_args: FixedPricePresaleParameters = lite_svm
         .get_deserialized_zc_account(&fixed_price_args_pubkey)
         .unwrap();
 
-    let FixedPricePresaleExtraArgs {
+    let FixedPricePresaleParameters {
         unsold_token_action,
         q_price: q_price_set,
         owner,

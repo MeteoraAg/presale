@@ -95,9 +95,9 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     ensure_supported_token2022_extensions(&ctx.accounts.presale_mint)?;
 
     let InitializePresaleArgs {
-        tokenomic,
         presale_params,
         locked_vesting_params,
+        presale_registries,
         ..
     } = args;
 
@@ -119,18 +119,18 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
 
     process_create_presale_vault(ProcessCreatePresaleVaultArgs {
         presale: &ctx.accounts.presale,
-        tokenomic_params: &tokenomic,
         presale_params: &presale_params,
+        presale_registries: &presale_registries,
         locked_vesting_params: locked_vesting_params.as_ref(),
         mint_pubkeys,
         remaining_accounts: &mut remaining_account_slice,
     })?;
 
-    let include_fee_presale_pool_supply = calculate_transfer_fee_included_amount(
-        &ctx.accounts.presale_mint,
-        tokenomic.presale_pool_supply,
-    )?
-    .amount;
+    let presale = ctx.accounts.presale.load()?;
+
+    let include_fee_presale_pool_supply =
+        calculate_transfer_fee_included_amount(&ctx.accounts.presale_mint, presale.presale_supply)?
+            .amount;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
         &mut remaining_account_slice,
@@ -153,8 +153,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     emit_cpi!(EvtPresaleVaultCreate {
         base_mint: ctx.accounts.presale_mint.key(),
         quote_mint: ctx.accounts.quote_token_mint.key(),
-        buyer_maximum_deposit_cap: presale_params.buyer_maximum_deposit_cap,
-        buyer_minimum_deposit_cap: presale_params.buyer_minimum_deposit_cap,
+        presale_registries,
         lock_duration: locked_vesting_params
             .as_ref()
             .map(|p| p.lock_duration)

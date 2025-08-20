@@ -53,9 +53,10 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
 
     // TODO: Should we ensure that the total deposit amount can buy at least one token? Because during init presale we only validate the max buyer cap.
     require!(deposit_amount > 0, PresaleError::ZeroTokenAmount);
+    let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
     require!(
-        deposit_amount >= presale.buyer_minimum_deposit_cap
-            && deposit_amount <= presale.buyer_maximum_deposit_cap,
+        deposit_amount >= presale_registry.buyer_minimum_deposit_cap
+            && deposit_amount <= presale_registry.buyer_maximum_deposit_cap,
         PresaleError::DepositAmountOutOfCap
     );
 

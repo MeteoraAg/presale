@@ -25,6 +25,17 @@ pub enum WhitelistMode {
     PermissionWithAuthority,
 }
 
+impl WhitelistMode {
+    pub fn is_permissioned(&self) -> bool {
+        match self {
+            WhitelistMode::Permissionless => false,
+            WhitelistMode::PermissionWithMerkleProof | WhitelistMode::PermissionWithAuthority => {
+                true
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
 #[repr(u8)]
 pub enum UnsoldTokenAction {
@@ -74,18 +85,21 @@ pub struct Presale {
     pub quote_token_vault: Pubkey,
     /// Base key
     pub base: Pubkey,
+    /// Presale version
+    pub version: u8,
+    /// Presale mode
+    pub presale_mode: u8,
+    /// Whitelist mode
+    pub whitelist_mode: u8,
+    pub padding0: [u8; 5],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
     pub presale_minimum_cap: u64,
     /// When presale starts
     pub presale_start_time: u64,
-    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode)
+    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode). (TODO) Will need to be triggered manually.
     pub presale_end_time: u64,
-    /// This is the minimum amount of quote token that a user can deposit to the presale
-    pub buyer_minimum_deposit_cap: u64,
-    /// This is the maximum amount of quote token that a user can deposit to the presale
-    pub buyer_maximum_deposit_cap: u64,
     /// Total base token supply that can be bought by presale participants
     pub presale_supply: u64,
     /// Total deposited quote token
@@ -110,32 +124,32 @@ pub struct Presale {
     pub total_claimed_token: u64,
     /// Total refunded quote token. For statistic purpose only
     pub total_refunded_quote_token: u64,
-    pub padding0: u64,
-    /// Whitelist mode
-    pub whitelist_mode: u8,
-    /// Presale mode
-    pub presale_mode: u8,
     /// Determine whether creator withdrawn the raised capital
     pub has_creator_withdrawn: u8,
     /// Base token program flag
     pub base_token_program_flag: u8,
     /// Quote token program flag
     pub quote_token_program_flag: u8,
+    /// Total presale registry count
+    pub total_presale_registry_count: u8,
     /// What to do with unsold base token. Only applicable for fixed price presale mode
     pub fixed_price_presale_unsold_token_action: u8,
+    /// Whether the fixed price presale unsold token action has been performed
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding2: [u8; 17],
+    pub padding1: [u8; 2],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
+    /// Presale registries
+    pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
     pub padding3: [u128; 6],
 }
 
-static_assertions::const_assert_eq!(Presale::INIT_SPACE, 480);
+static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1168);
 static_assertions::assert_eq_align!(Presale, u128);
 
-pub struct PresaleInitializeArgs {
-    pub tokenomic_params: TokenomicArgs,
+pub struct PresaleInitializeArgs<'a> {
     pub presale_params: PresaleArgs,
+    pub presale_registries: &'a [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub locked_vesting_params: Option<LockedVestingArgs>,
     pub fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
     pub base_mint: Pubkey,
@@ -162,10 +176,10 @@ fn token_program_to_flag(program: Pubkey) -> TokenProgramFlags {
 impl Presale {
     pub fn initialize(&mut self, args: PresaleInitializeArgs) -> Result<()> {
         let PresaleInitializeArgs {
-            tokenomic_params,
             presale_params,
             locked_vesting_params,
             fixed_price_presale_params,
+            presale_registries,
             base_mint,
             quote_mint,
             base_token_vault,
@@ -186,18 +200,19 @@ impl Presale {
         self.base_token_program_flag = token_program_to_flag(base_token_program).into();
         self.quote_token_program_flag = token_program_to_flag(quote_token_program).into();
 
-        let TokenomicArgs {
-            presale_pool_supply,
-            ..
-        } = tokenomic_params;
+        for (idx, registry) in presale_registries.iter().enumerate() {
+            self.presale_registries[idx].init(
+                registry.presale_supply,
+                registry.buyer_minimum_deposit_cap,
+                registry.buyer_maximum_deposit_cap,
+            );
 
-        self.presale_supply = presale_pool_supply;
+            self.presale_supply = self.presale_supply.safe_add(registry.presale_supply)?;
+        }
 
         let PresaleArgs {
             presale_maximum_cap,
             presale_minimum_cap,
-            buyer_minimum_deposit_cap,
-            buyer_maximum_deposit_cap,
             presale_end_time,
             whitelist_mode,
             presale_mode,
@@ -206,8 +221,6 @@ impl Presale {
 
         self.presale_maximum_cap = presale_maximum_cap;
         self.presale_minimum_cap = presale_minimum_cap;
-        self.buyer_minimum_deposit_cap = buyer_minimum_deposit_cap;
-        self.buyer_maximum_deposit_cap = buyer_maximum_deposit_cap;
         self.presale_start_time =
             presale_params.get_presale_start_time_without_going_backwards(current_timestamp);
         self.presale_end_time = presale_end_time;
@@ -254,12 +267,16 @@ impl Presale {
         }
     }
 
-    pub fn increase_escrow_count(&mut self) -> Result<()> {
+    pub fn increase_escrow_count(&mut self, registry_index: u8) -> Result<()> {
+        let presale_registry = self.get_presale_registry_mut(registry_index.into())?;
+        presale_registry.increase_escrow_count()?;
         self.total_escrow = self.total_escrow.safe_add(1)?;
         Ok(())
     }
 
-    pub fn decrease_escrow_count(&mut self) -> Result<()> {
+    pub fn decrease_escrow_count(&mut self, registry_index: u8) -> Result<()> {
+        let presale_registry = self.get_presale_registry_mut(registry_index.into())?;
+        presale_registry.decrease_escrow_count()?;
         self.total_escrow = self.total_escrow.safe_sub(1)?;
         Ok(())
     }
@@ -286,13 +303,15 @@ impl Presale {
     }
 
     pub fn deposit(&mut self, escrow: &mut Escrow, deposit_amount: u64) -> Result<()> {
+        let presale_registry = self.get_presale_registry_mut(escrow.registry_index.into())?;
+        presale_registry.deposit(escrow, deposit_amount)?;
         self.total_deposit = self.total_deposit.safe_add(deposit_amount)?;
-        escrow.deposit(deposit_amount)?;
         Ok(())
     }
 
     pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
-        escrow.withdraw(amount)?;
+        let presale_registry = self.get_presale_registry_mut(escrow.registry_index.into())?;
+        presale_registry.withdraw(escrow, amount)?;
         self.total_deposit = self.total_deposit.safe_sub(amount)?;
         Ok(())
     }
@@ -301,9 +320,14 @@ impl Presale {
         current_timestamp >= self.lock_start_time && current_timestamp <= self.lock_end_time
     }
 
-    pub fn update_total_refunded_quote_token(&mut self, amount: u64) -> Result<()> {
+    pub fn update_total_refunded_quote_token(
+        &mut self,
+        amount: u64,
+        registry_index: u8,
+    ) -> Result<()> {
+        let presale_registry = self.get_presale_registry_mut(registry_index.into())?;
+        presale_registry.update_total_refunded_quote_token(amount)?;
         self.total_refunded_quote_token = self.total_refunded_quote_token.safe_add(amount)?;
-
         Ok(())
     }
 
@@ -344,9 +368,14 @@ impl Presale {
             let remaining_quote_amount =
                 self.total_deposit.saturating_sub(self.presale_maximum_cap);
 
-            u128::from(escrow.total_deposit)
+            let presale_registry = self.get_presale_registry(escrow.registry_index.into())?;
+            let registry_remaining_quote_amount = u128::from(presale_registry.total_deposit)
                 .safe_mul(remaining_quote_amount.into())?
-                .safe_div(self.total_deposit.into())?
+                .safe_div(self.total_deposit.into())?;
+
+            u128::from(escrow.total_deposit)
+                .safe_mul(registry_remaining_quote_amount)?
+                .safe_div(presale_registry.total_deposit.into())?
                 .safe_cast()?
         };
 
@@ -370,10 +399,23 @@ impl Presale {
     }
 
     pub fn claim(&mut self, escrow: &mut Escrow) -> Result<()> {
-        self.total_claimed_token = self
-            .total_claimed_token
-            .safe_add(escrow.pending_claim_token)?;
+        let presale_registry = self.get_presale_registry_mut(escrow.registry_index.into())?;
+        let claimed_amount = escrow.claim()?;
+        presale_registry.update_total_claim_amount(claimed_amount)?;
+        self.total_claimed_token = self.total_claimed_token.safe_add(claimed_amount)?;
 
-        escrow.claim()
+        Ok(())
+    }
+
+    pub fn get_presale_registry(&self, index: usize) -> Result<&PresaleRegistry> {
+        self.presale_registries
+            .get(index)
+            .ok_or(PresaleError::InvalidPresaleRegistryIndex.into())
+    }
+
+    pub fn get_presale_registry_mut(&mut self, index: usize) -> Result<&mut PresaleRegistry> {
+        self.presale_registries
+            .get_mut(index)
+            .ok_or(PresaleError::InvalidPresaleRegistryIndex.into())
     }
 }

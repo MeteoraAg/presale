@@ -73,15 +73,16 @@ pub mod presale {
 
     pub fn create_permissioned_escrow_with_creator(
         ctx: Context<CreatePermissionedEscrowWithCreatorCtx>,
+        params: CreatePermissionedEscrowWithCreatorParams,
     ) -> Result<()> {
-        instructions::handle_create_permissioned_escrow_with_creator(ctx)
+        instructions::handle_create_permissioned_escrow_with_creator(ctx, params)
     }
 
     pub fn create_permissioned_escrow_with_merkle_proof(
         ctx: Context<CreatePermissionedEscrowWithMerkleProofCtx>,
-        proof: Vec<[u8; 32]>,
+        params: CreatePermissionedEscrowWithMerkleProofParams,
     ) -> Result<()> {
-        instructions::handle_create_permissioned_escrow_with_merkle_proof(ctx, proof)
+        instructions::handle_create_permissioned_escrow_with_merkle_proof(ctx, params)
     }
 
     pub fn create_operator(ctx: Context<CreateOperatorCtx>) -> Result<()> {

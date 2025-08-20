@@ -8,8 +8,8 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         &self,
         _presale_pubkey: Pubkey,
         presale: &mut Presale,
-        tokenomic_params: &TokenomicArgs,
         presale_params: &PresaleArgs,
+        presale_registries: &[PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
@@ -29,8 +29,8 @@ impl PresaleModeHandler for ProrataPresaleHandler {
 
         // 3. Create presale vault
         presale.initialize(PresaleInitializeArgs {
-            tokenomic_params: *tokenomic_params,
             presale_params: *presale_params,
+            presale_registries,
             locked_vesting_params: locked_vesting_params.cloned(),
             fixed_price_presale_params: None,
             base_mint,
@@ -49,7 +49,8 @@ impl PresaleModeHandler for ProrataPresaleHandler {
 
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         // Prorata can deposit > presale maximum cap. Therefore, the remaining deposit quota is the quote leftover in the escrow.
-        escrow.get_remaining_deposit_quota(presale.buyer_maximum_deposit_cap)
+        let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+        escrow.get_remaining_deposit_quota(presale_registry.buyer_maximum_deposit_cap)
     }
 
     fn end_presale_if_max_cap_reached(

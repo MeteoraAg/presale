@@ -13,7 +13,9 @@ pub struct Escrow {
     pub total_claimed_token: u64,
     // Determine whether user withdrawn remaining quote token
     pub is_remaining_quote_withdrawn: u8,
-    pub padding0: [u8; 7],
+    // The index of the presale registry
+    pub registry_index: u8,
+    pub padding0: [u8; 6],
     // Total pending claim token
     pub pending_claim_token: u64,
     // Timestamp of when the escrow was created
@@ -27,12 +29,19 @@ static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 176);
 static_assertions::assert_eq_align!(Escrow, u64);
 
 impl Escrow {
-    pub fn initialize(&mut self, presale: Pubkey, owner: Pubkey, created_at: u64) -> Result<()> {
+    pub fn initialize(
+        &mut self,
+        presale: Pubkey,
+        owner: Pubkey,
+        created_at: u64,
+        registry_index: u8,
+    ) -> Result<()> {
         self.presale = presale;
         self.owner = owner;
         self.total_deposit = 0;
         self.created_at = created_at;
         self.last_refreshed_at = created_at;
+        self.registry_index = registry_index;
 
         Ok(())
     }
@@ -56,12 +65,13 @@ impl Escrow {
         Ok(())
     }
 
-    pub fn claim(&mut self) -> Result<()> {
+    pub fn claim(&mut self) -> Result<u64> {
         self.total_claimed_token = self
             .total_claimed_token
             .safe_add(self.pending_claim_token)?;
+        let claimed_token = self.pending_claim_token;
         self.pending_claim_token = 0;
-        Ok(())
+        Ok(claimed_token)
     }
 
     pub fn update_remaining_quote_withdrawn(&mut self) -> Result<()> {
