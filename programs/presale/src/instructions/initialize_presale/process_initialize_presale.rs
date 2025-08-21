@@ -126,10 +126,12 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         remaining_accounts: &mut remaining_account_slice,
     })?;
 
-    let presale = ctx.accounts.presale.load()?;
+    let presale_pool_supply = presale_registries
+        .iter()
+        .try_fold(0u64, |acc, reg| acc.safe_add(reg.presale_supply))?;
 
     let include_fee_presale_pool_supply =
-        calculate_transfer_fee_included_amount(&ctx.accounts.presale_mint, presale.presale_supply)?
+        calculate_transfer_fee_included_amount(&ctx.accounts.presale_mint, presale_pool_supply)?
             .amount;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(

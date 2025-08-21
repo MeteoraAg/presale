@@ -17,6 +17,7 @@ pub struct HandleEscrowWithdrawArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub amount: u64,
+    pub registry_index: u8,
 }
 
 pub fn create_escrow_withdraw_ix(
@@ -27,6 +28,7 @@ pub fn create_escrow_withdraw_ix(
         owner,
         presale,
         amount,
+        registry_index,
     } = args;
     let owner_pubkey = owner.pubkey();
 
@@ -37,7 +39,7 @@ pub fn create_escrow_withdraw_ix(
     let quote_token_program =
         get_program_id_from_token_flag(presale_state.quote_token_program_flag);
 
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
     let owner_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,
         &presale_state.quote_mint,

@@ -14,15 +14,30 @@ use anchor_spl::{
 };
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{
-    AccountsType, LockedVestingArgs, PresaleArgs, PresaleMode, RemainingAccountsInfo,
-    RemainingAccountsSlice, TokenomicArgs, UnsoldTokenAction, WhitelistMode,
+    AccountsType, LockedVestingArgs, PresaleArgs, PresaleMode, PresaleRegistryArgs,
+    RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction, WhitelistMode,
+    MAX_PRESALE_REGISTRY_COUNT,
 };
 
-pub fn create_tokenomic_args(decimals: u8) -> TokenomicArgs {
-    TokenomicArgs {
-        presale_pool_supply: 1_000_000_000 * 10u64.pow(decimals as u32), // 100 million with specified decimals
-        ..Default::default()
+pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
+    [10_000, 0, 0, 0, 0];
+
+pub fn create_default_presale_registries(
+    decimals: u8,
+    basis_points: &[u16; MAX_PRESALE_REGISTRY_COUNT],
+) -> [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT] {
+    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    for (i, bps) in basis_points.iter().enumerate() {
+        if *bps > 0 {
+            let presale_supply =
+                1_000_000_000u128 * 10u128.pow(decimals.into()) * u128::from(*bps) / 10_000u128;
+            let presale_registry = &mut presale_registries[i];
+            presale_registry.presale_supply = presale_supply.try_into().unwrap();
+            presale_registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+            presale_registry.buyer_minimum_deposit_cap = 1_000;
+        }
     }
+    presale_registries
 }
 
 pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
@@ -36,8 +51,6 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
-        buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
-        buyer_minimum_deposit_cap: 1000,
         whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     }
@@ -55,8 +68,8 @@ fn create_locked_vesting_args() -> LockedVestingArgs {
 pub struct HandleInitializePresaleArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
-    pub tokenomic: TokenomicArgs,
     pub presale_params: PresaleArgs,
+    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub locked_vesting_params: Option<LockedVestingArgs>,
     pub creator: Pubkey,
     pub payer: Rc<Keypair>,
@@ -70,8 +83,8 @@ pub fn create_initialize_presale_ix(
     let HandleInitializePresaleArgs {
         base_mint,
         quote_mint,
-        tokenomic,
         presale_params,
+        presale_registries,
         locked_vesting_params,
         creator,
         payer,
@@ -128,7 +141,7 @@ pub fn create_initialize_presale_ix(
 
     let ix_data = presale::instruction::InitializePresale {
         params: presale::InitializePresaleArgs {
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: locked_vesting_params.try_into().unwrap(),
             ..Default::default()
@@ -192,9 +205,12 @@ pub fn create_predefined_fixed_price_presale_ix(
     let init_fixed_token_price_presale_args_ix =
         create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
 
-    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
 
-    let mut presale_params = create_presale_args(&lite_svm);
+    let mut presale_params = create_presale_args(lite_svm);
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
     presale_params.whitelist_mode = whitelist_mode.into();
 
@@ -205,7 +221,7 @@ pub fn create_predefined_fixed_price_presale_ix(
         HandleInitializePresaleArgs {
             base_mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user_pubkey,
@@ -244,7 +260,10 @@ fn create_predefined_prorata_presale_ix(
 
     let user_pubkey = user.pubkey();
 
-    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
 
     let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::Prorata.into();
@@ -257,7 +276,7 @@ fn create_predefined_prorata_presale_ix(
         HandleInitializePresaleArgs {
             base_mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user_pubkey,
@@ -281,7 +300,10 @@ fn create_predefined_fcfs_presale_ix(
 
     let user_pubkey = user.pubkey();
 
-    let tokenomic = create_tokenomic_args(base_mint_state.decimals);
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
 
     let mut presale_params = create_presale_args(&lite_svm);
     presale_params.presale_mode = PresaleMode::Fcfs.into();
@@ -294,7 +316,7 @@ fn create_predefined_fcfs_presale_ix(
         HandleInitializePresaleArgs {
             base_mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user_pubkey,

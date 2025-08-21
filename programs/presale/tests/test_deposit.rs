@@ -6,7 +6,7 @@ use anchor_client::solana_sdk::{
 use anchor_lang::{error::ERROR_CODE_OFFSET, AccountDeserialize};
 use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -30,13 +30,16 @@ fn test_deposit_below_buyer_minimum_cap() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    let deposit_amount = presale_state.buyer_minimum_deposit_cap - 1;
+    let presale_registry = presale_state.get_presale_registry(0).unwrap();
+
+    let deposit_amount = presale_registry.buyer_minimum_deposit_cap - 1;
 
     handle_create_permissionless_escrow(
         &mut lite_svm,
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -46,6 +49,7 @@ fn test_deposit_below_buyer_minimum_cap() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -79,6 +83,7 @@ fn test_deposit_before_presale_start() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -94,6 +99,7 @@ fn test_deposit_before_presale_start() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -127,6 +133,7 @@ fn test_deposit_when_presale_ended() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -142,6 +149,7 @@ fn test_deposit_when_presale_ended() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -177,10 +185,16 @@ fn test_deposit() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -218,24 +232,32 @@ fn test_deposit_with_max_buyer_cap() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
+    let presale_registry = presale_state.get_presale_registry(0).unwrap();
+
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(
         presale_state.total_deposit,
-        presale_state.buyer_maximum_deposit_cap
+        presale_registry.buyer_maximum_deposit_cap
     );
     assert_eq!(
         escrow_state.total_deposit,
-        presale_state.buyer_maximum_deposit_cap
+        presale_registry.buyer_maximum_deposit_cap
     );
 }
 
@@ -277,6 +299,7 @@ fn test_deposit_with_max_presale_cap() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -286,6 +309,7 @@ fn test_deposit_with_max_presale_cap() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -332,7 +356,9 @@ fn test_deposit_token2022() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    let deposit_amount = presale_state.buyer_minimum_deposit_cap + 1;
+    let presale_registry = presale_state.get_presale_registry(0).unwrap();
+
+    let deposit_amount = presale_registry.buyer_minimum_deposit_cap + 1;
 
     handle_escrow_deposit(
         &mut lite_svm,
@@ -340,10 +366,16 @@ fn test_deposit_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)

@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_lang::prelude::Clock;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 
 use crate::helpers::{
     derive_escrow, handle_create_predefined_permissionless_fixed_price_presale,
@@ -41,18 +41,25 @@ fn test_escrow_refresh() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
     warp_time(&mut lite_svm, presale_state.vesting_start_time + 1);
 
-    let escrow = derive_escrow(&presale_pubkey, &user.pubkey(), &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user.pubkey(),
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
 
     handle_escrow_refresh(
         &mut lite_svm,
         HandleEscrowRefreshArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

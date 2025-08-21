@@ -8,11 +8,12 @@ use anchor_spl::{
 use presale::{Presale, UnsoldTokenAction};
 
 use crate::helpers::{
-    calculate_q_price_from_ui_price, create_presale_args, create_tokenomic_args,
+    calculate_q_price_from_ui_price, create_default_presale_registries, create_presale_args,
     derive_fixed_price_presale_args, derive_presale,
     handle_initialize_fixed_token_price_presale_params, handle_initialize_presale,
     HandleInitializeFixedTokenPricePresaleParamsArgs, HandleInitializePresaleArgs, LiteSVMExt,
     SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_QUOTE_TOKEN_DECIMALS,
+    PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
 };
 
 pub mod helpers;
@@ -51,7 +52,11 @@ fn test_initialize_presale_vault_token_2022() {
         },
     );
 
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
     let presale_params = create_presale_args(&lite_svm);
 
     handle_initialize_presale(
@@ -59,7 +64,7 @@ fn test_initialize_presale_vault_token_2022() {
         HandleInitializePresaleArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: None,
             creator: user_pubkey,
@@ -90,7 +95,13 @@ fn test_initialize_presale_vault_token_2022() {
         .get_deserialized_account(&presale_state.base_token_vault)
         .unwrap();
 
-    assert_eq!(base_token_vault.amount, tokenomic.presale_pool_supply);
+    let presale_pool_supply = presale_state
+        .presale_registries
+        .iter()
+        .map(|r| r.presale_supply)
+        .sum::<u64>();
+
+    assert_eq!(base_token_vault.amount, presale_pool_supply);
 }
 
 #[test]
@@ -127,7 +138,11 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         },
     );
 
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
     let presale_params = create_presale_args(&lite_svm);
 
     let user_base_ata = get_associated_token_address_with_program_id(
@@ -144,7 +159,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         HandleInitializePresaleArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: None,
             creator: user_pubkey,
@@ -165,10 +180,6 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
     let after_user_base_token: TokenAccount =
         lite_svm.get_deserialized_account(&user_base_ata).unwrap();
 
-    let deducted_amount = before_user_base_token.amount - after_user_base_token.amount;
-    // Transfer fee
-    assert!(deducted_amount > tokenomic.presale_pool_supply);
-
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&derive_presale(
             &base_mint_pubkey,
@@ -178,11 +189,21 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         ))
         .unwrap();
 
+    let deducted_amount = before_user_base_token.amount - after_user_base_token.amount;
+    // Transfer fee
+    let presale_pool_supply = presale_state
+        .presale_registries
+        .iter()
+        .map(|r| r.presale_supply)
+        .sum::<u64>();
+
+    assert!(deducted_amount > presale_pool_supply);
+
     let base_token_vault: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)
         .unwrap();
 
-    assert_eq!(base_token_vault.amount, tokenomic.presale_pool_supply);
+    assert_eq!(base_token_vault.amount, presale_pool_supply);
 }
 
 #[test]
@@ -219,7 +240,10 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         },
     );
 
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
     let presale_params = create_presale_args(&lite_svm);
 
     handle_initialize_presale(
@@ -227,7 +251,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         HandleInitializePresaleArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: None,
             creator: user_pubkey,
@@ -258,5 +282,11 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         .get_deserialized_account(&presale_state.base_token_vault)
         .unwrap();
 
-    assert_eq!(base_token_vault.amount, tokenomic.presale_pool_supply);
+    let presale_pool_supply = presale_state
+        .presale_registries
+        .iter()
+        .map(|r| r.presale_supply)
+        .sum::<u64>();
+
+    assert_eq!(base_token_vault.amount, presale_pool_supply);
 }

@@ -5,7 +5,7 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::error::ERROR_CODE_OFFSET;
 use helpers::*;
-use presale::Presale;
+use presale::{Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -35,6 +35,7 @@ fn test_close_escrow_with_deposit() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_maximum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -43,6 +44,7 @@ fn test_close_escrow_with_deposit() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -80,6 +82,7 @@ fn test_close_escrow_with_unclaimed_token() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_maximum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -93,6 +96,7 @@ fn test_close_escrow_with_unclaimed_token() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -147,6 +151,7 @@ fn test_close_escrow_presale_ongoing() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount_0,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -156,6 +161,7 @@ fn test_close_escrow_presale_ongoing() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: amount_1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -165,6 +171,7 @@ fn test_close_escrow_presale_ongoing() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: amount_0,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -174,6 +181,7 @@ fn test_close_escrow_presale_ongoing() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             amount: amount_1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -182,6 +190,7 @@ fn test_close_escrow_presale_ongoing() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -190,6 +199,7 @@ fn test_close_escrow_presale_ongoing() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -244,6 +254,7 @@ fn test_close_escrow_presale_completed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount_0,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -253,6 +264,7 @@ fn test_close_escrow_presale_completed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: amount_1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -268,6 +280,7 @@ fn test_close_escrow_presale_completed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: true,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -277,6 +290,7 @@ fn test_close_escrow_presale_completed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             refresh_escrow: true,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -285,6 +299,7 @@ fn test_close_escrow_presale_completed() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -293,6 +308,7 @@ fn test_close_escrow_presale_completed() {
         HandleCloseEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

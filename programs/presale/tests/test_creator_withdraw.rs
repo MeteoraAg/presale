@@ -6,7 +6,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
 use helpers::*;
-use presale::Presale;
+use presale::{Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -42,6 +42,7 @@ fn test_creator_withdraw_presale_token_2022_success() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -115,6 +116,7 @@ fn test_creator_withdraw_presale_token_2022_failed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -184,6 +186,7 @@ fn test_creator_withdraw_presale_success() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -253,6 +256,7 @@ fn test_creator_withdraw_presale_failed() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

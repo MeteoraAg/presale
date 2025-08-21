@@ -20,6 +20,7 @@ pub struct HandleEscrowClaimArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub refresh_escrow: bool,
+    pub registry_index: u8,
 }
 
 pub fn create_escrow_claim_ix(
@@ -30,10 +31,11 @@ pub fn create_escrow_claim_ix(
         owner,
         presale,
         refresh_escrow,
+        registry_index,
     } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let presale_state = lite_svm
         .get_deserialized_zc_account::<Presale>(&presale)

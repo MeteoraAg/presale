@@ -11,15 +11,20 @@ use crate::helpers::{derive_escrow, derive_event_authority, process_transaction}
 pub struct HandleEscrowRefreshArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
+    pub registry_index: u8,
 }
 
 pub fn create_refresh_escrow_ix(args: HandleEscrowRefreshArgs) -> Vec<Instruction> {
-    let HandleEscrowRefreshArgs { owner, presale } = args;
+    let HandleEscrowRefreshArgs {
+        owner,
+        presale,
+        registry_index,
+    } = args;
     let owner_pubkey = owner.pubkey();
 
     let mut instructions = vec![];
 
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let ix_data = presale::instruction::RefreshEscrow {}.data();
     let accounts = presale::accounts::RefreshEscrowCtx {

@@ -11,7 +11,7 @@ use anchor_lang::solana_program::hash::hashv;
 // https://flawed.net.nz/2018/02/21/attacking-merkle-trees-with-a-second-preimage-attack
 const LEAF_PREFIX: &[u8] = &[0];
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct CreatePermissionedEscrowWithMerkleProofParams {
     pub proof: Vec<[u8; 32]>,
     pub registry_index: u8,

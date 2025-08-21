@@ -10,11 +10,17 @@ use std::rc::Rc;
 
 use crate::helpers::{derive_event_authority, derive_merkle_root_config, process_transaction};
 
-pub fn build_merkle_tree(whitelist_wallets: Vec<Pubkey>) -> ConfigMerkleTree {
+pub struct WhitelistWallet {
+    pub address: Pubkey,
+    pub registry_index: u8,
+}
+
+pub fn build_merkle_tree(whitelist_wallets: Vec<WhitelistWallet>) -> ConfigMerkleTree {
     let tree_nodes = whitelist_wallets
         .into_iter()
         .map(|wallet| TreeNode {
-            escrow_owner: wallet,
+            escrow_owner: wallet.address,
+            registry_index: wallet.registry_index,
             proof: None,
         })
         .collect::<Vec<_>>();

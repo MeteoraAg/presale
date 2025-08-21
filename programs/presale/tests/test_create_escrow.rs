@@ -5,7 +5,7 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::error::ERROR_CODE_OFFSET;
 use helpers::*;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -41,6 +41,7 @@ fn test_initialize_escrow_with_invalid_whitelist_mode() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
     errs.push(err_0);
@@ -57,6 +58,7 @@ fn test_initialize_escrow_with_invalid_whitelist_mode() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
     errs.push(err_1);
@@ -85,6 +87,7 @@ fn test_initialize_escrow_with_invalid_whitelist_mode() {
             owner: Rc::clone(&user),
             vault_owner: user.pubkey(),
             operator: Rc::clone(&operator),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
     errs.push(err_2);
@@ -128,6 +131,7 @@ fn test_initialize_escrow_when_deposit_closed() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -192,6 +196,7 @@ fn test_initialize_permissioned_with_authority_escrow_with_invalid_operator() {
             owner: Rc::clone(&user),
             vault_owner: user_1.pubkey(),
             operator: Rc::clone(&operator_1),
+            registry_index: 0,
         },
     );
 
@@ -221,7 +226,10 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_proof() {
         );
 
     let user_1 = Rc::new(Keypair::new());
-    let whitelist_wallet = vec![user_1.pubkey()];
+    let whitelist_wallet = vec![WhitelistWallet {
+        address: user_1.pubkey(),
+        registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+    }];
 
     let merkle_tree = build_merkle_tree(whitelist_wallet);
 
@@ -242,6 +250,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_proof() {
             proof: merkle_tree.get_node(&user_1.pubkey()).proof.unwrap(),
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
+            registry_index: 0,
         },
     );
 
@@ -286,6 +295,7 @@ fn test_initialize_permissioned_with_authority_escrow() {
             owner: Rc::clone(&user),
             vault_owner: user.pubkey(),
             operator: Rc::clone(&operator),
+            registry_index: 0, // TODO
         },
     );
 }
@@ -309,7 +319,10 @@ fn test_initialize_permissioned_with_merkle_proof_escrow() {
             Rc::clone(&user),
         );
 
-    let whitelist_wallet = vec![user.pubkey()];
+    let whitelist_wallet = vec![WhitelistWallet {
+        address: user.pubkey(),
+        registry_index: 0,
+    }];
 
     let merkle_tree = build_merkle_tree(whitelist_wallet);
 
@@ -330,6 +343,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow() {
             proof: merkle_tree.get_node(&user.pubkey()).proof.unwrap(),
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
+            registry_index: 0, // TODO
         },
     );
 }
@@ -359,11 +373,17 @@ fn test_initialize_permissionless_escrow() {
         HandleCreatePermissionlessEscrowArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
     let presale = derive_presale(&mint, &quote, &user_pubkey, &presale::ID);
-    let escrow = derive_escrow(&presale, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
 
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
     assert_eq!(escrow_state.presale, presale);

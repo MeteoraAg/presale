@@ -6,7 +6,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
 use helpers::*;
-use presale::{Presale, UnsoldTokenAction, WhitelistMode};
+use presale::{Presale, UnsoldTokenAction, WhitelistMode, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -38,6 +38,7 @@ fn test_unsold_token_action_fcfs_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -87,6 +88,7 @@ fn test_unsold_token_action_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -243,6 +245,7 @@ fn test_unsold_token_action_refund_fixed_price_presale_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -345,6 +348,7 @@ fn test_unsold_token_action_refund_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -447,6 +451,7 @@ fn test_unsold_token_action_burn_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

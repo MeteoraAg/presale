@@ -9,7 +9,7 @@ use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
 use litesvm::LiteSVM;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 enum Cmp {
@@ -26,7 +26,12 @@ fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: P
 
     let base_token_program = get_program_id_from_token_flag(presale_state.base_token_program_flag);
 
-    let escrow = derive_escrow(&presale_pubkey, &user.pubkey(), &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user.pubkey(),
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let user_token_address = get_associated_token_address_with_program_id(
         &user.pubkey(),
         &presale_state.base_mint,
@@ -44,6 +49,7 @@ fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: P
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: true,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -100,6 +106,7 @@ fn test_claim_non_completed_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -109,6 +116,7 @@ fn test_claim_non_completed_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: true,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -142,6 +150,7 @@ fn test_claim_locked_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -157,6 +166,7 @@ fn test_claim_locked_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: true,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -190,6 +200,7 @@ fn test_claim_without_refresh() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -205,6 +216,7 @@ fn test_claim_without_refresh() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: false,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -265,6 +277,7 @@ fn test_claim_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount_0,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -274,6 +287,7 @@ fn test_claim_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: amount_1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -358,6 +372,7 @@ fn test_claim() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: amount_0,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -367,6 +382,7 @@ fn test_claim() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: amount_1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

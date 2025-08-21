@@ -6,6 +6,8 @@ fn validate_presale_registries(
 ) -> Result<()> {
     let mut initialized_count = 0;
 
+    let mut presale_supply = 0u128;
+
     for i in 0..MAX_PRESALE_REGISTRY_COUNT {
         let current_registry = &presale_registries[i];
         current_registry.validate(&presale_params)?;
@@ -18,6 +20,9 @@ fn validate_presale_registries(
                 PresaleError::InvalidTokenSupply
             );
 
+            presale_supply =
+                presale_supply.safe_add(u128::from(current_registry.presale_supply))?;
+
             if i > 0 {
                 // Ensure presale registries are order from initialized to un-initialized
                 let previous_registry = &presale_registries[i - 1];
@@ -28,6 +33,11 @@ fn validate_presale_registries(
             }
         }
     }
+
+    require!(
+        presale_supply <= u128::from(u64::MAX),
+        PresaleError::InvalidTokenSupply
+    );
 
     // If presale have multiple registries. Whitelist mode must be Permissioned mode.
     // Reason: It make no sense for a single user to deposit to multiple registries which might have different price when it's dynamic price mode.
@@ -68,7 +78,7 @@ impl InitializePresaleArgs {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Copy, Clone, Default, Debug)]
 pub struct PresaleRegistryArgs {
     pub buyer_minimum_deposit_cap: u64,
     pub buyer_maximum_deposit_cap: u64,
@@ -212,6 +222,7 @@ impl TryFrom<Option<LockedVestingArgs>> for OptionalNonZeroLockedVestingArgs {
 
 #[cfg(test)]
 mod tests {
+    // Tests to ensure no breaking change on ix data deserialize
     use super::*;
 
     #[test]
@@ -223,13 +234,13 @@ mod tests {
     #[test]
     fn test_ensure_initialize_presale_args_size() {
         let args = InitializePresaleArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 202);
+        assert_eq!(args.try_to_vec().unwrap().len(), 426);
     }
 
     #[test]
     fn test_ensure_presale_args_size() {
         let args = PresaleArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 82);
+        assert_eq!(args.try_to_vec().unwrap().len(), 66);
     }
 
     #[test]

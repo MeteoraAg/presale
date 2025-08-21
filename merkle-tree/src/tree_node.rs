@@ -7,12 +7,17 @@ use solana_sdk::hash::Hash;
 pub struct TreeNode {
     /// Pubkey of the escrow owner
     pub escrow_owner: Pubkey,
+    /// Presale registry index
+    pub registry_index: u8,
     /// Escrow owner proof of inclusion in the Merkle Tree
     pub proof: Option<Vec<[u8; 32]>>,
 }
 
 impl TreeNode {
     pub fn hash(&self) -> Hash {
-        hashv(&[&self.escrow_owner.to_bytes()])
+        hashv(&[
+            &self.escrow_owner.to_bytes(),
+            &self.registry_index.to_le_bytes(),
+        ])
     }
 }

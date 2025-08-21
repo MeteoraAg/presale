@@ -69,7 +69,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         // For example: 1 token = 1 USDC, presale_maximum_cap = 100 USDC, buyer_minimum_deposit_cap = 20 USDC, buyer_maximum_deposit_cap = 90 USDC
         // User 1 deposit 90 USDC, remaining_presale_cap = 100 - 90 = 10
         // But buyer_minimum_deposit_cap = 20, thus it's impossible to fill the gap
-        // This might happen to both presale_minimum_cap and presale_maximum_cap
         for registry in presale_registries {
             if !registry.is_uninitialized() {
                 ensure_token_buyable(

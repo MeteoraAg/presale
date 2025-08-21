@@ -3,6 +3,9 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::*;
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
+use presale::{
+    CreatePermissionedEscrowWithCreatorParams, CreatePermissionedEscrowWithMerkleProofParams,
+};
 use std::rc::Rc;
 
 use crate::helpers::{derive_escrow, derive_event_authority, derive_operator, process_transaction};
@@ -12,6 +15,7 @@ pub struct HandleCreatePermissionedEscrowWithMerkleProofArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub merkle_root_config: Pubkey,
+    pub registry_index: u8,
     pub proof: Vec<[u8; 32]>,
 }
 
@@ -22,12 +26,13 @@ pub fn create_permissioned_escrow_with_merkle_proof_ix(
     let HandleCreatePermissionedEscrowWithMerkleProofArgs {
         presale,
         owner,
+        registry_index,
         proof,
         merkle_root_config,
     } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let escrow_account = lite_svm.get_account(&escrow);
 
@@ -35,7 +40,14 @@ pub fn create_permissioned_escrow_with_merkle_proof_ix(
         return None; // Escrow account already exists
     }
 
-    let ix_data = presale::instruction::CreatePermissionedEscrowWithMerkleProof { proof }.data();
+    let ix_data = presale::instruction::CreatePermissionedEscrowWithMerkleProof {
+        params: CreatePermissionedEscrowWithMerkleProofParams {
+            registry_index,
+            proof,
+            ..Default::default()
+        },
+    }
+    .data();
 
     let accounts = presale::accounts::CreatePermissionedEscrowWithMerkleProofCtx {
         escrow,
@@ -82,16 +94,21 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof_err(
 pub struct HandleCreatePermissionlessEscrowArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
+    pub registry_index: u8,
 }
 
 pub fn create_permissionless_escrow_ix(
     lite_svm: &mut LiteSVM,
     args: HandleCreatePermissionlessEscrowArgs,
 ) -> Option<Instruction> {
-    let HandleCreatePermissionlessEscrowArgs { presale, owner } = args;
+    let HandleCreatePermissionlessEscrowArgs {
+        presale,
+        owner,
+        registry_index,
+    } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let escrow_account = lite_svm.get_account(&escrow);
 
@@ -127,6 +144,7 @@ pub struct HandleCreatePermissionedEscrowWithOperatorArgs {
     pub owner: Rc<Keypair>,
     pub vault_owner: Pubkey,
     pub operator: Rc<Keypair>,
+    pub registry_index: u8,
 }
 
 pub fn create_permissioned_escrow_with_operator_ix(
@@ -138,10 +156,11 @@ pub fn create_permissioned_escrow_with_operator_ix(
         owner,
         vault_owner,
         operator,
+        registry_index,
     } = args;
 
     let owner_pubkey = owner.pubkey();
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let escrow_account = lite_svm.get_account(&escrow);
 
@@ -150,7 +169,13 @@ pub fn create_permissioned_escrow_with_operator_ix(
     }
 
     let operator_pda = derive_operator(&vault_owner, &operator.pubkey(), &presale::ID);
-    let ix_data = presale::instruction::CreatePermissionedEscrowWithCreator {}.data();
+    let ix_data = presale::instruction::CreatePermissionedEscrowWithCreator {
+        params: CreatePermissionedEscrowWithCreatorParams {
+            registry_index,
+            ..Default::default()
+        },
+    }
+    .data();
 
     let accounts = presale::accounts::CreatePermissionedEscrowWithCreatorCtx {
         escrow,

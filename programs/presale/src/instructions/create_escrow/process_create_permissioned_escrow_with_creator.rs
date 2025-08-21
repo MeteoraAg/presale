@@ -5,7 +5,7 @@ use crate::{
     *,
 };
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct CreatePermissionedEscrowWithCreatorParams {
     pub registry_index: u8,
     pub padding: [u8; 32],

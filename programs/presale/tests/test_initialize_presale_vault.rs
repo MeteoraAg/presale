@@ -13,28 +13,30 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use presale::{
-    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, TokenomicArgs, UnsoldTokenAction,
+    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, UnsoldTokenAction,
     WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION,
-    MAXIMUM_PRESALE_DURATION, MINIMUM_PRESALE_DURATION,
+    MAXIMUM_PRESALE_DURATION, MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION,
 };
 
-fn assert_err_invalid_tokenomic(
+fn assert_err_invalid_presale_supply(
     lite_svm: &mut LiteSVM,
     user: Rc<Keypair>,
     mint: Pubkey,
     quote_mint: Pubkey,
-    mut tokenomic: TokenomicArgs,
+    mut presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     presale_params: PresaleArgs,
     locked_vesting_params: LockedVestingArgs,
 ) {
-    tokenomic.presale_pool_supply = 0;
+    for registry in presale_registries.iter_mut() {
+        registry.presale_supply = 0;
+    }
 
     let err = handle_initialize_presale_err(
         lite_svm,
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -55,7 +57,7 @@ fn assert_err_invalid_locked_vesting_param(
     user: Rc<Keypair>,
     mint: Pubkey,
     quote_mint: Pubkey,
-    tokenomic: TokenomicArgs,
+    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     presale_params: PresaleArgs,
     locked_vesting_params: LockedVestingArgs,
 ) {
@@ -70,7 +72,7 @@ fn assert_err_invalid_locked_vesting_param(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(invalid_locked_vesting_params),
             creator: user.pubkey(),
@@ -95,7 +97,7 @@ fn assert_err_invalid_presale_params(
     user: Rc<Keypair>,
     mint: Pubkey,
     quote_mint: Pubkey,
-    tokenomic: TokenomicArgs,
+    mut presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     presale_params: PresaleArgs,
     locked_vesting_params: LockedVestingArgs,
 ) {
@@ -110,7 +112,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -129,7 +131,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -150,7 +152,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -169,7 +171,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -189,7 +191,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -209,7 +211,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -228,7 +230,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -239,15 +241,20 @@ fn assert_err_invalid_presale_params(
     errs.push(err_6);
 
     invalid_presale_params = presale_params.clone();
-    invalid_presale_params.buyer_maximum_deposit_cap = 0;
-    invalid_presale_params.buyer_minimum_deposit_cap = 0;
+
+    for registry in presale_registries.iter_mut() {
+        if !registry.is_uninitialized() {
+            registry.buyer_maximum_deposit_cap = 0;
+            registry.buyer_minimum_deposit_cap = 0;
+        }
+    }
 
     let err_7 = handle_initialize_presale_err(
         lite_svm,
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -258,15 +265,20 @@ fn assert_err_invalid_presale_params(
     errs.push(err_7);
 
     invalid_presale_params = presale_params.clone();
-    invalid_presale_params.buyer_maximum_deposit_cap = 100;
-    invalid_presale_params.buyer_minimum_deposit_cap = 200;
+
+    for registry in presale_registries.iter_mut() {
+        if !registry.is_uninitialized() {
+            registry.buyer_maximum_deposit_cap = 100;
+            registry.buyer_minimum_deposit_cap = 200;
+        }
+    }
 
     let err_8 = handle_initialize_presale_err(
         lite_svm,
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -278,8 +290,14 @@ fn assert_err_invalid_presale_params(
     errs.push(err_8);
 
     invalid_presale_params = presale_params.clone();
-    invalid_presale_params.buyer_maximum_deposit_cap = 100;
-    invalid_presale_params.buyer_minimum_deposit_cap = 50;
+
+    for registry in presale_registries.iter_mut() {
+        if !registry.is_uninitialized() {
+            registry.buyer_maximum_deposit_cap = 100;
+            registry.buyer_minimum_deposit_cap = 50;
+        }
+    }
+
     invalid_presale_params.presale_maximum_cap = 90;
     invalid_presale_params.presale_minimum_cap = 50;
 
@@ -288,7 +306,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -338,12 +356,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
         },
     );
 
-    let presale_pool_supply = 1_000_000; // 1 million
-
-    let tokenomic = TokenomicArgs {
-        presale_pool_supply: presale_pool_supply * 10u64.pow(6),
-        ..Default::default()
-    };
+    let presale_pool_supply = 1_000_000 * 10u64.pow(6); // 1 million
 
     let lamport_price = price
         * 10f64
@@ -356,14 +369,18 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
 
     let clock: Clock = lite_svm.get_sysvar();
 
+    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    let registry = presale_registries.get_mut(0).unwrap();
+    registry.presale_supply = presale_pool_supply;
+    registry.buyer_maximum_deposit_cap = buyer_maximum_deposit_cap;
+    registry.buyer_minimum_deposit_cap = 0;
+
     let presale_params = PresaleArgs {
         presale_start_time: clock.unix_timestamp as u64,
         presale_end_time: clock.unix_timestamp as u64 + 120,
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
-        buyer_maximum_deposit_cap,
-        buyer_minimum_deposit_cap: 0,
         whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
@@ -373,7 +390,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: None,
             creator: user_pubkey,
@@ -416,7 +433,10 @@ fn test_initialize_fixed_token_price_presale_vault_missing_fixed_price_extra_arg
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
     let presale_params = create_presale_args(&lite_svm);
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
@@ -427,7 +447,7 @@ fn test_initialize_fixed_token_price_presale_vault_missing_fixed_price_extra_arg
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: None,
             creator: user_pubkey,
@@ -453,7 +473,11 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
     let SetupContext { mut lite_svm, user } = setup_context;
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let tokenomic = create_tokenomic_args(DEFAULT_BASE_TOKEN_DECIMALS);
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
     let presale_params = create_presale_args(&lite_svm);
     let locked_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
@@ -461,12 +485,12 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
         ..Default::default()
     };
 
-    assert_err_invalid_tokenomic(
+    assert_err_invalid_presale_supply(
         &mut lite_svm,
         Rc::clone(&user),
         mint,
         quote_mint,
-        tokenomic,
+        presale_registries,
         presale_params,
         locked_vesting_params,
     );
@@ -476,7 +500,7 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
         Rc::clone(&user),
         mint,
         quote_mint,
-        tokenomic,
+        presale_registries,
         presale_params,
         locked_vesting_params,
     );
@@ -486,7 +510,7 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
         Rc::clone(&user),
         mint,
         quote_mint,
-        tokenomic,
+        presale_registries,
         presale_params,
         locked_vesting_params,
     )
@@ -503,10 +527,12 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let tokenomic = TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
-        ..Default::default()
-    };
+    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    let registry = presale_registries.get_mut(0).unwrap();
+
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -516,8 +542,6 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Fcfs.into(),
-        buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
-        buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
         whitelist_mode: WhitelistMode::PermissionWithAuthority.into(),
         ..Default::default()
     };
@@ -533,7 +557,7 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(lock_vesting_params),
             creator: user_pubkey,
@@ -568,10 +592,12 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let tokenomic = TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
-        ..Default::default()
-    };
+    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    let registry = presale_registries.get_mut(0).unwrap();
+
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -581,8 +607,6 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Prorata.into(),
-        buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
-        buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
         whitelist_mode: WhitelistMode::PermissionWithMerkleProof.into(),
         ..Default::default()
     };
@@ -598,7 +622,7 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(lock_vesting_params),
             creator: user_pubkey,
@@ -654,10 +678,12 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         },
     );
 
-    let tokenomic = TokenomicArgs {
-        presale_pool_supply: 1_000_000 * 10u64.pow(6), // 1 million
-        ..Default::default()
-    };
+    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    let registry = presale_registries.get_mut(0).unwrap();
+
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -667,8 +693,6 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
-        buyer_maximum_deposit_cap: LAMPORTS_PER_SOL,
-        buyer_minimum_deposit_cap: 1_000_000, // 0.0001 SOL
         whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
@@ -684,7 +708,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            tokenomic,
+            presale_registries,
             presale_params,
             locked_vesting_params: Some(lock_vesting_params),
             creator: user_pubkey,
@@ -730,14 +754,20 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_state.presale_minimum_cap,
         presale_params.presale_minimum_cap
     );
-    assert_eq!(
-        presale_state.buyer_maximum_deposit_cap,
-        presale_params.buyer_maximum_deposit_cap
-    );
-    assert_eq!(
-        presale_state.buyer_minimum_deposit_cap,
-        presale_params.buyer_minimum_deposit_cap
-    );
+
+    for (i, presale_registry) in presale_registries.iter().enumerate() {
+        let params = presale_registries.get(i).unwrap();
+        assert_eq!(
+            presale_registry.buyer_maximum_deposit_cap,
+            params.buyer_maximum_deposit_cap
+        );
+        assert_eq!(
+            presale_registry.buyer_minimum_deposit_cap,
+            params.buyer_minimum_deposit_cap
+        );
+        assert_eq!(presale_registry.presale_supply, params.presale_supply);
+    }
+
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
     assert_eq!(presale_state.owner, user_pubkey);
     assert_eq!(presale_state.base, user_pubkey);
@@ -778,8 +808,11 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         .get_deserialized_account(&presale_state.base_token_vault)
         .unwrap();
 
-    assert_eq!(
-        base_vault_token_account.amount,
-        tokenomic.presale_pool_supply
-    );
+    let presale_pool_supply = presale_state
+        .presale_registries
+        .iter()
+        .map(|r| r.presale_supply)
+        .sum::<u64>();
+
+    assert_eq!(base_vault_token_account.amount, presale_pool_supply);
 }

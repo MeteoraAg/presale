@@ -25,7 +25,13 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
         PresaleError::PresaleNotOpenForDeposit
     );
 
-    // 2. Initialize the escrow account
+    // 2. Ensure valid registry index
+    require!(
+        registry_index < presale.total_presale_registry_count,
+        PresaleError::InvalidPresaleRegistryIndex
+    );
+
+    // 3. Initialize the escrow account
     let mut escrow = escrow.load_init()?;
     escrow.initialize(
         presale_pubkey,
@@ -34,7 +40,7 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
         registry_index,
     )?;
 
-    // 3. Update the presale state
+    // 4. Update the presale state
     presale.increase_escrow_count(registry_index)?;
 
     Ok(())

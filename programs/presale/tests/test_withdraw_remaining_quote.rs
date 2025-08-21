@@ -8,7 +8,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
 use helpers::*;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -39,6 +39,7 @@ fn test_withdraw_remaining_quote_failed_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap - 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -63,6 +64,7 @@ fn test_withdraw_remaining_quote_failed_fixed_price_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -70,7 +72,12 @@ fn test_withdraw_remaining_quote_failed_fixed_price_presale() {
         .get_deserialized_account(&user_quote_token_pubkey)
         .unwrap();
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(escrow_state.is_remaining_quote_withdrawn, 1);
@@ -109,6 +116,7 @@ fn test_withdraw_remaining_quote_failed_fcfs_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap - 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -133,6 +141,7 @@ fn test_withdraw_remaining_quote_failed_fcfs_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -140,7 +149,12 @@ fn test_withdraw_remaining_quote_failed_fcfs_presale() {
         .get_deserialized_account(&user_quote_token_pubkey)
         .unwrap();
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(escrow_state.is_remaining_quote_withdrawn, 1);
@@ -179,6 +193,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap - 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -203,6 +218,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -210,7 +226,12 @@ fn test_withdraw_remaining_quote_failed_prorata_presale() {
         .get_deserialized_account(&user_quote_token_pubkey)
         .unwrap();
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(escrow_state.is_remaining_quote_withdrawn, 1);
@@ -255,6 +276,7 @@ fn test_withdraw_remaining_quote_success_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -264,6 +286,7 @@ fn test_withdraw_remaining_quote_success_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
             max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -288,6 +311,7 @@ fn test_withdraw_remaining_quote_success_prorata_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -295,7 +319,12 @@ fn test_withdraw_remaining_quote_success_prorata_presale() {
         .get_deserialized_account(&user_quote_token_pubkey)
         .unwrap();
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(escrow_state.is_remaining_quote_withdrawn, 1);
@@ -337,6 +366,7 @@ fn test_withdraw_remaining_quote_success_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 10,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -351,6 +381,7 @@ fn test_withdraw_remaining_quote_success_fixed_price_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -388,6 +419,7 @@ fn test_withdraw_remaining_quote_success_fcfs_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap + 10,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -402,6 +434,7 @@ fn test_withdraw_remaining_quote_success_fcfs_presale() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -439,6 +472,7 @@ fn test_withdraw_remaining_quote_when_presale_ongoing() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap - 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -447,6 +481,7 @@ fn test_withdraw_remaining_quote_when_presale_ongoing() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -490,6 +525,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: presale_state.presale_minimum_cap - 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -514,6 +550,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale_token2022() {
         HandleEscrowWithdrawRemainingQuoteArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -521,7 +558,12 @@ fn test_withdraw_remaining_quote_failed_prorata_presale_token2022() {
         .get_deserialized_account(&user_quote_token_pubkey)
         .unwrap();
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     assert_eq!(escrow_state.is_remaining_quote_withdrawn, 1);

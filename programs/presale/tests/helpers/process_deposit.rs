@@ -25,6 +25,7 @@ pub struct HandleEscrowDepositArgs {
     pub presale: Pubkey,
     pub owner: Rc<Keypair>,
     pub max_amount: u64,
+    pub registry_index: u8,
 }
 
 pub fn create_deposit_ix(
@@ -35,6 +36,7 @@ pub fn create_deposit_ix(
         owner,
         presale,
         max_amount,
+        registry_index,
     } = args;
     let owner_pubkey = owner.pubkey();
 
@@ -45,6 +47,7 @@ pub fn create_deposit_ix(
         super::HandleCreatePermissionlessEscrowArgs {
             presale,
             owner: Rc::clone(&owner),
+            registry_index,
         },
     );
 
@@ -59,7 +62,7 @@ pub fn create_deposit_ix(
         .unwrap()
         .owner;
 
-    let escrow = derive_escrow(&presale, &owner_pubkey, &presale::ID);
+    let escrow = derive_escrow(&presale, &owner_pubkey, registry_index, &presale::ID);
 
     let payer_quote_token = get_associated_token_address_with_program_id(
         &owner_pubkey,

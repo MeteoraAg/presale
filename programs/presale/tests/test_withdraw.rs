@@ -6,7 +6,7 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
 use helpers::*;
-use presale::{Escrow, Presale};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -34,6 +34,7 @@ fn test_withdraw_when_presale_end() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -49,6 +50,7 @@ fn test_withdraw_when_presale_end() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -84,6 +86,7 @@ fn test_withdraw_over_escrow_balance() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -93,6 +96,7 @@ fn test_withdraw_over_escrow_balance() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: deposit_amount + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -135,10 +139,16 @@ fn test_withdraw_fixed_price_presale_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let user_quote_token = get_associated_token_address_with_program_id(
         &user_pubkey,
         &quote_mint,
@@ -165,6 +175,7 @@ fn test_withdraw_fixed_price_presale_token2022() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: withdraw_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -220,10 +231,16 @@ fn test_withdraw_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let before_escrow_state = lite_svm
         .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
@@ -240,6 +257,7 @@ fn test_withdraw_fixed_price_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: withdraw_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -285,10 +303,16 @@ fn test_withdraw_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let before_escrow_state = lite_svm
         .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
@@ -301,6 +325,7 @@ fn test_withdraw_prorata_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: withdraw_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
@@ -338,10 +363,16 @@ fn test_withdraw_fcfs_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 
-    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, &presale::ID);
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
     let before_escrow_state = lite_svm
         .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
@@ -354,6 +385,7 @@ fn test_withdraw_fcfs_presale() {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             amount: withdraw_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
 

@@ -201,6 +201,11 @@ impl Presale {
         self.quote_token_program_flag = token_program_to_flag(quote_token_program).into();
 
         for (idx, registry) in presale_registries.iter().enumerate() {
+            if !registry.is_uninitialized() {
+                self.total_presale_registry_count =
+                    self.total_presale_registry_count.safe_add(1)?;
+            }
+
             self.presale_registries[idx].init(
                 registry.presale_supply,
                 registry.buyer_minimum_deposit_cap,
