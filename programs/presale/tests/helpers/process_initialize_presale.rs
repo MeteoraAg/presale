@@ -22,6 +22,9 @@ use presale::{
 pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
     [10_000, 0, 0, 0, 0];
 
+pub const PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
+    [2_000, 2_000, 2_000, 2_000, 2_000];
+
 pub fn create_default_presale_registries(
     decimals: u8,
     basis_points: &[u16; MAX_PRESALE_REGISTRY_COUNT],
@@ -170,13 +173,14 @@ pub struct HandleCreatePredefinedPresaleResponse {
     pub presale_pubkey: Pubkey,
 }
 
-pub fn create_predefined_fixed_price_presale_ix(
+fn inner_create_predefined_fixed_price_presale_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
     unsold_token_action: UnsoldTokenAction,
+    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
@@ -204,11 +208,6 @@ pub fn create_predefined_fixed_price_presale_ix(
     };
     let init_fixed_token_price_presale_args_ix =
         create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
-
-    let presale_registries = create_default_presale_registries(
-        base_mint_state.decimals,
-        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
-    );
 
     let mut presale_params = create_presale_args(lite_svm);
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
@@ -244,6 +243,64 @@ pub fn create_predefined_fixed_price_presale_ix(
         init_presale_ix,
     ]
     .concat()
+}
+
+pub fn create_predefined_fixed_price_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    inner_create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        unsold_token_action,
+        presale_registries,
+    )
+}
+
+pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    inner_create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        unsold_token_action,
+        presale_registries,
+    )
 }
 
 fn create_predefined_prorata_presale_ix(
@@ -450,6 +507,32 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
     let instructions = create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
+        UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale_with_multiple_presale_registries(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix_with_multiple_registries(
         lite_svm,
         base_mint,
         quote_mint,

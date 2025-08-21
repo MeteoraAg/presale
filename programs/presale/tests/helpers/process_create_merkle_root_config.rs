@@ -15,7 +15,10 @@ pub struct WhitelistWallet {
     pub registry_index: u8,
 }
 
-pub fn build_merkle_tree(whitelist_wallets: Vec<WhitelistWallet>) -> ConfigMerkleTree {
+pub fn build_merkle_tree(
+    whitelist_wallets: Vec<WhitelistWallet>,
+    version: u64,
+) -> ConfigMerkleTree {
     let tree_nodes = whitelist_wallets
         .into_iter()
         .map(|wallet| TreeNode {
@@ -25,7 +28,7 @@ pub fn build_merkle_tree(whitelist_wallets: Vec<WhitelistWallet>) -> ConfigMerkl
         })
         .collect::<Vec<_>>();
 
-    ConfigMerkleTree::new(tree_nodes, 0).unwrap()
+    ConfigMerkleTree::new(tree_nodes, version).unwrap()
 }
 
 pub struct HandleCreateMerkleRootConfigArgs<'a> {
