@@ -119,4 +119,7 @@ pub enum PresaleError {
 
     #[msg("Invalid presale registry index")]
     InvalidPresaleRegistryIndex,
+
+    #[msg("Multiple presale registries are not allowed")]
+    MultiplePresaleRegistriesNotAllowed,
 }

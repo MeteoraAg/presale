@@ -75,12 +75,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                     presale_extra_param.q_price,
                     registry.buyer_maximum_deposit_cap,
                 )?;
-
-                ensure_enough_presale_supply(
-                    presale_extra_param.q_price,
-                    registry.presale_supply,
-                    presale_params.presale_maximum_cap,
-                )?;
             }
         }
 
@@ -113,6 +107,13 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             base_token_program,
             quote_token_program,
         })?;
+
+        // Ensure presale supply is enough to fulfill presale maximum cap
+        ensure_enough_presale_supply(
+            presale_extra_param.q_price,
+            presale.presale_supply,
+            presale_params.presale_maximum_cap,
+        )?;
 
         Ok(())
     }

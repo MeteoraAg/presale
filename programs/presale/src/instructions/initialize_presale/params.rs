@@ -10,15 +10,10 @@ fn validate_presale_registries(
 
     for i in 0..MAX_PRESALE_REGISTRY_COUNT {
         let current_registry = &presale_registries[i];
-        current_registry.validate(&presale_params)?;
+        current_registry.validate(presale_params)?;
 
         if !current_registry.is_uninitialized() {
             initialized_count += 1;
-
-            require!(
-                current_registry.presale_supply > 0,
-                PresaleError::InvalidTokenSupply
-            );
 
             presale_supply =
                 presale_supply.safe_add(u128::from(current_registry.presale_supply))?;
@@ -27,7 +22,7 @@ fn validate_presale_registries(
                 // Ensure presale registries are order from initialized to un-initialized
                 let previous_registry = &presale_registries[i - 1];
                 require!(
-                    previous_registry.is_uninitialized(),
+                    !previous_registry.is_uninitialized(),
                     PresaleError::InvalidPresaleInfo
                 );
             }
@@ -39,6 +34,9 @@ fn validate_presale_registries(
         PresaleError::InvalidTokenSupply
     );
 
+    // Must have at least 1 presale registry
+    require!(presale_supply > 0, PresaleError::InvalidTokenSupply);
+
     // If presale have multiple registries. Whitelist mode must be Permissioned mode.
     // Reason: It make no sense for a single user to deposit to multiple registries which might have different price when it's dynamic price mode.
     // Note: Presale creator have to make sure user doesn't duplicate across registries.
@@ -46,7 +44,7 @@ fn validate_presale_registries(
         let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
         require!(
             whitelist_mode.is_permissioned(),
-            PresaleError::InvalidPresaleInfo
+            PresaleError::MultiplePresaleRegistriesNotAllowed
         );
     }
 
@@ -112,6 +110,8 @@ impl PresaleRegistryArgs {
             self.buyer_maximum_deposit_cap <= presale_args.presale_maximum_cap,
             PresaleError::InvalidPresaleInfo
         );
+
+        require!(self.presale_supply > 0, PresaleError::InvalidTokenSupply);
 
         Ok(())
     }

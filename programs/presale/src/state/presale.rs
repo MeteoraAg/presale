@@ -98,7 +98,7 @@ pub struct Presale {
     pub presale_minimum_cap: u64,
     /// When presale starts
     pub presale_start_time: u64,
-    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode). (TODO) Will need to be triggered manually.
+    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode).
     pub presale_end_time: u64,
     /// Total base token supply that can be bought by presale participants
     pub presale_supply: u64,
