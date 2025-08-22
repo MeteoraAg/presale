@@ -5,11 +5,16 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use anchor_lang::error::ERROR_CODE_OFFSET;
+use anchor_lang::prelude::Clock;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
 use litesvm::LiteSVM;
-use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
+use presale::{
+    calculate_dripped_amount_for_user, Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+    SCALE_OFFSET,
+};
+use std::ops::Shl;
 use std::rc::Rc;
 
 enum Cmp {
@@ -19,7 +24,14 @@ enum Cmp {
     LessThan,
 }
 
-fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: Pubkey, cmp: Cmp) {
+fn claim_and_assert(
+    lite_svm: &mut LiteSVM,
+    user: Rc<Keypair>,
+    presale_pubkey: Pubkey,
+    registry_index: u8,
+    cmp: Cmp,
+    amount_delta: Option<u64>,
+) {
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
@@ -29,7 +41,7 @@ fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: P
     let escrow = derive_escrow(
         &presale_pubkey,
         &user.pubkey(),
-        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        registry_index,
         &presale::ID,
     );
     let user_token_address = get_associated_token_address_with_program_id(
@@ -49,7 +61,7 @@ fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: P
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             refresh_escrow: true,
-            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+            registry_index,
         },
     );
 
@@ -79,6 +91,11 @@ fn claim_and_assert(lite_svm: &mut LiteSVM, user: Rc<Keypair>, presale_pubkey: P
             );
             assert!(after_user_token_amount < before_user_token_amount);
         }
+    }
+
+    if let Some(delta) = amount_delta {
+        let amount_claimed = after_user_token_amount.saturating_sub(before_user_token_amount);
+        assert_eq!(amount_claimed, delta);
     }
 }
 
@@ -300,13 +317,17 @@ fn test_claim_token2022() {
         &mut lite_svm,
         Rc::clone(&user),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
     claim_and_assert(
         &mut lite_svm,
         Rc::clone(&user_1),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
 
     warp_time(&mut lite_svm, presale_state.vesting_end_time);
@@ -315,20 +336,599 @@ fn test_claim_token2022() {
         &mut lite_svm,
         Rc::clone(&user),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
+
     claim_and_assert(
         &mut lite_svm,
         Rc::clone(&user_1),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
 
-    claim_and_assert(&mut lite_svm, Rc::clone(&user), presale_pubkey, Cmp::Equal);
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
 }
 
 #[test]
-fn test_claim() {
+fn test_claim_permissioned_fcfs_presale_with_multiple_presale_registries() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let user_1 = setup_context.create_user();
+    let user_2 = setup_context.create_user();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+    let user_2_pubkey = user_2.pubkey();
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
+
+    let whitelist_wallets = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 1,
+        },
+        WhitelistWallet {
+            address: user_2_pubkey,
+            registry_index: 1,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets.to_vec(), 0);
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let tree_node_0 = merkle_tree.get_node(&user_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_root_config,
+            registry_index: tree_node_0.registry_index,
+            proof: tree_node_0.proof.unwrap(),
+        },
+    );
+
+    let tree_node_1 = merkle_tree.get_node(&user_1_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            merkle_root_config,
+            registry_index: tree_node_1.registry_index,
+            proof: tree_node_1.proof.unwrap(),
+        },
+    );
+
+    let tree_node_2 = merkle_tree.get_node(&user_2_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_2),
+            merkle_root_config,
+            registry_index: tree_node_2.registry_index,
+            proof: tree_node_2.proof.unwrap(),
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    // 3 users, weighted from light to heavy
+    let total_weight = 1 + 2 + 3;
+    let user_keypairs = [Rc::clone(&user), Rc::clone(&user_1), Rc::clone(&user_2)];
+
+    for (idx, (wallet, keypair)) in whitelist_wallets
+        .iter()
+        .zip(user_keypairs.iter())
+        .enumerate()
+    {
+        let weight = (idx + 1) as u64;
+        let deposit_amount =
+            (presale_state.presale_maximum_cap * weight + total_weight - 1) / total_weight;
+
+        handle_escrow_deposit(
+            &mut lite_svm,
+            HandleEscrowDepositArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(keypair),
+                max_amount: deposit_amount,
+                registry_index: wallet.registry_index,
+            },
+        );
+    }
+
+    warp_time(
+        &mut lite_svm,
+        presale_state.vesting_end_time - presale_state.vest_duration / 2,
+    );
+
+    let clock: Clock = lite_svm.get_sysvar();
+
+    for (wallet, keypair) in whitelist_wallets.iter().zip(user_keypairs.iter()) {
+        let before_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let escrow = derive_escrow(
+            &presale_pubkey,
+            &wallet.address,
+            wallet.registry_index,
+            &presale::ID,
+        );
+
+        let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
+        let presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let amount_to_claim: u64 = calculate_dripped_amount_for_user(
+            before_presale_state.vesting_start_time,
+            before_presale_state.vest_duration,
+            clock.unix_timestamp as u64,
+            presale_registry.presale_supply,
+            escrow_state.total_deposit,
+            presale_registry.total_deposit,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+
+        claim_and_assert(
+            &mut lite_svm,
+            Rc::clone(keypair),
+            presale_pubkey,
+            escrow_state.registry_index,
+            Cmp::GreaterThan,
+            Some(amount_to_claim),
+        );
+
+        let after_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let total_claim_delta = after_presale_state
+            .total_claimed_token
+            .saturating_sub(before_presale_state.total_claimed_token);
+
+        assert_eq!(amount_to_claim, total_claim_delta);
+
+        let before_presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let after_presale_registry = after_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let total_claim_delta = after_presale_registry
+            .total_claimed_token
+            .saturating_sub(before_presale_registry.total_claimed_token);
+
+        assert_eq!(total_claim_delta, amount_to_claim);
+    }
+}
+
+#[test]
+fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let user_1 = setup_context.create_user();
+    let user_2 = setup_context.create_user();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+    let user_2_pubkey = user_2.pubkey();
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
+
+    let whitelist_wallets = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 1,
+        },
+        WhitelistWallet {
+            address: user_2_pubkey,
+            registry_index: 1,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets.to_vec(), 0);
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let tree_node_0 = merkle_tree.get_node(&user_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_root_config,
+            registry_index: tree_node_0.registry_index,
+            proof: tree_node_0.proof.unwrap(),
+        },
+    );
+
+    let tree_node_1 = merkle_tree.get_node(&user_1_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            merkle_root_config,
+            registry_index: tree_node_1.registry_index,
+            proof: tree_node_1.proof.unwrap(),
+        },
+    );
+
+    let tree_node_2 = merkle_tree.get_node(&user_2_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_2),
+            merkle_root_config,
+            registry_index: tree_node_2.registry_index,
+            proof: tree_node_2.proof.unwrap(),
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    // 3 users, weighted from light to heavy
+    let total_weight = 1 + 2 + 3;
+    let user_keypairs = [Rc::clone(&user), Rc::clone(&user_1), Rc::clone(&user_2)];
+
+    for (idx, (wallet, keypair)) in whitelist_wallets
+        .iter()
+        .zip(user_keypairs.iter())
+        .enumerate()
+    {
+        let weight = (idx + 1) as u64;
+        let deposit_amount =
+            (presale_state.presale_maximum_cap * weight + total_weight - 1) / total_weight;
+
+        handle_escrow_deposit(
+            &mut lite_svm,
+            HandleEscrowDepositArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(keypair),
+                max_amount: deposit_amount,
+                registry_index: wallet.registry_index,
+            },
+        );
+    }
+
+    warp_time(
+        &mut lite_svm,
+        presale_state.vesting_end_time - presale_state.vest_duration / 2,
+    );
+
+    let clock: Clock = lite_svm.get_sysvar();
+
+    for (wallet, keypair) in whitelist_wallets.iter().zip(user_keypairs.iter()) {
+        let before_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let escrow = derive_escrow(
+            &presale_pubkey,
+            &wallet.address,
+            wallet.registry_index,
+            &presale::ID,
+        );
+
+        let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
+        let presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let amount_to_claim: u64 = calculate_dripped_amount_for_user(
+            before_presale_state.vesting_start_time,
+            before_presale_state.vest_duration,
+            clock.unix_timestamp as u64,
+            presale_registry.presale_supply,
+            escrow_state.total_deposit,
+            presale_registry.total_deposit,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+
+        claim_and_assert(
+            &mut lite_svm,
+            Rc::clone(keypair),
+            presale_pubkey,
+            escrow_state.registry_index,
+            Cmp::GreaterThan,
+            Some(amount_to_claim),
+        );
+
+        let after_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let total_claim_delta = after_presale_state
+            .total_claimed_token
+            .saturating_sub(before_presale_state.total_claimed_token);
+
+        assert_eq!(amount_to_claim, total_claim_delta);
+
+        let before_presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let after_presale_registry = after_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let total_claim_delta = after_presale_registry
+            .total_claimed_token
+            .saturating_sub(before_presale_registry.total_claimed_token);
+
+        assert_eq!(total_claim_delta, amount_to_claim);
+    }
+}
+
+#[test]
+fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let user_1 = setup_context.create_user();
+    let user_2 = setup_context.create_user();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+    let user_2_pubkey = user_2.pubkey();
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
+
+    let whitelist_wallets = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 1,
+        },
+        WhitelistWallet {
+            address: user_2_pubkey,
+            registry_index: 1,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets.to_vec(), 0);
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let tree_node_0 = merkle_tree.get_node(&user_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_root_config,
+            registry_index: tree_node_0.registry_index,
+            proof: tree_node_0.proof.unwrap(),
+        },
+    );
+
+    let tree_node_1 = merkle_tree.get_node(&user_1_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            merkle_root_config,
+            registry_index: tree_node_1.registry_index,
+            proof: tree_node_1.proof.unwrap(),
+        },
+    );
+
+    let tree_node_2 = merkle_tree.get_node(&user_2_pubkey);
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_2),
+            merkle_root_config,
+            registry_index: tree_node_2.registry_index,
+            proof: tree_node_2.proof.unwrap(),
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    // 3 users, weighted from light to heavy
+    let total_weight = 1 + 2 + 3;
+    let user_keypairs = [Rc::clone(&user), Rc::clone(&user_1), Rc::clone(&user_2)];
+
+    for (idx, (wallet, keypair)) in whitelist_wallets
+        .iter()
+        .zip(user_keypairs.iter())
+        .enumerate()
+    {
+        let weight = (idx + 1) as u64;
+        let deposit_amount =
+            (presale_state.presale_maximum_cap * weight + total_weight - 1) / total_weight;
+
+        handle_escrow_deposit(
+            &mut lite_svm,
+            HandleEscrowDepositArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(keypair),
+                max_amount: deposit_amount,
+                registry_index: wallet.registry_index,
+            },
+        );
+    }
+
+    warp_time(
+        &mut lite_svm,
+        presale_state.vesting_end_time - presale_state.vest_duration / 2,
+    );
+
+    let clock: Clock = lite_svm.get_sysvar();
+
+    for (wallet, keypair) in whitelist_wallets.iter().zip(user_keypairs.iter()) {
+        let before_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let escrow = derive_escrow(
+            &presale_pubkey,
+            &wallet.address,
+            wallet.registry_index,
+            &presale::ID,
+        );
+
+        let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
+        let presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let q_amount = u128::from(presale_registry.total_deposit).shl(SCALE_OFFSET);
+        let registry_sold_token = q_amount / before_presale_state.fixed_price_presale_q_price;
+
+        let amount_to_claim: u64 = calculate_dripped_amount_for_user(
+            before_presale_state.vesting_start_time,
+            before_presale_state.vest_duration,
+            clock.unix_timestamp as u64,
+            registry_sold_token.try_into().unwrap(),
+            escrow_state.total_deposit,
+            presale_registry.total_deposit,
+        )
+        .unwrap()
+        .try_into()
+        .unwrap();
+
+        claim_and_assert(
+            &mut lite_svm,
+            Rc::clone(keypair),
+            presale_pubkey,
+            escrow_state.registry_index,
+            Cmp::GreaterThan,
+            Some(amount_to_claim),
+        );
+
+        let after_presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let total_claim_delta = after_presale_state
+            .total_claimed_token
+            .saturating_sub(before_presale_state.total_claimed_token);
+
+        assert_eq!(amount_to_claim, total_claim_delta);
+
+        let before_presale_registry = before_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let after_presale_registry = after_presale_state
+            .presale_registries
+            .get(escrow_state.registry_index as usize)
+            .unwrap();
+
+        let total_claim_delta = after_presale_registry
+            .total_claimed_token
+            .saturating_sub(before_presale_registry.total_claimed_token);
+
+        assert_eq!(total_claim_delta, amount_to_claim);
+    }
+}
+
+#[test]
+fn test_claim_permissionless_presale() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -395,13 +995,17 @@ fn test_claim() {
         &mut lite_svm,
         Rc::clone(&user),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
     claim_and_assert(
         &mut lite_svm,
         Rc::clone(&user_1),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
 
     warp_time(&mut lite_svm, presale_state.vesting_end_time);
@@ -410,14 +1014,25 @@ fn test_claim() {
         &mut lite_svm,
         Rc::clone(&user),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
     claim_and_assert(
         &mut lite_svm,
         Rc::clone(&user_1),
         presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::GreaterThan,
+        None,
     );
 
-    claim_and_assert(&mut lite_svm, Rc::clone(&user), presale_pubkey, Cmp::Equal);
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
 }

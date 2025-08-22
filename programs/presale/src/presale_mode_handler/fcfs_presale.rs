@@ -97,13 +97,14 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         escrow: &Escrow,
         current_timestamp: u64,
     ) -> Result<u128> {
+        let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         calculate_dripped_amount_for_user(
-            presale.lock_end_time,
+            presale.vesting_start_time,
             presale.vest_duration,
             current_timestamp,
-            presale.presale_supply,
+            presale_registry.presale_supply,
             escrow.total_deposit,
-            presale.total_deposit,
+            presale_registry.total_deposit,
         )
     }
 

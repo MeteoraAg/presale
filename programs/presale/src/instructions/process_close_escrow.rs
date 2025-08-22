@@ -89,7 +89,7 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
     let presale_mode = PresaleMode::from(presale.presale_mode);
     let presale_handler = get_presale_mode_handler(presale_mode);
 
-    let vesting_end_time = presale.lock_end_time.safe_add(presale.vest_duration)?;
+    let vesting_end_time = presale.vesting_start_time.safe_add(presale.vest_duration)?;
 
     // Get total dripped bought token at vesting end time
     let escrow_total_claimable_amount: u64 = presale_handler

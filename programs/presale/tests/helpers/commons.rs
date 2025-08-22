@@ -72,6 +72,17 @@ impl SetupContext {
         }
     }
 
+    pub fn create_user(&mut self) -> Rc<Keypair> {
+        let user = Rc::new(Keypair::new());
+        let user_address = user.pubkey();
+
+        self.lite_svm
+            .airdrop(&user_address, 1000 * LAMPORTS_PER_SOL)
+            .expect("Failed to airdrop SOL to user");
+
+        user
+    }
+
     fn create_and_mint_token_ix(
         &mut self,
         token_decimals: u8,

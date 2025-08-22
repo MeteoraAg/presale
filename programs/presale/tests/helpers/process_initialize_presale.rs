@@ -303,6 +303,37 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
     )
 }
 
+fn custom_create_predefined_prorata_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+) -> Vec<Instruction> {
+    let user_pubkey = user.pubkey();
+
+    let mut presale_params = create_presale_args(lite_svm);
+    presale_params.presale_mode = PresaleMode::Prorata.into();
+    presale_params.whitelist_mode = whitelist_mode.into();
+
+    let locked_vesting_params = create_locked_vesting_args();
+
+    create_initialize_presale_ix(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint,
+            quote_mint,
+            presale_registries,
+            presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![],
+        },
+    )
+}
+
 fn create_predefined_prorata_presale_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
@@ -315,15 +346,60 @@ fn create_predefined_prorata_presale_ix(
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
-    let user_pubkey = user.pubkey();
-
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
+    custom_create_predefined_prorata_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
+    )
+}
+
+fn create_predefined_prorata_presale_with_multiple_registries_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    custom_create_predefined_prorata_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
+    )
+}
+
+fn custom_create_predefined_fcfs_presale_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+) -> Vec<Instruction> {
+    let user_pubkey = user.pubkey();
+
     let mut presale_params = create_presale_args(&lite_svm);
-    presale_params.presale_mode = PresaleMode::Prorata.into();
+    presale_params.presale_mode = PresaleMode::Fcfs.into();
     presale_params.whitelist_mode = whitelist_mode.into();
 
     let locked_vesting_params = create_locked_vesting_args();
@@ -355,31 +431,45 @@ fn create_predefined_fcfs_presale_ix(
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
-    let user_pubkey = user.pubkey();
-
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    let mut presale_params = create_presale_args(&lite_svm);
-    presale_params.presale_mode = PresaleMode::Fcfs.into();
-    presale_params.whitelist_mode = whitelist_mode.into();
-
-    let locked_vesting_params = create_locked_vesting_args();
-
-    create_initialize_presale_ix(
+    custom_create_predefined_fcfs_presale_ix(
         lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint,
-            quote_mint,
-            presale_registries,
-            presale_params,
-            locked_vesting_params: Some(locked_vesting_params),
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
+    )
+}
+
+fn create_predefined_fcfs_presale_with_multiple_registries_ix(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    custom_create_predefined_fcfs_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
     )
 }
 
@@ -539,6 +629,56 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
         Rc::clone(&user),
         WhitelistMode::PermissionWithMerkleProof,
         UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_prorata_presale_with_multiple_registries_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with_multiple_presale_registries(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fcfs_presale_with_multiple_registries_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();

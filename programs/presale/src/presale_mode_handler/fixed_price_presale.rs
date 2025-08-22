@@ -176,8 +176,18 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     }
 
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
-        let q_total_deposit = u128::from(presale.total_deposit).safe_shl(SCALE_OFFSET)?;
-        let total_sold_token = q_total_deposit.safe_div(presale.fixed_price_presale_q_price)?;
+        let mut total_sold_token: u128 = 0;
+
+        for presale_registry in presale.presale_registries.iter() {
+            if presale_registry.is_uninitialized() {
+                break;
+            }
+            total_sold_token = total_sold_token.safe_add(calculate_token_bought(
+                presale.fixed_price_presale_q_price,
+                presale_registry.total_deposit,
+            )?)?;
+        }
+
         Ok(total_sold_token.safe_cast()?)
     }
 
@@ -188,16 +198,21 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         current_timestamp: u64,
     ) -> Result<u128> {
         // 1. Calculate how many base tokens were bought
-        let total_sold_token = self.get_total_base_token_sold(presale)?;
+        let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+        let total_sold_token = calculate_token_bought(
+            presale.fixed_price_presale_q_price,
+            presale_registry.total_deposit,
+        )?
+        .safe_cast()?;
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
         let dripped_escrow_bought_token = calculate_dripped_amount_for_user(
-            presale.lock_end_time,
+            presale.vesting_start_time,
             presale.vest_duration,
             current_timestamp,
             total_sold_token,
             escrow.total_deposit,
-            presale.total_deposit,
+            presale_registry.total_deposit,
         )?;
 
         Ok(dripped_escrow_bought_token)

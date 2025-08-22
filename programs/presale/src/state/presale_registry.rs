@@ -67,4 +67,10 @@ impl PresaleRegistry {
         self.total_claimed_token = self.total_claimed_token.safe_add(claimed_amount)?;
         Ok(())
     }
+
+    pub fn is_uninitialized(&self) -> bool {
+        self.presale_supply == 0
+            && self.buyer_maximum_deposit_cap == 0
+            && self.buyer_minimum_deposit_cap == 0
+    }
 }

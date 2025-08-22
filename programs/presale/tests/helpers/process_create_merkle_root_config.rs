@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use crate::helpers::{derive_event_authority, derive_merkle_root_config, process_transaction};
 
+#[derive(Debug, Clone)]
 pub struct WhitelistWallet {
     pub address: Pubkey,
     pub registry_index: u8,
