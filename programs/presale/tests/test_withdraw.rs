@@ -317,6 +317,10 @@ fn test_withdraw_prorata_presale() {
         .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
 
+    let before_presale_state = lite_svm
+        .get_deserialized_zc_account::<Presale>(&presale_pubkey)
+        .unwrap();
+
     let withdraw_amount = before_escrow_state.total_deposit / 2;
 
     handle_escrow_withdraw(
@@ -333,8 +337,25 @@ fn test_withdraw_prorata_presale() {
         .get_deserialized_zc_account::<Escrow>(&escrow)
         .unwrap();
 
+    let after_presale_state = lite_svm
+        .get_deserialized_zc_account::<Presale>(&presale_pubkey)
+        .unwrap();
+
     let withdrawn_amount = before_escrow_state.total_deposit - after_escrow_state.total_deposit;
     assert_eq!(withdrawn_amount, withdraw_amount);
+
+    assert_eq!(
+        after_presale_state.total_deposit,
+        before_presale_state.total_deposit - withdrawn_amount
+    );
+
+    let before_presale_registry = before_presale_state.get_presale_registry(0).unwrap();
+    let after_presale_registry = after_presale_state.get_presale_registry(0).unwrap();
+
+    assert_eq!(
+        after_presale_registry.total_deposit,
+        before_presale_registry.total_deposit - withdrawn_amount
+    );
 }
 
 #[test]

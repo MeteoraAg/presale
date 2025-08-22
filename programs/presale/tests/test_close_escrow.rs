@@ -317,4 +317,7 @@ fn test_close_escrow_presale_completed() {
         .unwrap();
 
     assert_eq!(presale_state.total_escrow, 0);
+
+    let presale_registry = presale_state.get_presale_registry(0).unwrap();
+    assert_eq!(presale_registry.total_escrow, 0);
 }
