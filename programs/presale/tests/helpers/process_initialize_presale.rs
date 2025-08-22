@@ -173,7 +173,7 @@ pub struct HandleCreatePredefinedPresaleResponse {
     pub presale_pubkey: Pubkey,
 }
 
-fn inner_create_predefined_fixed_price_presale_ix(
+pub fn custom_create_predefined_fixed_price_presale_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
@@ -263,7 +263,7 @@ pub fn create_predefined_fixed_price_presale_ix(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    inner_create_predefined_fixed_price_presale_ix(
+    custom_create_predefined_fixed_price_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -292,7 +292,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    inner_create_predefined_fixed_price_presale_ix(
+    custom_create_predefined_fixed_price_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
