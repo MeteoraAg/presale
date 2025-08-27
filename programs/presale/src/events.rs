@@ -18,7 +18,7 @@ pub struct EvtFixedPricePresaleArgsClose {
 pub struct EvtPresaleVaultCreate {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
-    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    pub presale_registries: Vec<PresaleRegistryArgs>,
     pub lock_duration: u64,
     pub vest_duration: u64,
     pub whitelist_mode: u8,

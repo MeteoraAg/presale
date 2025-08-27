@@ -4,29 +4,16 @@ fn validate_presale_registries(
     presale_registries: &[PresaleRegistryArgs],
     presale_params: &PresaleArgs,
 ) -> Result<()> {
-    let mut initialized_count = 0;
+    require!(
+        presale_registries.len() > 0 && presale_registries.len() <= MAX_PRESALE_REGISTRY_COUNT,
+        PresaleError::InvalidPresaleInfo
+    );
 
     let mut presale_supply = 0u128;
 
-    for i in 0..MAX_PRESALE_REGISTRY_COUNT {
-        let current_registry = &presale_registries[i];
-        current_registry.validate(presale_params)?;
-
-        if !current_registry.is_uninitialized() {
-            initialized_count += 1;
-
-            presale_supply =
-                presale_supply.safe_add(u128::from(current_registry.presale_supply))?;
-
-            if i > 0 {
-                // Ensure presale registries are order from initialized to un-initialized
-                let previous_registry = &presale_registries[i - 1];
-                require!(
-                    !previous_registry.is_uninitialized(),
-                    PresaleError::InvalidPresaleInfo
-                );
-            }
-        }
+    for registry in presale_registries {
+        registry.validate(presale_params)?;
+        presale_supply = presale_supply.safe_add(u128::from(registry.presale_supply))?;
     }
 
     require!(
@@ -40,7 +27,7 @@ fn validate_presale_registries(
     // If presale have multiple registries. Whitelist mode must be Permissioned mode.
     // Reason: It make no sense for a single user to deposit to multiple registries which might have different price when it's dynamic price mode.
     // Note: Presale creator have to make sure user doesn't duplicate across registries.
-    if initialized_count > 1 {
+    if presale_registries.len() > 1 {
         let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
         require!(
             whitelist_mode.is_permissioned(),
@@ -54,9 +41,9 @@ fn validate_presale_registries(
 #[derive(AnchorSerialize, AnchorDeserialize, Default)]
 pub struct InitializePresaleArgs {
     pub presale_params: PresaleArgs,
-    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
     pub locked_vesting_params: OptionalNonZeroLockedVestingArgs,
     pub padding: [u8; 32],
+    pub presale_registries: Vec<PresaleRegistryArgs>,
 }
 
 impl InitializePresaleArgs {
@@ -92,10 +79,6 @@ impl PresaleRegistryArgs {
     }
 
     pub fn validate(&self, presale_args: &PresaleArgs) -> Result<()> {
-        if self.is_uninitialized() {
-            return Ok(());
-        }
-
         require!(
             self.buyer_maximum_deposit_cap >= self.buyer_minimum_deposit_cap,
             PresaleError::InvalidPresaleInfo
@@ -234,7 +217,8 @@ mod tests {
     #[test]
     fn test_ensure_initialize_presale_args_size() {
         let args = InitializePresaleArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 426);
+        // The size is based on 0 registry
+        assert_eq!(args.try_to_vec().unwrap().len(), 150);
     }
 
     #[test]

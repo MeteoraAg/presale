@@ -3,7 +3,7 @@ use crate::*;
 pub struct ProcessCreatePresaleVaultArgs<'a, 'c: 'info, 'd, 'e, 'info> {
     pub presale: &'a AccountLoader<'info, Presale>,
     pub presale_params: &'d PresaleArgs,
-    pub presale_registries: &'d [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    pub presale_registries: &'d [PresaleRegistryArgs],
     pub locked_vesting_params: Option<&'d LockedVestingArgs>,
     pub remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     pub mint_pubkeys: InitializePresaleVaultAccountPubkeys,

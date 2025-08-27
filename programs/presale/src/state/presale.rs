@@ -139,9 +139,9 @@ pub struct Presale {
     pub padding1: [u8; 2],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
-    /// Presale registries
-    pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
     pub padding3: [u128; 6],
+    /// Presale registries. Note: Supporting more registries will causes increased account size.
+    pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
 }
 
 static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1168);
@@ -149,7 +149,7 @@ static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs<'a> {
     pub presale_params: PresaleArgs,
-    pub presale_registries: &'a [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    pub presale_registries: &'a [PresaleRegistryArgs],
     pub locked_vesting_params: Option<LockedVestingArgs>,
     pub fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
     pub base_mint: Pubkey,
@@ -201,11 +201,6 @@ impl Presale {
         self.quote_token_program_flag = token_program_to_flag(quote_token_program).into();
 
         for (idx, registry) in presale_registries.iter().enumerate() {
-            if !registry.is_uninitialized() {
-                self.total_presale_registry_count =
-                    self.total_presale_registry_count.safe_add(1)?;
-            }
-
             self.presale_registries[idx].init(
                 registry.presale_supply,
                 registry.buyer_minimum_deposit_cap,
@@ -214,6 +209,8 @@ impl Presale {
 
             self.presale_supply = self.presale_supply.safe_add(registry.presale_supply)?;
         }
+
+        self.total_presale_registry_count = presale_registries.len() as u8;
 
         let PresaleArgs {
             presale_maximum_cap,

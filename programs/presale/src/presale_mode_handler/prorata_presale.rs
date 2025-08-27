@@ -9,7 +9,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         _presale_pubkey: Pubkey,
         presale: &mut Presale,
         presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+        presale_registries: &[PresaleRegistryArgs],
         locked_vesting_params: Option<&LockedVestingArgs>,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],

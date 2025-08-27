@@ -8,7 +8,7 @@ use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
 use presale::{
     Escrow, Presale, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
-    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, MAX_PRESALE_REGISTRY_COUNT,
+    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
 use std::rc::Rc;
 
@@ -201,26 +201,23 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
         },
     );
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
+    let mut presale_registries = vec![];
 
-    {
-        let registry_args_0 = presale_registries.get_mut(0).unwrap();
-        *registry_args_0 = PresaleRegistryArgs {
-            buyer_minimum_deposit_cap: 100,
-            buyer_maximum_deposit_cap: 600_000_000,
-            presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-            ..PresaleRegistryArgs::default()
-        };
-    }
-    {
-        let registry_args_1 = presale_registries.get_mut(1).unwrap();
-        *registry_args_1 = PresaleRegistryArgs {
-            buyer_minimum_deposit_cap: 200,
-            buyer_maximum_deposit_cap: 400_000_000,
-            presale_supply: 2_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-            ..PresaleRegistryArgs::default()
-        };
-    }
+    let registry_args_0 = PresaleRegistryArgs {
+        buyer_minimum_deposit_cap: 100,
+        buyer_maximum_deposit_cap: 600_000_000,
+        presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+        ..PresaleRegistryArgs::default()
+    };
+    presale_registries.push(registry_args_0);
+
+    let registry_args_1 = PresaleRegistryArgs {
+        buyer_minimum_deposit_cap: 200,
+        buyer_maximum_deposit_cap: 400_000_000,
+        presale_supply: 2_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+        ..PresaleRegistryArgs::default()
+    };
+    presale_registries.push(registry_args_1);
 
     let instructions = custom_create_predefined_fixed_price_presale_ix(
         &mut lite_svm,
@@ -229,7 +226,7 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
         Rc::clone(&user),
         WhitelistMode::PermissionWithAuthority,
         UnsoldTokenAction::Refund,
-        presale_registries,
+        presale_registries.clone(),
     );
 
     process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();

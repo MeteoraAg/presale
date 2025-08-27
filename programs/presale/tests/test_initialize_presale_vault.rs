@@ -23,7 +23,7 @@ fn assert_err_invalid_locked_vesting_param(
     user: Rc<Keypair>,
     mint: Pubkey,
     quote_mint: Pubkey,
-    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    presale_registries: Vec<PresaleRegistryArgs>,
     presale_params: PresaleArgs,
     locked_vesting_params: LockedVestingArgs,
 ) {
@@ -63,7 +63,7 @@ fn assert_err_invalid_presale_params(
     user: Rc<Keypair>,
     mint: Pubkey,
     quote_mint: Pubkey,
-    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    presale_registries: Vec<PresaleRegistryArgs>,
     presale_params: PresaleArgs,
     locked_vesting_params: LockedVestingArgs,
 ) {
@@ -80,7 +80,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -99,7 +99,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -120,7 +120,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -139,7 +139,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -159,7 +159,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -179,7 +179,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -198,7 +198,7 @@ fn assert_err_invalid_presale_params(
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries: valid_presale_registries,
+            presale_registries: valid_presale_registries.clone(),
             presale_params: invalid_presale_params,
             locked_vesting_params: Some(locked_vesting_params),
             creator: user.pubkey(),
@@ -211,10 +211,10 @@ fn assert_err_invalid_presale_params(
     invalid_presale_params = presale_params.clone();
 
     // Un-depositable
-    let mut invalid_presale_registries =
-        [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let invalid_registry = invalid_presale_registries.get_mut(0).unwrap();
+    let mut invalid_presale_registries = vec![];
+    let mut invalid_registry = PresaleRegistryArgs::default();
     invalid_registry.presale_supply = 1000;
+    invalid_presale_registries.push(invalid_registry);
 
     let err_7 = handle_initialize_presale_err(
         lite_svm,
@@ -234,12 +234,12 @@ fn assert_err_invalid_presale_params(
     invalid_presale_params = presale_params.clone();
 
     // Minimum > maximum
-    let mut invalid_presale_registries =
-        [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let invalid_registry = invalid_presale_registries.get_mut(0).unwrap();
+    let mut invalid_presale_registries = vec![];
+    let mut invalid_registry = PresaleRegistryArgs::default();
     invalid_registry.presale_supply = 1000;
     invalid_registry.buyer_maximum_deposit_cap = 100;
     invalid_registry.buyer_minimum_deposit_cap = 200;
+    invalid_presale_registries.push(invalid_registry);
 
     let err_8 = handle_initialize_presale_err(
         lite_svm,
@@ -259,15 +259,14 @@ fn assert_err_invalid_presale_params(
 
     invalid_presale_params = presale_params.clone();
     // Unreachable buyer maximum deposit cap due to > presale maximum cap
-    let mut invalid_presale_registries =
-        [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let invalid_registry = invalid_presale_registries.get_mut(0).unwrap();
+    let mut invalid_presale_registries = vec![];
+    let mut invalid_registry = PresaleRegistryArgs::default();
     invalid_registry.presale_supply = 1000;
     invalid_registry.buyer_maximum_deposit_cap = 100;
     invalid_registry.buyer_minimum_deposit_cap = 200;
-
     invalid_presale_params.presale_maximum_cap = 90;
     invalid_presale_params.presale_minimum_cap = 50;
+    invalid_presale_registries.push(invalid_registry);
 
     let err_9 = handle_initialize_presale_err(
         lite_svm,
@@ -284,6 +283,23 @@ fn assert_err_invalid_presale_params(
     );
     errs.push(err_9);
 
+    // Presale have 0 registries
+    let err_10 = handle_initialize_presale_err(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint: mint,
+            quote_mint,
+            presale_registries: vec![],
+            presale_params: invalid_presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user.pubkey(),
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![],
+        },
+    );
+
+    errs.push(err_10);
+
     let expected_err = presale::errors::PresaleError::InvalidPresaleInfo;
     let err_code = ERROR_CODE_OFFSET + expected_err as u32;
     let err_str = format!("Error Number: {}.", err_code);
@@ -295,32 +311,13 @@ fn assert_err_invalid_presale_params(
     errs.clear();
 
     // Presale registry have 0 supply
-    let mut invalid_presale_registries =
-        [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let invalid_registry = invalid_presale_registries.get_mut(0).unwrap();
+    let mut invalid_presale_registries = vec![];
+    let mut invalid_registry = PresaleRegistryArgs::default();
     invalid_registry.buyer_minimum_deposit_cap = 0;
     invalid_registry.buyer_maximum_deposit_cap = 50;
+    invalid_presale_registries.push(invalid_registry);
 
     let err_0 = handle_initialize_presale_err(
-        lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: mint,
-            quote_mint,
-            presale_registries: invalid_presale_registries,
-            presale_params: invalid_presale_params,
-            locked_vesting_params: Some(locked_vesting_params),
-            creator: user.pubkey(),
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    errs.push(err_0);
-
-    // Presale have 0 registries
-    let invalid_presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-
-    let err_1 = handle_initialize_presale_err(
         lite_svm,
         HandleInitializePresaleArgs {
             base_mint: mint,
@@ -337,12 +334,7 @@ fn assert_err_invalid_presale_params(
     let expected_err = presale::errors::PresaleError::InvalidTokenSupply;
     let err_code = ERROR_CODE_OFFSET + expected_err as u32;
     let err_str = format!("Error Number: {}.", err_code);
-
-    for err in errs.iter() {
-        assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
-    }
-
-    assert!(err_1.meta.logs.iter().any(|log| log.contains(&err_str)));
+    assert!(err_0.meta.logs.iter().any(|log| log.contains(&err_str)));
 }
 
 fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &mut SetupContext) {
@@ -389,11 +381,12 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
 
     let clock: Clock = lite_svm.get_sysvar();
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = presale_pool_supply;
     registry.buyer_maximum_deposit_cap = buyer_maximum_deposit_cap;
     registry.buyer_minimum_deposit_cap = 0;
+    presale_registries.push(registry);
 
     let presale_params = PresaleArgs {
         presale_start_time: clock.unix_timestamp as u64,
@@ -482,11 +475,12 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
 
     let clock: Clock = lite_svm.get_sysvar();
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = presale_pool_supply;
     registry.buyer_maximum_deposit_cap = presale_maximum_cap / 2;
     registry.buyer_minimum_deposit_cap = 0;
+    presale_registries.push(registry);
 
     let presale_params = PresaleArgs {
         presale_start_time: clock.unix_timestamp as u64,
@@ -563,7 +557,7 @@ fn test_initialize_permissionless_presale_vault_with_multiple_registries() {
             base_mint: mint,
             quote_mint: anchor_spl::token::spl_token::native_mint::ID,
             presale_params,
-            presale_registries,
+            presale_registries: presale_registries.to_vec(),
             locked_vesting_params,
             creator: user_pubkey,
             payer: Rc::clone(&user),
@@ -572,48 +566,6 @@ fn test_initialize_permissionless_presale_vault_with_multiple_registries() {
     );
 
     let expected_err = presale::errors::PresaleError::MultiplePresaleRegistriesNotAllowed;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-
-    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
-}
-
-#[test]
-fn test_initialize_presale_vault_with_unordered_multiple_registries() {
-    let mut setup_context = SetupContext::initialize();
-    let mint = setup_context.setup_mint(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-
-    let SetupContext { mut lite_svm, user } = setup_context;
-
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    // Skipped 1 index
-    let registry = presale_registries.get_mut(1).unwrap();
-    registry.presale_supply = 1000 * 10u64.pow(6);
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 0;
-
-    let presale_params = create_presale_args(&lite_svm);
-    let locked_vesting_params = None;
-    let user_pubkey = user.pubkey();
-
-    let err = handle_initialize_presale_err(
-        &mut lite_svm,
-        HandleInitializePresaleArgs {
-            base_mint: mint,
-            quote_mint: anchor_spl::token::spl_token::native_mint::ID,
-            presale_params,
-            presale_registries,
-            locked_vesting_params,
-            creator: user_pubkey,
-            payer: Rc::clone(&user),
-            remaining_accounts: vec![],
-        },
-    );
-
-    let expected_err = presale::errors::PresaleError::InvalidPresaleInfo;
     let err_code = ERROR_CODE_OFFSET + expected_err as u32;
     let err_str = format!("Error Number: {}.", err_code);
 
@@ -647,7 +599,7 @@ fn test_total_presale_supply_from_multiple_registries_overflow() {
             base_mint: mint,
             quote_mint: anchor_spl::token::spl_token::native_mint::ID,
             presale_params,
-            presale_registries,
+            presale_registries: presale_registries.to_vec(),
             locked_vesting_params,
             creator: user_pubkey,
             payer: Rc::clone(&user),
@@ -730,7 +682,7 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
         Rc::clone(&user),
         mint,
         quote_mint,
-        presale_registries,
+        presale_registries.clone(),
         presale_params,
         locked_vesting_params,
     );
@@ -757,12 +709,12 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
-
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    presale_registries.push(registry);
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -822,12 +774,12 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
-
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    presale_registries.push(registry);
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -908,12 +860,12 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         },
     );
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
-
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    presale_registries.push(registry);
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -938,7 +890,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries,
+            presale_registries: presale_registries.clone(),
             presale_params,
             locked_vesting_params: Some(lock_vesting_params),
             creator: user_pubkey,
@@ -985,17 +937,20 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_params.presale_minimum_cap
     );
 
-    for (i, presale_registry) in presale_registries.iter().enumerate() {
-        let params = presale_registries.get(i).unwrap();
+    for (i, presale_registry_param) in presale_registries.iter().enumerate() {
+        let registry = presale_state.presale_registries.get(i).unwrap();
         assert_eq!(
-            presale_registry.buyer_maximum_deposit_cap,
-            params.buyer_maximum_deposit_cap
+            presale_registry_param.buyer_maximum_deposit_cap,
+            registry.buyer_maximum_deposit_cap
         );
         assert_eq!(
-            presale_registry.buyer_minimum_deposit_cap,
-            params.buyer_minimum_deposit_cap
+            presale_registry_param.buyer_minimum_deposit_cap,
+            registry.buyer_minimum_deposit_cap
         );
-        assert_eq!(presale_registry.presale_supply, params.presale_supply);
+        assert_eq!(
+            presale_registry_param.presale_supply,
+            registry.presale_supply
+        );
     }
 
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
@@ -1090,18 +1045,21 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         },
     );
 
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    let registry = presale_registries.get_mut(0).unwrap();
+    let mut presale_registries = vec![];
 
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
 
-    let registry = presale_registries.get_mut(1).unwrap();
+    presale_registries.push(registry);
 
+    let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+
+    presale_registries.push(registry);
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -1126,7 +1084,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         HandleInitializePresaleArgs {
             base_mint: mint,
             quote_mint,
-            presale_registries,
+            presale_registries: presale_registries.clone(),
             presale_params,
             locked_vesting_params: Some(lock_vesting_params),
             creator: user_pubkey,
@@ -1173,17 +1131,20 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_params.presale_minimum_cap
     );
 
-    for (i, presale_registry) in presale_registries.iter().enumerate() {
-        let params = presale_registries.get(i).unwrap();
+    for (i, presale_registry_params) in presale_registries.iter().enumerate() {
+        let registry = presale_state.presale_registries.get(i).unwrap();
         assert_eq!(
-            presale_registry.buyer_maximum_deposit_cap,
-            params.buyer_maximum_deposit_cap
+            presale_registry_params.buyer_maximum_deposit_cap,
+            registry.buyer_maximum_deposit_cap
         );
         assert_eq!(
-            presale_registry.buyer_minimum_deposit_cap,
-            params.buyer_minimum_deposit_cap
+            presale_registry_params.buyer_minimum_deposit_cap,
+            registry.buyer_minimum_deposit_cap
         );
-        assert_eq!(presale_registry.presale_supply, params.presale_supply);
+        assert_eq!(
+            presale_registry_params.presale_supply,
+            registry.presale_supply
+        );
     }
 
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);

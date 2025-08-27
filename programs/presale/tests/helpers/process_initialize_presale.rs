@@ -19,25 +19,25 @@ use presale::{
     MAX_PRESALE_REGISTRY_COUNT,
 };
 
-pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
-    [10_000, 0, 0, 0, 0];
+pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; 1] = [10_000];
 
 pub const PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
     [2_000, 2_000, 2_000, 2_000, 2_000];
 
 pub fn create_default_presale_registries(
     decimals: u8,
-    basis_points: &[u16; MAX_PRESALE_REGISTRY_COUNT],
-) -> [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT] {
-    let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
-    for (i, bps) in basis_points.iter().enumerate() {
+    basis_points: &[u16],
+) -> Vec<PresaleRegistryArgs> {
+    let mut presale_registries = vec![];
+    for bps in basis_points.iter() {
         if *bps > 0 {
+            let mut presale_registry = PresaleRegistryArgs::default();
             let presale_supply =
                 1_000_000_000u128 * 10u128.pow(decimals.into()) * u128::from(*bps) / 10_000u128;
-            let presale_registry = &mut presale_registries[i];
             presale_registry.presale_supply = presale_supply.try_into().unwrap();
             presale_registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
             presale_registry.buyer_minimum_deposit_cap = 1_000;
+            presale_registries.push(presale_registry);
         }
     }
     presale_registries
@@ -72,7 +72,7 @@ pub struct HandleInitializePresaleArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub presale_params: PresaleArgs,
-    pub presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    pub presale_registries: Vec<PresaleRegistryArgs>,
     pub locked_vesting_params: Option<LockedVestingArgs>,
     pub creator: Pubkey,
     pub payer: Rc<Keypair>,
@@ -180,7 +180,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
     unsold_token_action: UnsoldTokenAction,
-    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    presale_registries: Vec<PresaleRegistryArgs>,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
@@ -309,7 +309,7 @@ fn custom_create_predefined_prorata_presale_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    presale_registries: Vec<PresaleRegistryArgs>,
 ) -> Vec<Instruction> {
     let user_pubkey = user.pubkey();
 
@@ -394,7 +394,7 @@ fn custom_create_predefined_fcfs_presale_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-    presale_registries: [PresaleRegistryArgs; MAX_PRESALE_REGISTRY_COUNT],
+    presale_registries: Vec<PresaleRegistryArgs>,
 ) -> Vec<Instruction> {
     let user_pubkey = user.pubkey();
 
