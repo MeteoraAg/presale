@@ -9,6 +9,8 @@ pub struct TreeNode {
     pub escrow_owner: Pubkey,
     /// Presale registry index
     pub registry_index: u8,
+    /// Personal deposit cap
+    pub deposit_cap: u64,
     /// Escrow owner proof of inclusion in the Merkle Tree
     pub proof: Option<Vec<[u8; 32]>>,
 }
@@ -18,6 +20,7 @@ impl TreeNode {
         hashv(&[
             &self.escrow_owner.to_bytes(),
             &self.registry_index.to_le_bytes(),
+            &self.deposit_cap.to_le_bytes(),
         ])
     }
 }

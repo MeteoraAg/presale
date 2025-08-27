@@ -80,6 +80,10 @@ fn test_initialize_escrow_with_invalid_whitelist_mode() {
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let err_2 = handle_create_permissioned_escrow_with_operator_err(
         &mut lite_svm,
         HandleCreatePermissionedEscrowWithOperatorArgs {
@@ -88,6 +92,11 @@ fn test_initialize_escrow_with_invalid_whitelist_mode() {
             vault_owner: user.pubkey(),
             operator: Rc::clone(&operator),
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX as usize)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
     errs.push(err_2);
@@ -223,6 +232,10 @@ fn test_initialize_permissioned_with_authority_escrow_with_invalid_operator() {
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey_0)
+        .unwrap();
+
     let err = handle_create_permissioned_escrow_with_operator_err(
         &mut lite_svm,
         HandleCreatePermissionedEscrowWithOperatorArgs {
@@ -231,6 +244,11 @@ fn test_initialize_permissioned_with_authority_escrow_with_invalid_operator() {
             vault_owner: user_1.pubkey(),
             operator: Rc::clone(&operator_1),
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
 
@@ -259,10 +277,19 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_proof() {
             Rc::clone(&user),
         );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let user_1 = Rc::new(Keypair::new());
     let whitelist_wallet = vec![WhitelistWallet {
         address: user_1.pubkey(),
         registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        max_deposit_cap: presale_state
+            .presale_registries
+            .get(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX as usize)
+            .unwrap()
+            .buyer_maximum_deposit_cap,
     }];
 
     let merkle_tree = build_merkle_tree(whitelist_wallet, 0);
@@ -287,6 +314,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_proof() {
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node.registry_index,
+            max_deposit_cap: tree_node.deposit_cap,
         },
     );
 
@@ -315,9 +343,18 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_registry_i
             Rc::clone(&user),
         );
 
+    let presale: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallet = vec![WhitelistWallet {
         address: user.pubkey(),
         registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        max_deposit_cap: presale
+            .presale_registries
+            .get(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX as usize)
+            .unwrap()
+            .buyer_maximum_deposit_cap,
     }];
 
     let merkle_tree = build_merkle_tree(whitelist_wallet, 0);
@@ -342,6 +379,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_registry_i
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: 1, // invalid index
+            max_deposit_cap: tree_node.deposit_cap,
         },
     );
 
@@ -379,6 +417,10 @@ fn test_initialize_permissioned_with_authority_escrow_with_invalid_registry_inde
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let err = handle_create_permissioned_escrow_with_operator_err(
         &mut lite_svm,
         HandleCreatePermissionedEscrowWithOperatorArgs {
@@ -387,6 +429,11 @@ fn test_initialize_permissioned_with_authority_escrow_with_invalid_registry_inde
             vault_owner: user.pubkey(),
             operator: Rc::clone(&operator),
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
 
@@ -424,6 +471,10 @@ fn test_initialize_permissioned_with_authority_escrow() {
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     handle_create_permissioned_escrow_with_operator(
         &mut lite_svm,
         HandleCreatePermissionedEscrowWithOperatorArgs {
@@ -432,6 +483,11 @@ fn test_initialize_permissioned_with_authority_escrow() {
             vault_owner: user.pubkey(),
             operator: Rc::clone(&operator),
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX as usize)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
 }
@@ -455,9 +511,18 @@ fn test_initialize_permissioned_with_merkle_proof_escrow() {
             Rc::clone(&user),
         );
 
+    let presale: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallet = vec![WhitelistWallet {
         address: user.pubkey(),
         registry_index: 0,
+        max_deposit_cap: presale
+            .presale_registries
+            .get(0)
+            .unwrap()
+            .buyer_maximum_deposit_cap,
     }];
 
     let merkle_tree = build_merkle_tree(whitelist_wallet, 0);
@@ -482,6 +547,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow() {
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node.registry_index,
+            max_deposit_cap: tree_node.deposit_cap,
         },
     );
 }
@@ -514,14 +580,28 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             Rc::clone(&user),
         );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallet = vec![
         WhitelistWallet {
             address: user.pubkey(),
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_1_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     ];
 
@@ -547,6 +627,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node_0.registry_index,
+            max_deposit_cap: tree_node_0.deposit_cap,
         },
     );
 
@@ -561,6 +642,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             merkle_root_config: merkle_tree
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node_1.registry_index,
+            max_deposit_cap: tree_node_1.deposit_cap,
         },
     );
 
@@ -623,9 +705,18 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             Rc::clone(&user),
         );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallet_0 = vec![WhitelistWallet {
         address: user.pubkey(),
         registry_index: 0,
+        max_deposit_cap: presale_state
+            .presale_registries
+            .get(0)
+            .unwrap()
+            .buyer_maximum_deposit_cap,
     }];
 
     let merkle_tree_0 = build_merkle_tree(whitelist_wallet_0, 0);
@@ -650,12 +741,18 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             merkle_root_config: merkle_tree_0
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node_0.registry_index,
+            max_deposit_cap: tree_node_0.deposit_cap,
         },
     );
 
     let whitelist_wallet_1 = vec![WhitelistWallet {
         address: user_1_pubkey,
         registry_index: 1,
+        max_deposit_cap: presale_state
+            .presale_registries
+            .get(1)
+            .unwrap()
+            .buyer_maximum_deposit_cap,
     }];
 
     let merkle_tree_1 = build_merkle_tree(whitelist_wallet_1, 1);
@@ -680,6 +777,7 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
             merkle_root_config: merkle_tree_1
                 .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
             registry_index: tree_node_1.registry_index,
+            max_deposit_cap: tree_node_1.deposit_cap,
         },
     );
 
@@ -712,6 +810,131 @@ fn test_initialize_permissioned_with_merkle_proof_escrow_with_different_registry
 
     let escrow_state_1: Escrow = lite_svm.get_deserialized_zc_account(&escrow_1).unwrap();
     assert_eq!(escrow_state_1.registry_index, tree_node_1.registry_index);
+}
+
+#[test]
+fn test_initialize_permissioned_with_merkle_proof_escrow_with_invalid_deposit_cap() {
+    let mut setup_context = SetupContext::initialize();
+
+    let user_1 = setup_context.create_user();
+    let user_2 = setup_context.create_user();
+
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+    let user_2_pubkey = user_2.pubkey();
+
+    let quote = anchor_spl::token::spl_token::native_mint::ID;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale_with_multiple_presale_registries(
+            &mut lite_svm,
+            mint,
+            quote,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let whitelist_wallets = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+            // Personal max deposit cap more than registry buyer max deposit cap
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap
+                + 1,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 0,
+            // Personal minimum deposit cap lesser than registry buyer minimum deposit cap
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_minimum_deposit_cap
+                - 1,
+        },
+        WhitelistWallet {
+            address: user_2_pubkey,
+            registry_index: 0,
+            // Impossible to deposit
+            max_deposit_cap: 0,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets.to_vec(), 0);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+    let tree_node_0 = merkle_tree.get_node(&user_pubkey);
+
+    let err_0 = handle_create_permissioned_escrow_with_merkle_proof_err(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            proof: tree_node_0.proof.unwrap(),
+            merkle_root_config,
+            registry_index: tree_node_0.registry_index,
+            max_deposit_cap: tree_node_0.deposit_cap,
+        },
+    );
+
+    let tree_node_1 = merkle_tree.get_node(&user_1_pubkey);
+
+    let err_1 = handle_create_permissioned_escrow_with_merkle_proof_err(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            proof: tree_node_1.proof.unwrap(),
+            merkle_root_config,
+            registry_index: tree_node_1.registry_index,
+            max_deposit_cap: tree_node_1.deposit_cap,
+        },
+    );
+
+    let tree_node_2 = merkle_tree.get_node(&user_2_pubkey);
+
+    let err_2 = handle_create_permissioned_escrow_with_merkle_proof_err(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_2),
+            proof: tree_node_2.proof.unwrap(),
+            merkle_root_config,
+            registry_index: tree_node_2.registry_index,
+            max_deposit_cap: tree_node_2.deposit_cap,
+        },
+    );
+
+    for err in [err_0, err_1, err_2] {
+        let expected_err = presale::errors::PresaleError::InvalidDepositCap;
+        let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+        let err_str = format!("Error Number: {}.", err_code);
+        assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+    }
 }
 
 #[test]
@@ -767,4 +990,8 @@ fn test_initialize_permissionless_escrow() {
 
     let presale_registry = presale_state.presale_registries.first().unwrap();
     assert_eq!(presale_registry.total_escrow, 1);
+    assert_eq!(
+        escrow_state.deposit_max_cap,
+        presale_registry.buyer_maximum_deposit_cap
+    );
 }

@@ -14,6 +14,7 @@ use crate::helpers::{derive_event_authority, derive_merkle_root_config, process_
 pub struct WhitelistWallet {
     pub address: Pubkey,
     pub registry_index: u8,
+    pub max_deposit_cap: u64,
 }
 
 pub fn build_merkle_tree(
@@ -26,6 +27,7 @@ pub fn build_merkle_tree(
             escrow_owner: wallet.address,
             registry_index: wallet.registry_index,
             proof: None,
+            deposit_cap: wallet.max_deposit_cap,
         })
         .collect::<Vec<_>>();
 

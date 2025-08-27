@@ -13,9 +13,9 @@ pub struct PresaleRegistry {
     pub total_claimed_token: u64,
     /// Total refunded quote token. For statistic purpose only
     pub total_refunded_quote_token: u64,
-    /// This is the minimum amount of quote token that a user can deposit to the presale
+    /// This is the minimum amount of quote token that a user can deposit to the presale. Personal cap must within the global cap range.
     pub buyer_minimum_deposit_cap: u64,
-    /// This is the maximum amount of quote token that a user can deposit to the presale
+    /// This is the maximum amount of quote token that a user can deposit to the presale. Personal cap must within the global cap range.
     pub buyer_maximum_deposit_cap: u64,
     pub padding0: [u8; 8],
     pub padding1: [u128; 5],

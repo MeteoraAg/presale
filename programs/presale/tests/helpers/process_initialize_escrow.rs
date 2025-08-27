@@ -16,6 +16,7 @@ pub struct HandleCreatePermissionedEscrowWithMerkleProofArgs {
     pub owner: Rc<Keypair>,
     pub merkle_root_config: Pubkey,
     pub registry_index: u8,
+    pub max_deposit_cap: u64,
     pub proof: Vec<[u8; 32]>,
 }
 
@@ -28,6 +29,7 @@ pub fn create_permissioned_escrow_with_merkle_proof_ix(
         owner,
         registry_index,
         proof,
+        max_deposit_cap,
         merkle_root_config,
     } = args;
 
@@ -44,6 +46,7 @@ pub fn create_permissioned_escrow_with_merkle_proof_ix(
         params: CreatePermissionedEscrowWithMerkleProofParams {
             registry_index,
             proof,
+            deposit_cap: max_deposit_cap,
             ..Default::default()
         },
     }
@@ -145,6 +148,7 @@ pub struct HandleCreatePermissionedEscrowWithOperatorArgs {
     pub vault_owner: Pubkey,
     pub operator: Rc<Keypair>,
     pub registry_index: u8,
+    pub max_deposit_cap: u64,
 }
 
 pub fn create_permissioned_escrow_with_operator_ix(
@@ -157,6 +161,7 @@ pub fn create_permissioned_escrow_with_operator_ix(
         vault_owner,
         operator,
         registry_index,
+        max_deposit_cap,
     } = args;
 
     let owner_pubkey = owner.pubkey();
@@ -172,6 +177,7 @@ pub fn create_permissioned_escrow_with_operator_ix(
     let ix_data = presale::instruction::CreatePermissionedEscrowWithCreator {
         params: CreatePermissionedEscrowWithCreatorParams {
             registry_index,
+            deposit_cap: max_deposit_cap,
             ..Default::default()
         },
     }

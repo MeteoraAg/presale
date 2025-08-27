@@ -8,6 +8,7 @@ use crate::{
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, Default)]
 pub struct CreatePermissionedEscrowWithCreatorParams {
     pub registry_index: u8,
+    pub deposit_cap: u64,
     pub padding: [u8; 32],
 }
 
@@ -66,7 +67,11 @@ pub fn handle_create_permissioned_escrow_with_creator(
         &ctx.accounts.operator_owner.key(),
     )?;
 
-    let CreatePermissionedEscrowWithCreatorParams { registry_index, .. } = params;
+    let CreatePermissionedEscrowWithCreatorParams {
+        registry_index,
+        deposit_cap,
+        ..
+    } = params;
 
     process_create_escrow(HandleCreateEscrowArgs {
         presale: &mut presale,
@@ -74,6 +79,7 @@ pub fn handle_create_permissioned_escrow_with_creator(
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
         registry_index,
+        deposit_cap: Some(deposit_cap),
     })?;
 
     emit_cpi!(EvtEscrowCreate {

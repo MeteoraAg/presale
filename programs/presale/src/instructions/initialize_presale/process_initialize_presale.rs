@@ -113,9 +113,7 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         quote_token_program: ctx.accounts.quote_token_program.key(),
     };
 
-    let locked_vesting_params: Option<LockedVestingArgs> = locked_vesting_params
-        .try_into()
-        .map_err(|_| PresaleError::InvalidLockVestingInfo)?;
+    let locked_vesting_params: Option<LockedVestingArgs> = locked_vesting_params.into();
 
     process_create_presale_vault(ProcessCreatePresaleVaultArgs {
         presale: &ctx.accounts.presale,

@@ -382,18 +382,37 @@ fn test_claim_permissioned_fcfs_presale_with_multiple_presale_registries() {
     let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallets = [
         WhitelistWallet {
             address: user_pubkey,
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_1_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_2_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     ];
 
@@ -419,6 +438,7 @@ fn test_claim_permissioned_fcfs_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_0.registry_index,
             proof: tree_node_0.proof.unwrap(),
+            max_deposit_cap: tree_node_0.deposit_cap,
         },
     );
 
@@ -431,6 +451,7 @@ fn test_claim_permissioned_fcfs_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_1.registry_index,
             proof: tree_node_1.proof.unwrap(),
+            max_deposit_cap: tree_node_1.deposit_cap,
         },
     );
 
@@ -443,6 +464,7 @@ fn test_claim_permissioned_fcfs_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_2.registry_index,
             proof: tree_node_2.proof.unwrap(),
+            max_deposit_cap: tree_node_2.deposit_cap,
         },
     );
 
@@ -570,18 +592,37 @@ fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
     let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallets = [
         WhitelistWallet {
             address: user_pubkey,
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_1_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_2_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     ];
 
@@ -607,6 +648,7 @@ fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_0.registry_index,
             proof: tree_node_0.proof.unwrap(),
+            max_deposit_cap: tree_node_0.deposit_cap,
         },
     );
 
@@ -619,6 +661,7 @@ fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_1.registry_index,
             proof: tree_node_1.proof.unwrap(),
+            max_deposit_cap: tree_node_1.deposit_cap,
         },
     );
 
@@ -631,6 +674,7 @@ fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
             merkle_root_config,
             registry_index: tree_node_2.registry_index,
             proof: tree_node_2.proof.unwrap(),
+            max_deposit_cap: tree_node_2.deposit_cap,
         },
     );
 
@@ -758,18 +802,37 @@ fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries(
     let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let whitelist_wallets = [
         WhitelistWallet {
             address: user_pubkey,
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_1_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
         WhitelistWallet {
             address: user_2_pubkey,
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     ];
 
@@ -795,6 +858,7 @@ fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries(
             merkle_root_config,
             registry_index: tree_node_0.registry_index,
             proof: tree_node_0.proof.unwrap(),
+            max_deposit_cap: tree_node_0.deposit_cap,
         },
     );
 
@@ -807,6 +871,7 @@ fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries(
             merkle_root_config,
             registry_index: tree_node_1.registry_index,
             proof: tree_node_1.proof.unwrap(),
+            max_deposit_cap: tree_node_1.deposit_cap,
         },
     );
 
@@ -819,6 +884,7 @@ fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries(
             merkle_root_config,
             registry_index: tree_node_2.registry_index,
             proof: tree_node_2.proof.unwrap(),
+            max_deposit_cap: tree_node_2.deposit_cap,
         },
     );
 

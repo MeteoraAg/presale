@@ -18,6 +18,8 @@ pub struct Escrow {
     pub padding0: [u8; 6],
     // Total pending claim token
     pub pending_claim_token: u64,
+    // Personal deposit cap. Only available if whitelist mode is permissioned.
+    pub deposit_max_cap: u64,
     // Timestamp of when the escrow was created
     pub created_at: u64,
     // Timestamp of when the escrow was refreshed
@@ -25,7 +27,7 @@ pub struct Escrow {
     pub padding: [u64; 8],
 }
 
-static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 176);
+static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 184);
 static_assertions::assert_eq_align!(Escrow, u64);
 
 impl Escrow {
@@ -35,6 +37,7 @@ impl Escrow {
         owner: Pubkey,
         created_at: u64,
         registry_index: u8,
+        deposit_cap: u64,
     ) -> Result<()> {
         self.presale = presale;
         self.owner = owner;
@@ -42,16 +45,18 @@ impl Escrow {
         self.created_at = created_at;
         self.last_refreshed_at = created_at;
         self.registry_index = registry_index;
+        self.deposit_max_cap = deposit_cap;
 
         Ok(())
     }
 
     pub fn get_remaining_deposit_quota(&self, buyer_maximum_buy_cap: u64) -> Result<u64> {
-        if self.total_deposit >= buyer_maximum_buy_cap {
+        let maximum_buy_cap = buyer_maximum_buy_cap.min(self.deposit_max_cap);
+        if self.total_deposit >= maximum_buy_cap {
             return Ok(0);
         }
 
-        let remaining_quota = buyer_maximum_buy_cap.safe_sub(self.total_deposit)?;
+        let remaining_quota = maximum_buy_cap.safe_sub(self.total_deposit)?;
         Ok(remaining_quota)
     }
 

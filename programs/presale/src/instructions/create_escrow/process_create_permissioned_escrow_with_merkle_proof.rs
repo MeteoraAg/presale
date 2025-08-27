@@ -15,6 +15,7 @@ const LEAF_PREFIX: &[u8] = &[0];
 pub struct CreatePermissionedEscrowWithMerkleProofParams {
     pub proof: Vec<[u8; 32]>,
     pub registry_index: u8,
+    pub deposit_cap: u64,
     pub padding: [u8; 32],
 }
 
@@ -67,6 +68,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
     let CreatePermissionedEscrowWithMerkleProofParams {
         registry_index,
         proof,
+        deposit_cap,
         ..
     } = params;
 
@@ -75,6 +77,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
     let node = hashv(&[
         &ctx.accounts.owner.key().to_bytes(),
         registry_index.to_le_bytes().as_ref(),
+        deposit_cap.to_le_bytes().as_ref(),
     ]);
     let node = hashv(&[LEAF_PREFIX, &node.to_bytes()]);
     require!(
@@ -88,6 +91,7 @@ pub fn handle_create_permissioned_escrow_with_merkle_proof(
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
         registry_index,
+        deposit_cap: Some(deposit_cap),
     })?;
 
     emit_cpi!(EvtEscrowCreate {

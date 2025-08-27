@@ -122,4 +122,7 @@ pub enum PresaleError {
 
     #[msg("Multiple presale registries are not allowed")]
     MultiplePresaleRegistriesNotAllowed,
+
+    #[msg("Invalid deposit cap")]
+    InvalidDepositCap,
 }

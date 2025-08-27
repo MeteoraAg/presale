@@ -59,7 +59,7 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
     }
 }
 
-fn create_locked_vesting_args() -> LockedVestingArgs {
+pub fn create_locked_vesting_args() -> LockedVestingArgs {
     LockedVestingArgs {
         lock_duration: 3600,  // 1 hour
         vest_duration: 86400, // 1 day

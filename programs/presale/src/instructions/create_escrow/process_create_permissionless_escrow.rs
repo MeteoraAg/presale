@@ -52,6 +52,7 @@ pub fn handle_create_permissionless_escrow(
         presale_pubkey: ctx.accounts.presale.key(),
         owner_pubkey: ctx.accounts.owner.key(),
         registry_index: crate::constants::DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        deposit_cap: None,
     })?;
 
     emit_cpi!(EvtEscrowCreate {

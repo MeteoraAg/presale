@@ -3,11 +3,11 @@ pub mod helpers;
 use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
-use anchor_lang::{error::ERROR_CODE_OFFSET, AccountDeserialize};
-use anchor_spl::token_interface::TokenAccount;
+use anchor_lang::{error::ERROR_CODE_OFFSET, prelude::AccountMeta, AccountDeserialize};
+use anchor_spl::token_interface::{Mint, TokenAccount};
 use helpers::*;
 use presale::{
-    Escrow, Presale, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
+    Escrow, Presale, PresaleMode, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
     DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
 use std::rc::Rc;
@@ -233,6 +233,10 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
 
     let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     handle_create_permissioned_escrow_with_operator(
         &mut lite_svm,
         HandleCreatePermissionedEscrowWithOperatorArgs {
@@ -241,6 +245,11 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
             vault_owner: user_pubkey,
             operator: Rc::clone(&operator),
             registry_index: 0,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(0)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
 
@@ -252,6 +261,11 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
             vault_owner: user_pubkey,
             operator: Rc::clone(&operator),
             registry_index: 1,
+            max_deposit_cap: presale_state
+                .presale_registries
+                .get(1)
+                .unwrap()
+                .buyer_maximum_deposit_cap,
         },
     );
 
@@ -475,6 +489,298 @@ fn test_deposit_with_max_presale_cap() {
     assert!(after_presale_state.lock_end_time < before_presale_state.lock_end_time);
     assert!(after_presale_state.vesting_start_time < before_presale_state.vesting_start_time);
     assert!(after_presale_state.vesting_end_time < before_presale_state.vesting_end_time);
+}
+
+#[test]
+fn test_deposit_over_escrow_max_deposit_cap() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+    let user_pubkey = user.pubkey();
+
+    let quote = anchor_spl::token::spl_token::native_mint::ID;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presale_with_multiple_presale_registries(
+            &mut lite_svm,
+            mint,
+            quote,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let presale_registry = presale_state.get_presale_registry(0).unwrap();
+    let max_deposit_cap = (presale_registry.buyer_maximum_deposit_cap
+        - presale_registry.buyer_minimum_deposit_cap)
+        / 2;
+
+    let whitelist_wallet = [WhitelistWallet {
+        address: user_pubkey,
+        registry_index: 0,
+        max_deposit_cap,
+    }];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallet.to_vec(), 0);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            merkle_tree: &merkle_tree,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    let tree_node_0 = merkle_tree.get_node(&user_pubkey);
+
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_root_config: merkle_tree
+                .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
+            registry_index: tree_node_0.registry_index,
+            proof: tree_node_0.proof.unwrap(),
+            max_deposit_cap: tree_node_0.deposit_cap,
+        },
+    );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: tree_node_0.deposit_cap + 100,
+            registry_index: tree_node_0.registry_index,
+        },
+    );
+
+    let escrow_address = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        tree_node_0.registry_index,
+        &presale::ID,
+    );
+
+    let escrow_state: Escrow = lite_svm
+        .get_deserialized_zc_account(&escrow_address)
+        .unwrap();
+
+    assert_eq!(escrow_state.total_deposit, escrow_state.deposit_max_cap);
+}
+
+// Case: Deposit must within buyer min and max cap
+// Someone might able to deposit, some might not
+// presale_min_cap = 10, presale_max_cap = 100
+// buyer_min_cap = 20, buyer_max_cap = 100
+// user_0, max_deposit_cap = 70
+// user_1, max_deposit_cap = 40
+// user_2, max_deposit_cap = 30
+// 1. user_0 deposit 70, presale.total_deposit = 70
+// 2. user_1 deposit 20, presale.total_deposit = 90
+// user_2 cannot deposit
+// 3. user_1 deposit 10, presale.total_deposit = 100
+#[test]
+fn test_deposit_edge_case_0() {
+    let mut setup_context = SetupContext::initialize();
+
+    let user_1 = setup_context.create_user();
+    let user_2 = setup_context.create_user();
+
+    let base_mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+    let user_2_pubkey = user_2.pubkey();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
+    let args = HandleInitializeFixedTokenPricePresaleParamsArgs {
+        base_mint,
+        quote_mint,
+        q_price: calculate_q_price_from_ui_price(
+            0.01,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        ),
+        unsold_token_action: UnsoldTokenAction::Refund,
+        owner: user_pubkey,
+        payer: Rc::clone(&user),
+        base: user_pubkey,
+    };
+    let init_fixed_token_price_presale_args_ix =
+        create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
+
+    let mut presale_params = create_presale_args(&lite_svm);
+    presale_params.presale_minimum_cap = 10 * LAMPORTS_PER_SOL;
+    presale_params.presale_maximum_cap = 100 * LAMPORTS_PER_SOL;
+    presale_params.presale_mode = PresaleMode::FixedPrice.into();
+    presale_params.whitelist_mode = WhitelistMode::PermissionWithMerkleProof.into();
+
+    let locked_vesting_params = create_locked_vesting_args();
+
+    let presale_registries = vec![PresaleRegistryArgs {
+        buyer_minimum_deposit_cap: 20 * LAMPORTS_PER_SOL,
+        buyer_maximum_deposit_cap: 100 * LAMPORTS_PER_SOL,
+        presale_supply: 100_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+        ..PresaleRegistryArgs::default()
+    }];
+
+    let init_presale_ix = create_initialize_presale_ix(
+        &lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint,
+            quote_mint,
+            presale_registries,
+            presale_params,
+            locked_vesting_params: Some(locked_vesting_params),
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![AccountMeta {
+                pubkey: derive_fixed_price_presale_args(
+                    &base_mint,
+                    &quote_mint,
+                    &user_pubkey,
+                    &presale::ID,
+                ),
+                is_signer: false,
+                is_writable: false,
+            }],
+        },
+    );
+
+    let mut instructions = vec![];
+    instructions.push(init_fixed_token_price_presale_args_ix);
+    instructions.extend_from_slice(&init_presale_ix);
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+
+    let presale_pubkey = derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID);
+
+    let whitelist_wallet = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+            max_deposit_cap: 70 * LAMPORTS_PER_SOL,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 0,
+            max_deposit_cap: 40 * LAMPORTS_PER_SOL,
+        },
+        WhitelistWallet {
+            address: user_2_pubkey,
+            registry_index: 0,
+            max_deposit_cap: 30 * LAMPORTS_PER_SOL,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallet.to_vec(), 0);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            merkle_tree: &merkle_tree,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+
+    for user in [&user, &user_1, &user_2] {
+        let tree_node = merkle_tree.get_node(&user.pubkey());
+        handle_create_permissioned_escrow_with_merkle_proof(
+            &mut lite_svm,
+            HandleCreatePermissionedEscrowWithMerkleProofArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(user),
+                merkle_root_config,
+                registry_index: tree_node.registry_index,
+                proof: tree_node.proof.unwrap(),
+                max_deposit_cap: tree_node.deposit_cap,
+            },
+        );
+    }
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: 70 * LAMPORTS_PER_SOL,
+            registry_index: 0,
+        },
+    );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            max_amount: 20 * LAMPORTS_PER_SOL,
+            registry_index: 0,
+        },
+    );
+
+    let err_0 = handle_escrow_deposit_err(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_2),
+            max_amount: 30 * LAMPORTS_PER_SOL,
+            registry_index: 0,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::DepositAmountOutOfCap;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err_0.meta.logs.iter().any(|log| log.contains(&err_str)));
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            max_amount: 30 * LAMPORTS_PER_SOL,
+            registry_index: 0,
+        },
+    );
+
+    let escrow_0 = derive_escrow(&presale_pubkey, &user_pubkey, 0, &presale::ID);
+    let escrow_1 = derive_escrow(&presale_pubkey, &user_1_pubkey, 0, &presale::ID);
+    let escrow_2 = derive_escrow(&presale_pubkey, &user_2_pubkey, 0, &presale::ID);
+
+    let escrow_state_0: Escrow = lite_svm.get_deserialized_zc_account(&escrow_0).unwrap();
+    assert_eq!(escrow_state_0.total_deposit, 70 * LAMPORTS_PER_SOL);
+
+    let escrow_state_1: Escrow = lite_svm.get_deserialized_zc_account(&escrow_1).unwrap();
+    assert_eq!(escrow_state_1.total_deposit, 30 * LAMPORTS_PER_SOL);
+
+    let escrow_state_2: Escrow = lite_svm.get_deserialized_zc_account(&escrow_2).unwrap();
+    assert_eq!(escrow_state_2.total_deposit, 0);
 }
 
 #[test]
