@@ -24,6 +24,8 @@ pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; 1] = [10_000];
 pub const PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_REGISTRY_COUNT] =
     [2_000, 2_000, 2_000, 2_000, 2_000];
 
+pub const DEFAULT_DEPOSIT_BPS: u16 = 500;
+
 pub fn create_default_presale_registries(
     decimals: u8,
     basis_points: &[u16],
@@ -40,6 +42,19 @@ pub fn create_default_presale_registries(
             presale_registries.push(presale_registry);
         }
     }
+    presale_registries
+}
+
+pub fn create_default_presale_registries_with_deposit_fee(
+    decimals: u8,
+    basis_points: &[u16],
+) -> Vec<PresaleRegistryArgs> {
+    let mut presale_registries = create_default_presale_registries(decimals, basis_points);
+
+    for presale_registry in presale_registries.iter_mut() {
+        presale_registry.deposit_fee_bps = DEFAULT_DEPOSIT_BPS;
+    }
+
     presale_registries
 }
 
@@ -274,6 +289,35 @@ pub fn create_predefined_fixed_price_presale_ix(
     )
 }
 
+pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries_with_deposit_fee(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    custom_create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        unsold_token_action,
+        presale_registries,
+    )
+}
+
 pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
@@ -331,6 +375,33 @@ pub fn custom_create_predefined_prorata_presale_ix(
             payer: Rc::clone(&user),
             remaining_accounts: vec![],
         },
+    )
+}
+
+fn create_predefined_prorata_presale_ix_with_deposit_fee(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries_with_deposit_fee(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    custom_create_predefined_prorata_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
     )
 }
 
@@ -446,6 +517,33 @@ fn create_predefined_fcfs_presale_ix(
     )
 }
 
+fn create_predefined_fcfs_presale_ix_with_deposit_fee(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries_with_deposit_fee(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    custom_create_predefined_fcfs_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        presale_registries,
+    )
+}
+
 fn create_predefined_fcfs_presale_with_multiple_registries_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
@@ -538,6 +636,31 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
     }
 }
 
+pub fn handle_create_predefined_permissionless_fcfs_presale_with_deposit_fees(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fcfs_presale_ix_with_deposit_fee(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
 pub fn handle_create_predefined_permissionless_fixed_price_presale(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
@@ -545,6 +668,57 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
     let instructions = create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+        UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissionless_prorata_presale_with_deposit_fee(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_prorata_presale_ix_with_deposit_fee(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissionless_fixed_price_presale_with_deposit_fee(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix_with_deposit_fees(
         lite_svm,
         base_mint,
         quote_mint,

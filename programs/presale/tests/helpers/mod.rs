@@ -62,3 +62,6 @@ pub use process_create_permissioned_server_metadata::*;
 
 mod process_close_permissioned_server_metadata;
 pub use process_close_permissioned_server_metadata::*;
+
+mod process_creator_collect_fee;
+pub use process_creator_collect_fee::*;

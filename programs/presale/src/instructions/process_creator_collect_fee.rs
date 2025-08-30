@@ -8,6 +8,7 @@ use anchor_spl::{
 #[derive(Accounts)]
 pub struct CreatorCollectFeeCtx<'info> {
     #[account(
+        mut,
         has_one = owner,
         has_one = quote_mint,
         has_one = quote_token_vault
@@ -20,6 +21,7 @@ pub struct CreatorCollectFeeCtx<'info> {
     )]
     pub presale_authority: UncheckedAccount<'info>,
 
+    #[account(mut)]
     pub quote_token_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub quote_mint: InterfaceAccount<'info, Mint>,

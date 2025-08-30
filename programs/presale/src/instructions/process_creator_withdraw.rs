@@ -137,7 +137,8 @@ pub fn handle_creator_withdraw<'a, 'b, 'c: 'info, 'info>(
             )?;
 
             (
-                presale.total_deposit,
+                // Prorata can have total_deposit > presale_maximum_cap
+                presale.total_deposit.min(presale.presale_maximum_cap),
                 quote_token_vault,
                 quote_mint,
                 [AccountsType::TransferHookQuote],
