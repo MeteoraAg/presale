@@ -157,4 +157,11 @@ pub mod presale {
     ) -> Result<()> {
         instructions::handle_close_permissioned_server_metadata(ctx)
     }
+
+    pub fn creator_collect_fee<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, CreatorCollectFeeCtx<'info>>,
+        remaining_accounts_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_creator_collect_fee(ctx, remaining_accounts_info)
+    }
 }

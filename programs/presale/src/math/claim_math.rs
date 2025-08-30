@@ -8,6 +8,10 @@ pub fn calculate_dripped_amount_for_user(
     user_deposit: u64,
     total_deposit: u64,
 ) -> Result<u128> {
+    if current_timestamp < vesting_start_time || vest_duration == 0 || total_deposit == 0 {
+        return Ok(0);
+    }
+
     let elapsed_seconds = current_timestamp
         .safe_sub(vesting_start_time)?
         .min(vest_duration);

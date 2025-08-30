@@ -4,10 +4,15 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use anchor_lang::{error::ERROR_CODE_OFFSET, prelude::AccountMeta, AccountDeserialize};
-use anchor_spl::token_interface::{Mint, TokenAccount};
+use anchor_spl::{
+    associated_token::get_associated_token_address_with_program_id,
+    token_2022,
+    token_interface::{Mint, TokenAccount},
+};
 use helpers::*;
 use presale::{
-    Escrow, Presale, PresaleMode, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
+    calculate_deposit_fee_included_amount, DepositFeeIncludedCalculation, Escrow, Presale,
+    PresaleMode, PresaleRegistryArgs, Rounding, UnsoldTokenAction, WhitelistMode,
     DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
 use std::rc::Rc;
@@ -781,6 +786,200 @@ fn test_deposit_edge_case_0() {
 
     let escrow_state_2: Escrow = lite_svm.get_deserialized_zc_account(&escrow_2).unwrap();
     assert_eq!(escrow_state_2.total_deposit, 0);
+}
+
+#[test]
+fn test_deposit_2022_with_fee() {
+    let mut setup_context = SetupContext::initialize();
+    let base_mint = setup_context.setup_token_2022_mint_with_transfer_hook_and_fee(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        5_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let quote_mint = setup_context.setup_token_2022_mint_with_transfer_hook_and_fee(
+        DEFAULT_QUOTE_TOKEN_DECIMALS,
+        5_000_000_000 * 10u64.pow(DEFAULT_QUOTE_TOKEN_DECIMALS.into()),
+    );
+
+    let user_1 = setup_context.create_user();
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+    let user_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+
+    transfer_token(
+        &mut lite_svm,
+        Rc::clone(&user),
+        user_1_pubkey,
+        base_mint,
+        100_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    transfer_token(
+        &mut lite_svm,
+        Rc::clone(&user),
+        user_1_pubkey,
+        quote_mint,
+        100_000_000 * 10u64.pow(DEFAULT_QUOTE_TOKEN_DECIMALS.into()),
+    );
+
+    let presale_registries = vec![
+        PresaleRegistryArgs {
+            buyer_minimum_deposit_cap: 100,
+            buyer_maximum_deposit_cap: 200_000_000,
+            presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+            deposit_fee_bps: 100, // 1%
+            ..PresaleRegistryArgs::default()
+        },
+        PresaleRegistryArgs {
+            buyer_minimum_deposit_cap: 200,
+            buyer_maximum_deposit_cap: 400_000_000,
+            presale_supply: 2_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+            deposit_fee_bps: 200, // 2%
+            ..PresaleRegistryArgs::default()
+        },
+    ];
+
+    let create_ixs = custom_create_predefined_prorata_presale_ix(
+        &mut lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
+        presale_registries,
+    );
+
+    process_transaction(&mut lite_svm, &create_ixs, Some(&user_pubkey), &[&user]).unwrap();
+
+    let presale_pubkey = derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID);
+
+    let whitelist_wallets = [
+        WhitelistWallet {
+            address: user_pubkey,
+            registry_index: 0,
+            max_deposit_cap: 200_000_000,
+        },
+        WhitelistWallet {
+            address: user_1_pubkey,
+            registry_index: 1,
+            max_deposit_cap: 400_000_000,
+        },
+    ];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets.to_vec(), 0);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let deposit_amount_0 = 100_000_000;
+    let deposit_amount_1 = 200_000_000;
+
+    for (deposit_amount, user) in [
+        (deposit_amount_0, Rc::clone(&user)),
+        (deposit_amount_1, Rc::clone(&user_1)),
+    ] {
+        let tree_node = merkle_tree.get_node(&user.pubkey());
+        handle_create_permissioned_escrow_with_merkle_proof(
+            &mut lite_svm,
+            HandleCreatePermissionedEscrowWithMerkleProofArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(&user),
+                merkle_root_config: merkle_tree
+                    .get_merkle_root_config_pubkey(presale_pubkey, &presale::ID),
+                registry_index: tree_node.registry_index,
+                proof: tree_node.proof.unwrap(),
+                max_deposit_cap: tree_node.deposit_cap,
+            },
+        );
+
+        let user_quote_token_address = get_associated_token_address_with_program_id(
+            &user.pubkey(),
+            &quote_mint,
+            &token_2022::ID,
+        );
+
+        let before_user_quote_token_account = lite_svm.get_account(&user_quote_token_address);
+
+        handle_escrow_deposit(
+            &mut lite_svm,
+            HandleEscrowDepositArgs {
+                presale: presale_pubkey,
+                owner: Rc::clone(&user),
+                max_amount: deposit_amount,
+                registry_index: tree_node.registry_index,
+            },
+        );
+
+        let after_user_quote_token_account =
+            lite_svm.get_account(&user_quote_token_address).unwrap();
+
+        let before_amount = if let Some(account) = before_user_quote_token_account {
+            let token_account = TokenAccount::try_deserialize(&mut account.data.as_ref()).unwrap();
+            token_account.amount
+        } else {
+            0
+        };
+
+        let after_amount =
+            TokenAccount::try_deserialize(&mut after_user_quote_token_account.data.as_ref())
+                .unwrap()
+                .amount;
+
+        let transfer_amount = before_amount - after_amount;
+
+        let escrow = derive_escrow(
+            &presale_pubkey,
+            &user.pubkey(),
+            tree_node.registry_index,
+            &presale::ID,
+        );
+
+        let presale_state: Presale = lite_svm
+            .get_deserialized_zc_account(&presale_pubkey)
+            .unwrap();
+
+        let presale_registry = presale_state
+            .get_presale_registry(tree_node.registry_index.into())
+            .unwrap();
+
+        let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
+
+        let DepositFeeIncludedCalculation {
+            fee,
+            amount_included_fee,
+        } = calculate_deposit_fee_included_amount(
+            deposit_amount,
+            presale_registry.deposit_fee_bps,
+            Rounding::Up,
+        )
+        .unwrap();
+
+        assert_eq!(escrow_state.total_deposit, deposit_amount);
+        assert_eq!(escrow_state.total_deposit_fee, fee);
+        assert_eq!(presale_registry.total_deposit, deposit_amount);
+        assert_eq!(presale_registry.total_deposit_fee, fee);
+
+        // Due to transfer fee
+        assert!(transfer_amount > amount_included_fee);
+
+        let total_deposit_in_registries = presale_state
+            .presale_registries
+            .iter()
+            .fold(0u64, |acc, x| acc.checked_add(x.total_deposit).unwrap());
+
+        let total_fee_in_registries = presale_state
+            .presale_registries
+            .iter()
+            .fold(0u64, |acc, x| acc.checked_add(x.total_deposit_fee).unwrap());
+
+        assert_eq!(total_deposit_in_registries, presale_state.total_deposit);
+        assert_eq!(total_fee_in_registries, presale_state.total_deposit_fee);
+    }
 }
 
 #[test]

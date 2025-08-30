@@ -54,16 +54,19 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
         PresaleError::RemainingQuoteAlreadyWithdrawn
     );
 
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
     // 2. Ensure the presale is in a state that allows withdrawing remaining quote
-    let amount_to_refund =
-        presale.validate_and_get_escrow_remaining_quote(&escrow, current_timestamp)?;
+    let EscrowRemainingQuoteResult {
+        refund_deposit_amount,
+        refund_fee_amount,
+    } = presale.validate_and_get_escrow_remaining_quote(&escrow, current_timestamp)?;
 
-    require!(amount_to_refund > 0, PresaleError::ZeroTokenAmount);
+    let total_refund_amount = refund_deposit_amount.safe_add(refund_fee_amount)?;
+    require!(total_refund_amount > 0, PresaleError::ZeroTokenAmount);
 
     // 3. Update presale and escrow state
-    presale.update_total_refunded_quote_token(amount_to_refund, escrow.registry_index)?;
+    presale.update_total_refunded_quote_token(total_refund_amount, escrow.registry_index)?;
     escrow.update_remaining_quote_withdrawn()?;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
@@ -78,7 +81,7 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.quote_token_vault,
         &ctx.accounts.owner_quote_token,
         &ctx.accounts.token_program,
-        amount_to_refund,
+        total_refund_amount,
         Some(MemoTransferContext {
             memo_program: &ctx.accounts.memo_program,
             memo: PRESALE_MEMO,
@@ -87,7 +90,8 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
     )?;
 
     let exclude_fee_amount_to_refund =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, amount_to_refund)?.amount;
+        calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, total_refund_amount)?
+            .amount;
 
     emit_cpi!(EvtWithdrawRemainingQuote {
         presale: ctx.accounts.presale.key(),

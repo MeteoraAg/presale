@@ -125,4 +125,7 @@ pub enum PresaleError {
 
     #[msg("Invalid deposit cap")]
     InvalidDepositCap,
+
+    #[msg("Presale is not open for collect fee")]
+    PresaleNotOpenForCollectFee,
 }

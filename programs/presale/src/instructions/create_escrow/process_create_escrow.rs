@@ -20,7 +20,7 @@ pub fn process_create_escrow(args: HandleCreateEscrowArgs) -> Result<()> {
     } = args;
 
     // 1. Ensure presale is open for deposit
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let progress = presale.get_presale_progress(current_timestamp);
     require!(
         progress == PresaleProgress::Ongoing,

@@ -22,12 +22,14 @@ pub struct Escrow {
     pub deposit_max_cap: u64,
     // Timestamp of when the escrow was created
     pub created_at: u64,
+    // Total deposit fee collected
+    pub total_deposit_fee: u64,
     // Timestamp of when the escrow was refreshed
     pub last_refreshed_at: u64,
     pub padding: [u64; 8],
 }
 
-static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 184);
+static_assertions::const_assert_eq!(Escrow::INIT_SPACE, 192);
 static_assertions::assert_eq_align!(Escrow, u64);
 
 impl Escrow {
@@ -60,8 +62,9 @@ impl Escrow {
         Ok(remaining_quota)
     }
 
-    pub fn deposit(&mut self, deposit_amount: u64) -> Result<()> {
-        self.total_deposit = self.total_deposit.safe_add(deposit_amount)?;
+    pub fn deposit(&mut self, fee_excluded_deposit_amount: u64, fee: u64) -> Result<()> {
+        self.total_deposit = self.total_deposit.safe_add(fee_excluded_deposit_amount)?;
+        self.total_deposit_fee = self.total_deposit_fee.safe_add(fee)?;
         Ok(())
     }
 

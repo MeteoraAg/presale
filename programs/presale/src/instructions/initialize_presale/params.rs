@@ -48,7 +48,7 @@ pub struct InitializePresaleArgs {
 
 impl InitializePresaleArgs {
     pub fn validate(&self) -> Result<()> {
-        let current_timestamp = Clock::get()?.unix_timestamp as u64;
+        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
         self.presale_params.validate(current_timestamp)?;
 
         validate_presale_registries(&self.presale_registries, &self.presale_params)?;
@@ -68,6 +68,7 @@ pub struct PresaleRegistryArgs {
     pub buyer_minimum_deposit_cap: u64,
     pub buyer_maximum_deposit_cap: u64,
     pub presale_supply: u64,
+    pub deposit_fee_bps: u16,
     pub padding: [u8; 32],
 }
 
@@ -76,6 +77,7 @@ impl PresaleRegistryArgs {
         self.buyer_minimum_deposit_cap == 0
             && self.buyer_maximum_deposit_cap == 0
             && self.presale_supply == 0
+            && self.deposit_fee_bps == 0
     }
 
     pub fn validate(&self, presale_args: &PresaleArgs) -> Result<()> {
@@ -95,6 +97,11 @@ impl PresaleRegistryArgs {
         );
 
         require!(self.presale_supply > 0, PresaleError::InvalidTokenSupply);
+
+        require!(
+            self.deposit_fee_bps <= MAX_DEPOSIT_FEE_BPS,
+            PresaleError::InvalidPresaleInfo
+        );
 
         Ok(())
     }
@@ -230,6 +237,6 @@ mod tests {
     #[test]
     fn test_ensure_presale_registry_args_size() {
         let args = PresaleRegistryArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 56);
+        assert_eq!(args.try_to_vec().unwrap().len(), 58);
     }
 }

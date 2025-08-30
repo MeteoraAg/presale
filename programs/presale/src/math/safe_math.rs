@@ -135,3 +135,4 @@ macro_rules! try_into_impl {
 }
 
 try_into_impl!(u128, u64);
+try_into_impl!(i64, u64);

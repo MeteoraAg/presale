@@ -14,7 +14,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
-        let current_timestamp = Clock::get()?.unix_timestamp as u64;
+        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
         let InitializePresaleVaultAccountPubkeys {
             base_mint,

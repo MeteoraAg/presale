@@ -45,7 +45,7 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
 ) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
 
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let presale_progress = presale.get_presale_progress(current_timestamp);
 
     // 1. Ensure the presale is completed

@@ -11,6 +11,7 @@ pub struct DepositCtx<'info> {
         has_one = quote_mint,
     )]
     pub presale: AccountLoader<'info, Presale>,
+
     #[account(mut)]
     pub quote_token_vault: Box<InterfaceAccount<'info, TokenAccount>>,
     pub quote_mint: Box<InterfaceAccount<'info, Mint>>,
@@ -28,7 +29,7 @@ pub struct DepositCtx<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
-// Max amount doesn't include the transfer fees. This is the maximum amount the user wants to deposit.
+// Max amount doesn't include the transfer fees and deposit fees. This is the maximum amount the user wants to deposit.
 pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, DepositCtx<'info>>,
     max_amount: u64,
@@ -38,7 +39,7 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
     // 1. Ensure presale is open for deposit
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let progress = presale.get_presale_progress(current_timestamp);
     require!(
         progress == PresaleProgress::Ongoing,
@@ -51,9 +52,13 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     let remaining_deposit_quota = presale_handler.get_remaining_deposit_quota(&presale, &escrow)?;
     let deposit_amount = remaining_deposit_quota.min(max_amount);
 
-    // TODO: Should we ensure that the total deposit amount can buy at least one token? Because during init presale we only validate the max buyer cap.
     require!(deposit_amount > 0, PresaleError::ZeroTokenAmount);
-    presale.deposit(&mut escrow, deposit_amount)?;
+
+    // TODO: Should we ensure that the total deposit amount can buy at least one token? Because during init presale we only validate the max buyer cap.
+    let DepositFeeIncludedCalculation {
+        fee,
+        amount_included_fee: included_fee_deposit_amount,
+    } = presale.deposit(&mut escrow, deposit_amount)?;
 
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
     require!(
@@ -66,8 +71,11 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
 
     // 4. Transfer
-    let include_transfer_fee_deposit_amount =
-        calculate_transfer_fee_included_amount(&ctx.accounts.quote_mint, deposit_amount)?.amount;
+    let include_transfer_fee_deposit_amount = calculate_transfer_fee_included_amount(
+        &ctx.accounts.quote_mint,
+        included_fee_deposit_amount,
+    )?
+    .amount;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
         &mut &ctx.remaining_accounts[..],
@@ -92,7 +100,8 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
         deposit_amount,
         escrow_total_deposit_amount: escrow.total_deposit,
         presale_total_deposit_amount: presale.total_deposit,
-        owner: ctx.accounts.payer.key()
+        owner: ctx.accounts.payer.key(),
+        deposit_fee: fee,
     });
 
     Ok(())

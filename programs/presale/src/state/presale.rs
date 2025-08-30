@@ -124,6 +124,12 @@ pub struct Presale {
     pub total_claimed_token: u64,
     /// Total refunded quote token. For statistic purpose only
     pub total_refunded_quote_token: u64,
+    /// Total deposit fee collected
+    pub total_deposit_fee: u64,
+    /// Determine whether creator collected the deposit fee
+    pub deposit_fee_collected: u8,
+    /// Padding
+    pub padding1: [u8; 7],
     /// Determine whether creator withdrawn the raised capital
     pub has_creator_withdrawn: u8,
     /// Base token program flag
@@ -136,7 +142,7 @@ pub struct Presale {
     pub fixed_price_presale_unsold_token_action: u8,
     /// Whether the fixed price presale unsold token action has been performed
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding1: [u8; 2],
+    pub padding2: [u8; 2],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
     pub padding3: [u128; 6],
@@ -144,7 +150,7 @@ pub struct Presale {
     pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
 }
 
-static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1168);
+static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1264);
 static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs<'a> {
@@ -205,6 +211,7 @@ impl Presale {
                 registry.presale_supply,
                 registry.buyer_minimum_deposit_cap,
                 registry.buyer_maximum_deposit_cap,
+                registry.deposit_fee_bps,
             );
 
             self.presale_supply = self.presale_supply.safe_add(registry.presale_supply)?;
@@ -304,11 +311,24 @@ impl Presale {
         Ok(remaining_quota)
     }
 
-    pub fn deposit(&mut self, escrow: &mut Escrow, deposit_amount: u64) -> Result<()> {
+    pub fn deposit(
+        &mut self,
+        escrow: &mut Escrow,
+        deposit_amount: u64,
+    ) -> Result<DepositFeeIncludedCalculation> {
         let presale_registry = self.get_presale_registry_mut(escrow.registry_index.into())?;
-        presale_registry.deposit(escrow, deposit_amount)?;
+
+        let deposit_fee_calculation =
+            presale_registry.calculate_deposit_fee_included_amount(deposit_amount)?;
+
+        presale_registry.deposit(escrow, deposit_amount, deposit_fee_calculation.fee)?;
+
         self.total_deposit = self.total_deposit.safe_add(deposit_amount)?;
-        Ok(())
+        self.total_deposit_fee = self
+            .total_deposit_fee
+            .safe_add(deposit_fee_calculation.fee)?;
+
+        Ok(deposit_fee_calculation)
     }
 
     pub fn withdraw(&mut self, escrow: &mut Escrow, amount: u64) -> Result<()> {
@@ -350,11 +370,15 @@ impl Presale {
                 && presale_mode == PresaleMode::Prorata)
     }
 
+    pub fn get_remaining_quote(&self) -> u64 {
+        self.total_deposit.saturating_sub(self.presale_maximum_cap)
+    }
+
     pub fn validate_and_get_escrow_remaining_quote(
         &self,
         escrow: &Escrow,
         current_timestamp: u64,
-    ) -> Result<u64> {
+    ) -> Result<EscrowRemainingQuoteResult> {
         // 1. Ensure presale is in failed or prorata completed state
         let presale_progress = self.get_presale_progress(current_timestamp);
         require!(
@@ -362,26 +386,46 @@ impl Presale {
             PresaleError::PresaleNotOpenForWithdrawRemainingQuote
         );
 
-        let refund_amount = if presale_progress == PresaleProgress::Failed {
-            // 2. Failed presale will refund all tokens to the owner
-            escrow.total_deposit
-        } else {
-            // 3. Prorata will refund only the overflow (unused) quote token
-            let remaining_quote_amount =
-                self.total_deposit.saturating_sub(self.presale_maximum_cap);
+        let (refund_deposit_amount, refund_fee_amount) =
+            if presale_progress == PresaleProgress::Failed {
+                // 2. Failed presale will refund all tokens to the owner
+                (escrow.total_deposit, escrow.total_deposit_fee)
+            } else {
+                // 3. Prorata (success presale) will refund only the overflow (unused) quote token
+                let presale_registry = self.get_presale_registry(escrow.registry_index.into())?;
 
-            let presale_registry = self.get_presale_registry(escrow.registry_index.into())?;
-            let registry_remaining_quote_amount = u128::from(presale_registry.total_deposit)
-                .safe_mul(remaining_quote_amount.into())?
-                .safe_div(self.total_deposit.into())?;
+                let RemainingQuote {
+                    refund_amount,
+                    refund_fee,
+                } = presale_registry
+                    .get_remaining_quote(self.get_remaining_quote(), self.total_deposit)?;
 
-            u128::from(escrow.total_deposit)
-                .safe_mul(registry_remaining_quote_amount)?
-                .safe_div(presale_registry.total_deposit.into())?
-                .safe_cast()?
-        };
+                // To be fair to all participants in the registry (same price), refund deposit fee charges on remaining quote amount
+                let escrow_refund_fee = if presale_registry.total_deposit_fee > 0 {
+                    u128::from(escrow.total_deposit_fee)
+                        .safe_mul(refund_fee.into())?
+                        .safe_div(presale_registry.total_deposit_fee.into())?
+                        .safe_cast()?
+                } else {
+                    0
+                };
 
-        Ok(refund_amount)
+                let escrow_refund_amount = if presale_registry.total_deposit > 0 {
+                    u128::from(escrow.total_deposit)
+                        .safe_mul(refund_amount.into())?
+                        .safe_div(presale_registry.total_deposit.into())?
+                        .safe_cast()?
+                } else {
+                    0
+                };
+
+                (escrow_refund_amount, escrow_refund_fee)
+            };
+
+        Ok(EscrowRemainingQuoteResult {
+            refund_deposit_amount,
+            refund_fee_amount,
+        })
     }
 
     pub fn get_total_unsold_token(&self, presale_handler: &dyn PresaleModeHandler) -> Result<u64> {
@@ -420,4 +464,45 @@ impl Presale {
             .get_mut(index)
             .ok_or(PresaleError::InvalidPresaleRegistryIndex.into())
     }
+
+    pub fn is_deposit_fee_collected(&self) -> bool {
+        self.deposit_fee_collected == 1
+    }
+
+    pub fn set_deposit_fee_collected(&mut self) {
+        self.deposit_fee_collected = 1;
+    }
+
+    pub fn get_total_collected_fee(&self) -> Result<u64> {
+        let presale_mode = PresaleMode::from(self.presale_mode);
+        match presale_mode {
+            // In prorata, we need to refund deposit fee of remaining quote to allow fair price for participants in the same registry
+            PresaleMode::Prorata => {
+                let presale_remaining_quote = self.get_remaining_quote();
+
+                let mut total_fee: u64 = 0;
+
+                for registry in self.presale_registries.iter() {
+                    // We can early break because registries are ordered from initialized -> uninitialized
+                    if registry.is_uninitialized() {
+                        break;
+                    }
+
+                    let RemainingQuote { refund_fee, .. } = registry
+                        .get_remaining_quote(presale_remaining_quote, self.total_deposit)?;
+
+                    let registry_collected_fee = registry.total_deposit_fee.safe_sub(refund_fee)?;
+                    total_fee = total_fee.safe_add(registry_collected_fee)?;
+                }
+
+                Ok(total_fee)
+            }
+            PresaleMode::Fcfs | PresaleMode::FixedPrice => Ok(self.total_deposit_fee),
+        }
+    }
+}
+
+pub struct EscrowRemainingQuoteResult {
+    pub refund_deposit_amount: u64,
+    pub refund_fee_amount: u64,
 }

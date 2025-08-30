@@ -1051,6 +1051,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
     registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    registry.deposit_fee_bps = 100; // 1%
 
     presale_registries.push(registry);
 
@@ -1058,6 +1059,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
     registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
     registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
     registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    registry.deposit_fee_bps = 200; // 2%
 
     presale_registries.push(registry);
 
@@ -1144,6 +1146,10 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         assert_eq!(
             presale_registry_params.presale_supply,
             registry.presale_supply
+        );
+        assert_eq!(
+            presale_registry_params.deposit_fee_bps,
+            registry.deposit_fee_bps
         );
     }
 

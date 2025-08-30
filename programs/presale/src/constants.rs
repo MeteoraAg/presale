@@ -12,6 +12,8 @@ pub const SCALE_OFFSET: u32 = 64; // 2^64
 
 pub const MAX_PRESALE_REGISTRY_COUNT: usize = 5;
 
+pub const MAX_DEPOSIT_FEE_BPS: u16 = 5000; // 50%
+
 // Only permissioned whitelist mode allowed to have multiple presale registries. The constant defined below is the default index for permissionless registries.
 pub const DEFAULT_PERMISSIONLESS_REGISTRY_INDEX: u8 = 0;
 

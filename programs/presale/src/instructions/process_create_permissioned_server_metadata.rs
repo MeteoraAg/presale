@@ -39,7 +39,7 @@ pub fn handle_create_permissioned_server_metadata(
         PresaleError::InvalidPresaleWhitelistMode
     );
 
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let progress = presale.get_presale_progress(current_timestamp);
 
     require!(

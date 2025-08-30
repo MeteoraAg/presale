@@ -303,7 +303,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
     )
 }
 
-fn custom_create_predefined_prorata_presale_ix(
+pub fn custom_create_predefined_prorata_presale_ix(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,

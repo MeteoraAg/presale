@@ -25,7 +25,7 @@ pub fn handle_close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
     let escrow = ctx.accounts.escrow.load()?;
 
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let presale_progress = presale.get_presale_progress(current_timestamp);
 
     match presale_progress {
@@ -66,8 +66,11 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
 ) -> Result<()> {
     // 1. Ensure the escrow has withdrawn remaining quote token
     match presale.validate_and_get_escrow_remaining_quote(escrow, current_timestamp) {
-        Ok(remaining_quote) => {
-            if remaining_quote > 0 {
+        Ok(EscrowRemainingQuoteResult {
+            refund_deposit_amount,
+            refund_fee_amount,
+        }) => {
+            if refund_deposit_amount > 0 || refund_fee_amount > 0 {
                 require!(
                     escrow.is_remaining_quote_withdrawn(),
                     PresaleError::EscrowNotEmpty

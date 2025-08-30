@@ -16,7 +16,7 @@ pub fn handle_refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {
     let presale = ctx.accounts.presale.load()?;
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
-    let current_timestamp: u64 = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
     if current_timestamp >= presale.vesting_start_time {
         let presale_mode = PresaleMode::from(presale.presale_mode);

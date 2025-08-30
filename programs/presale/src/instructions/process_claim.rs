@@ -50,7 +50,7 @@ pub fn handle_claim<'a, 'b, 'c: 'info, 'info>(
     let mut escrow = ctx.accounts.escrow.load_mut()?;
 
     // 1. Ensure the presale is in a state that allows claiming
-    let current_timestamp = Clock::get()?.unix_timestamp as u64;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
     let presale_progress = presale.get_presale_progress(current_timestamp);
 
     require!(

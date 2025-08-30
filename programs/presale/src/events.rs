@@ -54,6 +54,7 @@ pub struct EvtDeposit {
     pub escrow_total_deposit_amount: u64,
     pub presale_total_deposit_amount: u64,
     pub owner: Pubkey,
+    pub deposit_fee: u64,
 }
 
 #[event]
@@ -135,4 +136,11 @@ pub struct EvtPermissionedServerMetadataCreate {
 pub struct EvtPermissionedServerMetadataClose {
     pub presale: Pubkey,
     pub permissioned_server_metadata: Pubkey,
+}
+
+#[event]
+pub struct EvtCreatorCollectFee {
+    pub presale: Pubkey,
+    pub owner: Pubkey,
+    pub total_collected_fee: u64,
 }

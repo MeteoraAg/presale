@@ -78,7 +78,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             }
         }
 
-        let current_timestamp = Clock::get()?.unix_timestamp as u64;
+        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
         let InitializePresaleVaultAccountPubkeys {
             base_mint,
