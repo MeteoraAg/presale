@@ -880,6 +880,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     };
 
     let lock_vesting_params = LockedVestingArgs {
+        immediately_release_bps: 5000,
         lock_duration: 3600,
         vest_duration: 3600 * 2,
         ..Default::default()
@@ -987,6 +988,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     assert_eq!(
         presale_state.fixed_price_presale_unsold_token_action,
         unsold_token_action as u8
+    );
+    assert_eq!(
+        presale_state.immediate_release_bps,
+        lock_vesting_params.immediately_release_bps
     );
 
     let base_vault_token_account: TokenAccount = lite_svm

@@ -85,18 +85,19 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         process_claim_full_presale_supply_by_share(presale, escrow, current_timestamp)
     }
 
-    fn get_escrow_dripped_bought_token(
+    fn get_escrow_cumulative_claimable_token(
         &self,
         presale: &Presale,
         escrow: &Escrow,
         current_timestamp: u64,
-    ) -> Result<u128> {
+    ) -> Result<u64> {
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
-        calculate_dripped_amount_for_user(
+        calculate_cumulative_claimable_amount_for_user(
+            presale.immediate_release_bps,
+            presale_registry.presale_supply,
             presale.vesting_start_time,
             presale.vest_duration,
             current_timestamp,
-            presale_registry.presale_supply,
             escrow.total_deposit,
             presale_registry.total_deposit,
         )

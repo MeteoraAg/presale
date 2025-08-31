@@ -162,12 +162,11 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         escrow: &mut Escrow,
         current_timestamp: u64,
     ) -> Result<()> {
-        let dripped_escrow_bought_token =
-            self.get_escrow_dripped_bought_token(presale, escrow, current_timestamp)?;
+        let cumulative_escrow_claimable_amount =
+            self.get_escrow_cumulative_claimable_token(presale, escrow, current_timestamp)?;
 
-        let claimable_bought_token: u64 = dripped_escrow_bought_token
-            .safe_sub(escrow.sum_claimed_and_pending_claim_amount()?.into())?
-            .safe_cast()?;
+        let claimable_bought_token = cumulative_escrow_claimable_amount
+            .safe_sub(escrow.sum_claimed_and_pending_claim_amount()?)?;
 
         escrow.accumulate_pending_claim_token(claimable_bought_token)?;
         escrow.update_last_refreshed_at(current_timestamp)?;
@@ -191,12 +190,12 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         Ok(total_sold_token.safe_cast()?)
     }
 
-    fn get_escrow_dripped_bought_token(
+    fn get_escrow_cumulative_claimable_token(
         &self,
         presale: &Presale,
         escrow: &Escrow,
         current_timestamp: u64,
-    ) -> Result<u128> {
+    ) -> Result<u64> {
         // 1. Calculate how many base tokens were bought
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         let total_sold_token = calculate_token_bought(
@@ -206,15 +205,16 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         .safe_cast()?;
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
-        let dripped_escrow_bought_token = calculate_dripped_amount_for_user(
+        let claimable_bought_token = calculate_cumulative_claimable_amount_for_user(
+            presale.immediate_release_bps,
+            total_sold_token,
             presale.vesting_start_time,
             presale.vest_duration,
             current_timestamp,
-            total_sold_token,
             escrow.total_deposit,
             presale_registry.total_deposit,
         )?;
 
-        Ok(dripped_escrow_bought_token)
+        Ok(claimable_bought_token)
     }
 }

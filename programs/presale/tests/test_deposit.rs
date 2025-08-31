@@ -232,6 +232,7 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
         WhitelistMode::PermissionWithAuthority,
         UnsoldTokenAction::Refund,
         presale_registries.clone(),
+        create_locked_vesting_args(),
     );
 
     process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();

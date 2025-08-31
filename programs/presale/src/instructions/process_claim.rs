@@ -58,11 +58,6 @@ pub fn handle_claim<'a, 'b, 'c: 'info, 'info>(
         PresaleError::PresaleNotOpenForClaim
     );
 
-    require!(
-        !presale.in_locking_period(current_timestamp),
-        PresaleError::PresaleNotOpenForClaim
-    );
-
     // 2. Process claim
     require!(
         escrow.last_refreshed_at == current_timestamp,

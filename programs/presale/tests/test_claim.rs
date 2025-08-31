@@ -100,6 +100,114 @@ fn claim_and_assert(
 }
 
 #[test]
+fn test_claim_with_immediate_release() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale_with_immediate_release(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
+}
+
+#[test]
+fn test_claim_empty_escrow() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let user_1 = setup_context.create_user();
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    handle_create_permissionless_escrow(
+        &mut lite_svm,
+        HandleCreatePermissionlessEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    warp_time(&mut lite_svm, presale_state.vesting_end_time + 1);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::GreaterThan,
+        None,
+    );
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user_1),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
+}
+
+#[test]
 fn test_claim_non_completed_presale() {
     let mut setup_context = SetupContext::initialize();
     let mint = setup_context.setup_mint(
@@ -177,20 +285,14 @@ fn test_claim_locked_presale() {
 
     warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
 
-    let err = handle_escrow_claim_err(
+    claim_and_assert(
         &mut lite_svm,
-        HandleEscrowClaimArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user),
-            refresh_escrow: true,
-            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-        },
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
     );
-
-    let expected_err = presale::errors::PresaleError::PresaleNotOpenForClaim;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
 }
 
 #[test]

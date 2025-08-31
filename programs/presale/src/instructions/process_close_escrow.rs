@@ -95,9 +95,8 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
     let vesting_end_time = presale.vesting_start_time.safe_add(presale.vest_duration)?;
 
     // Get total dripped bought token at vesting end time
-    let escrow_total_claimable_amount: u64 = presale_handler
-        .get_escrow_dripped_bought_token(presale, escrow, vesting_end_time)?
-        .safe_cast()?;
+    let escrow_total_claimable_amount: u64 =
+        presale_handler.get_escrow_cumulative_claimable_token(presale, escrow, vesting_end_time)?;
 
     require!(
         escrow.total_claimed_token == escrow_total_claimable_amount,

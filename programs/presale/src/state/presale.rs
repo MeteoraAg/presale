@@ -142,7 +142,8 @@ pub struct Presale {
     pub fixed_price_presale_unsold_token_action: u8,
     /// Whether the fixed price presale unsold token action has been performed
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding2: [u8; 2],
+    /// How many % of the token supply is released immediately
+    pub immediate_release_bps: u16,
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
     pub padding3: [u128; 6],
@@ -240,11 +241,13 @@ impl Presale {
         if let Some(LockedVestingArgs {
             lock_duration,
             vest_duration,
+            immediately_release_bps,
             ..
         }) = locked_vesting_params
         {
             self.lock_duration = lock_duration;
             self.vest_duration = vest_duration;
+            self.immediate_release_bps = immediately_release_bps;
 
             self.recalculate_presale_timing(self.presale_end_time)?;
         }
@@ -336,10 +339,6 @@ impl Presale {
         presale_registry.withdraw(escrow, amount)?;
         self.total_deposit = self.total_deposit.safe_sub(amount)?;
         Ok(())
-    }
-
-    pub fn in_locking_period(&self, current_timestamp: u64) -> bool {
-        current_timestamp >= self.lock_start_time && current_timestamp <= self.lock_end_time
     }
 
     pub fn update_total_refunded_quote_token(

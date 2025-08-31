@@ -1,3 +1,5 @@
+use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::MAX_FEE_BASIS_POINTS;
+
 use crate::*;
 
 fn validate_presale_registries(
@@ -173,6 +175,8 @@ impl PresaleArgs {
 /// Vest user bought token
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LockedVestingArgs {
+    /// How many % of the token supply is released immediately
+    pub immediately_release_bps: u16,
     /// Lock duration until buyer can claim the token
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
@@ -187,6 +191,27 @@ impl LockedVestingArgs {
             total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
             PresaleError::InvalidLockVestingInfo
         );
+
+        require!(
+            self.immediately_release_bps <= MAX_FEE_BASIS_POINTS,
+            PresaleError::InvalidLockVestingInfo
+        );
+
+        // All tokens are immediately release, nothing to be vested
+        if self.immediately_release_bps == MAX_FEE_BASIS_POINTS {
+            require!(
+                self.lock_duration == 0 && self.vest_duration == 0,
+                PresaleError::InvalidLockVestingInfo
+            );
+        }
+
+        // Portion of token is immediately release, another part must be vested else it's have same effect as immediate release
+        if self.immediately_release_bps > 0 {
+            require!(
+                self.lock_duration > 0 || self.vest_duration > 0,
+                PresaleError::InvalidLockVestingInfo
+            );
+        }
 
         Ok(())
     }
@@ -218,14 +243,14 @@ mod tests {
     #[test]
     fn test_ensure_locked_vesting_args_size() {
         let args = LockedVestingArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 48);
+        assert_eq!(args.try_to_vec().unwrap().len(), 50);
     }
 
     #[test]
     fn test_ensure_initialize_presale_args_size() {
         let args = InitializePresaleArgs::default();
         // The size is based on 0 registry
-        assert_eq!(args.try_to_vec().unwrap().len(), 150);
+        assert_eq!(args.try_to_vec().unwrap().len(), 152);
     }
 
     #[test]

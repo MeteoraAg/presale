@@ -196,6 +196,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
     whitelist_mode: WhitelistMode,
     unsold_token_action: UnsoldTokenAction,
     presale_registries: Vec<PresaleRegistryArgs>,
+    locked_vesting_args: LockedVestingArgs,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
@@ -228,8 +229,6 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
     presale_params.whitelist_mode = whitelist_mode.into();
 
-    let locked_vesting_params = create_locked_vesting_args();
-
     let init_presale_ix = create_initialize_presale_ix(
         lite_svm,
         HandleInitializePresaleArgs {
@@ -237,7 +236,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
             quote_mint,
             presale_registries,
             presale_params,
-            locked_vesting_params: Some(locked_vesting_params),
+            locked_vesting_params: Some(locked_vesting_args),
             creator: user_pubkey,
             payer: Rc::clone(&user),
             remaining_accounts: vec![AccountMeta {
@@ -258,6 +257,39 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
         init_presale_ix,
     ]
     .concat()
+}
+
+pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+    whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
+) -> Vec<Instruction> {
+    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+
+    let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
+        .expect("Failed to deserialize base mint state");
+
+    let presale_registries = create_default_presale_registries(
+        base_mint_state.decimals,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    );
+
+    let mut locked_vesting_args = create_locked_vesting_args();
+    locked_vesting_args.immediately_release_bps = 5000;
+
+    custom_create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        user,
+        whitelist_mode,
+        unsold_token_action,
+        presale_registries,
+        locked_vesting_args,
+    )
 }
 
 pub fn create_predefined_fixed_price_presale_ix(
@@ -286,6 +318,7 @@ pub fn create_predefined_fixed_price_presale_ix(
         whitelist_mode,
         unsold_token_action,
         presale_registries,
+        create_locked_vesting_args(),
     )
 }
 
@@ -315,6 +348,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
         whitelist_mode,
         unsold_token_action,
         presale_registries,
+        create_locked_vesting_args(),
     )
 }
 
@@ -344,6 +378,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
         whitelist_mode,
         unsold_token_action,
         presale_registries,
+        create_locked_vesting_args(),
     )
 }
 
@@ -668,6 +703,32 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
     let instructions = create_predefined_fixed_price_presale_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+        UnsoldTokenAction::Burn,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissionless_fixed_price_presale_with_immediate_release(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_fixed_price_presale_ix_with_deposit_fees(
         lite_svm,
         base_mint,
         quote_mint,

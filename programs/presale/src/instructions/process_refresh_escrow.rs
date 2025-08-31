@@ -18,7 +18,9 @@ pub fn handle_refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {
 
     let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
-    if current_timestamp >= presale.vesting_start_time {
+    let presale_progress = presale.get_presale_progress(current_timestamp);
+
+    if presale_progress == PresaleProgress::Completed {
         let presale_mode = PresaleMode::from(presale.presale_mode);
         let presale_handler = get_presale_mode_handler(presale_mode);
 
