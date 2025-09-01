@@ -85,13 +85,13 @@ pub struct Presale {
     pub quote_token_vault: Pubkey,
     /// Base key
     pub base: Pubkey,
-    /// Presale version
-    pub version: u8,
+    /// Padding
+    pub padding0: u8,
     /// Presale mode
     pub presale_mode: u8,
     /// Whitelist mode
     pub whitelist_mode: u8,
-    pub padding0: [u8; 5],
+    pub padding1: [u8; 5],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -129,7 +129,7 @@ pub struct Presale {
     /// Determine whether creator collected the deposit fee
     pub deposit_fee_collected: u8,
     /// Padding
-    pub padding1: [u8; 7],
+    pub padding2: [u8; 7],
     /// Determine whether creator withdrawn the raised capital
     pub has_creator_withdrawn: u8,
     /// Base token program flag
