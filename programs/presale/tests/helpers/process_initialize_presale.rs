@@ -863,7 +863,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::PermissionWithMerkleProof,
-        UnsoldTokenAction::Burn,
+        UnsoldTokenAction::Refund,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();

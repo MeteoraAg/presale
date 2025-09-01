@@ -67,6 +67,25 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
     }
 }
 
+pub fn get_dynamic_price_based_total_base_token_sold(presale: &Presale) -> Result<u64> {
+    // FCFS / Prorata presale sells the full supply of base token, but if no one deposit for the particular registry, it consider nothing been sold
+    let mut total_token_sold = 0;
+
+    for registry in presale.presale_registries.iter() {
+        if registry.is_uninitialized() {
+            break;
+        }
+
+        if registry.total_deposit == 0 {
+            continue;
+        }
+
+        total_token_sold = total_token_sold.safe_add(registry.presale_supply)?;
+    }
+
+    Ok(total_token_sold)
+}
+
 pub fn process_claim_full_presale_supply_by_share(
     presale: &Presale,
     escrow: &mut Escrow,

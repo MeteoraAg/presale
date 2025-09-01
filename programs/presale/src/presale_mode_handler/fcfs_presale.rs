@@ -110,7 +110,6 @@ impl PresaleModeHandler for FcfsPresaleHandler {
     }
 
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
-        // FCFS presale sells the full supply of base token
-        Ok(presale.presale_supply)
+        get_dynamic_price_based_total_base_token_sold(presale)
     }
 }

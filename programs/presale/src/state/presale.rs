@@ -138,10 +138,10 @@ pub struct Presale {
     pub quote_token_program_flag: u8,
     /// Total presale registry count
     pub total_presale_registry_count: u8,
-    /// What to do with unsold base token. Only applicable for fixed price presale mode
-    pub fixed_price_presale_unsold_token_action: u8,
+    /// What to do with unsold base token
+    pub unsold_token_action: u8,
     /// Whether the fixed price presale unsold token action has been performed
-    pub is_fixed_price_presale_unsold_token_action_performed: u8,
+    pub is_unsold_token_action_performed: u8,
     /// How many % of the token supply is released immediately
     pub immediate_release_bps: u16,
     /// Presale rate. Only applicable for fixed price presale mode
@@ -258,7 +258,7 @@ impl Presale {
             ..
         }) = fixed_price_presale_params
         {
-            self.fixed_price_presale_unsold_token_action = unsold_token_action;
+            self.unsold_token_action = unsold_token_action;
             self.fixed_price_presale_q_price = q_price;
         }
 
@@ -352,12 +352,12 @@ impl Presale {
         Ok(())
     }
 
-    pub fn is_fixed_price_presale_unsold_token_action_performed(&self) -> bool {
-        self.is_fixed_price_presale_unsold_token_action_performed != 0
+    pub fn is_unsold_price_token_action_performed(&self) -> bool {
+        self.is_unsold_token_action_performed != 0
     }
 
-    pub fn set_fixed_price_presale_unsold_token_action_performed(&mut self) -> Result<()> {
-        self.is_fixed_price_presale_unsold_token_action_performed = 1;
+    pub fn set_unsold_token_action_performed(&mut self) -> Result<()> {
+        self.is_unsold_token_action_performed = 1;
         Ok(())
     }
 

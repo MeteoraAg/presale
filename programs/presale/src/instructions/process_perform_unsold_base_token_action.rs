@@ -55,7 +55,7 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
     );
 
     require!(
-        !presale.is_fixed_price_presale_unsold_token_action_performed(),
+        !presale.is_unsold_price_token_action_performed(),
         PresaleError::UnsoldBaseTokenActionAlreadyPerformed
     );
 
@@ -66,11 +66,10 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
     let total_token_unsold = presale.get_total_unsold_token(presale_handler.as_ref())?;
     require!(total_token_unsold > 0, PresaleError::NoUnsoldBaseTokens);
 
-    presale.set_fixed_price_presale_unsold_token_action_performed()?;
+    presale.set_unsold_token_action_performed()?;
 
     // 3. Burn or refund the unsold base tokens to the creator
-    let unsold_base_token_action =
-        UnsoldTokenAction::from(presale.fixed_price_presale_unsold_token_action);
+    let unsold_base_token_action = UnsoldTokenAction::from(presale.unsold_token_action);
 
     let signer_seeds = &[&presale_authority_seeds!()[..]];
 

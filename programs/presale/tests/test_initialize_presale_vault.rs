@@ -760,7 +760,7 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
     assert_eq!(presale_state.presale_mode, PresaleMode::Fcfs as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
     assert_eq!(presale_state.fixed_price_presale_q_price, 0);
-    assert_eq!(presale_state.fixed_price_presale_unsold_token_action, 0);
+    assert_eq!(presale_state.unsold_token_action, 0);
 }
 
 #[test]
@@ -825,7 +825,7 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
     assert_eq!(presale_state.presale_mode, PresaleMode::Prorata as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
     assert_eq!(presale_state.fixed_price_presale_q_price, 0);
-    assert_eq!(presale_state.fixed_price_presale_unsold_token_action, 0);
+    assert_eq!(presale_state.unsold_token_action, 0);
 }
 
 #[test]
@@ -985,10 +985,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
     assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
-    assert_eq!(
-        presale_state.fixed_price_presale_unsold_token_action,
-        unsold_token_action as u8
-    );
+    assert_eq!(presale_state.unsold_token_action, unsold_token_action as u8);
     assert_eq!(
         presale_state.immediate_release_bps,
         lock_vesting_params.immediately_release_bps
@@ -1189,10 +1186,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
     assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
-    assert_eq!(
-        presale_state.fixed_price_presale_unsold_token_action,
-        unsold_token_action as u8
-    );
+    assert_eq!(presale_state.unsold_token_action, unsold_token_action as u8);
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

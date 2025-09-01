@@ -181,6 +181,11 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             if presale_registry.is_uninitialized() {
                 break;
             }
+
+            if presale_registry.total_deposit == 0 {
+                continue;
+            }
+
             total_sold_token = total_sold_token.safe_add(calculate_token_bought(
                 presale.fixed_price_presale_q_price,
                 presale_registry.total_deposit,
