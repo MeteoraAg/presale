@@ -85,13 +85,13 @@ pub struct Presale {
     pub quote_token_vault: Pubkey,
     /// Base key
     pub base: Pubkey,
-    /// Presale version
-    pub version: u8,
+    /// Padding
+    pub padding0: u8,
     /// Presale mode
     pub presale_mode: u8,
     /// Whitelist mode
     pub whitelist_mode: u8,
-    pub padding0: [u8; 5],
+    pub padding1: [u8; 5],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -136,7 +136,7 @@ pub struct Presale {
     pub fixed_price_presale_unsold_token_action: u8,
     /// Whether the fixed price presale unsold token action has been performed
     pub is_fixed_price_presale_unsold_token_action_performed: u8,
-    pub padding1: [u8; 2],
+    pub padding2: [u8; 2],
     /// Presale rate. Only applicable for fixed price presale mode
     pub fixed_price_presale_q_price: u128,
     pub padding3: [u128; 6],
