@@ -226,6 +226,7 @@ impl Presale {
             presale_end_time,
             whitelist_mode,
             presale_mode,
+            unsold_token_action,
             ..
         } = presale_params;
 
@@ -236,6 +237,7 @@ impl Presale {
         self.presale_end_time = presale_end_time;
         self.whitelist_mode = whitelist_mode;
         self.presale_mode = presale_mode;
+        self.unsold_token_action = unsold_token_action;
         self.created_at = current_timestamp;
 
         if let Some(LockedVestingArgs {
@@ -252,13 +254,7 @@ impl Presale {
             self.recalculate_presale_timing(self.presale_end_time)?;
         }
 
-        if let Some(FixedPricePresaleExtraArgs {
-            unsold_token_action,
-            q_price,
-            ..
-        }) = fixed_price_presale_params
-        {
-            self.unsold_token_action = unsold_token_action;
+        if let Some(FixedPricePresaleExtraArgs { q_price, .. }) = fixed_price_presale_params {
             self.fixed_price_presale_q_price = q_price;
         }
 

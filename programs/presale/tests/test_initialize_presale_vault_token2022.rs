@@ -5,7 +5,7 @@ use anchor_lang::prelude::AccountMeta;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
-use presale::{Presale, UnsoldTokenAction};
+use presale::Presale;
 
 use crate::helpers::{
     calculate_q_price_from_ui_price, create_default_presale_registries, create_presale_args,
@@ -37,15 +37,12 @@ fn test_initialize_presale_vault_token_2022() {
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
-    let unsold_token_action = UnsoldTokenAction::Refund;
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -123,15 +120,12 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
-    let unsold_token_action = UnsoldTokenAction::Refund;
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -225,15 +219,12 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
-    let unsold_token_action = UnsoldTokenAction::Refund;
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,

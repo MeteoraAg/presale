@@ -27,9 +27,8 @@ pub struct InitializeFixedPricePresaleArgsCtx {
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Default)]
 pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
-    pub unsold_token_action: u8,
     pub q_price: u128,
-    pub padding: [u64; 8],
+    pub padding1: [u64; 8],
 }
 
 pub fn handle_initialize_fixed_price_presale_args(
@@ -37,25 +36,17 @@ pub fn handle_initialize_fixed_price_presale_args(
     params: InitializeFixedPricePresaleExtraArgs,
 ) -> Result<()> {
     let InitializeFixedPricePresaleExtraArgs {
-        presale,
-        unsold_token_action,
-        q_price,
-        ..
+        presale, q_price, ..
     } = params;
 
     let fixed_price_presale_params = &mut ctx.accounts.fixed_price_presale_params.load_init()?;
     fixed_price_presale_params.validate_and_initialize(
-        unsold_token_action,
         q_price,
         ctx.accounts.owner.key(),
         presale,
     )?;
 
-    emit_cpi!(EvtFixedPricePresaleArgsCreate {
-        presale,
-        unsold_token_action,
-        q_price,
-    });
+    emit_cpi!(EvtFixedPricePresaleArgsCreate { presale, q_price });
 
     Ok(())
 }
@@ -67,6 +58,6 @@ mod tests {
     #[test]
     fn test_ensure_initialize_fixed_price_presale_extra_args_size() {
         let args = InitializeFixedPricePresaleExtraArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 113);
+        assert_eq!(args.try_to_vec().unwrap().len(), 112);
     }
 }

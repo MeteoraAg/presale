@@ -70,6 +70,7 @@ pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::FixedPrice.into(),
         whitelist_mode: WhitelistMode::Permissionless.into(),
+        unsold_token_action: UnsoldTokenAction::Refund.into(),
         ..Default::default()
     }
 }
@@ -217,7 +218,6 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
             base_mint_state.decimals,
             quote_mint_state.decimals,
         ),
-        unsold_token_action,
         owner: user_pubkey,
         payer: Rc::clone(&user),
         base: user_pubkey,
@@ -226,6 +226,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
         create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
 
     let mut presale_params = create_presale_args(lite_svm);
+    presale_params.unsold_token_action = unsold_token_action.into();
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
     presale_params.whitelist_mode = whitelist_mode.into();
 
