@@ -1,0 +1,72 @@
+use std::rc::Rc;
+
+use anchor_client::solana_sdk::signer::Signer;
+use anchor_lang::error::ERROR_CODE_OFFSET;
+use presale::{Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
+
+use crate::helpers::{
+    create_deposit_ix, create_escrow_withdraw_ix,
+    handle_create_predefined_permissionless_fixed_price_presale, process_transaction,
+    HandleCreatePredefinedPresaleResponse, HandleEscrowDepositArgs, HandleEscrowWithdrawArgs,
+    LiteSVMExt, SetupContext, DEFAULT_BASE_TOKEN_DECIMALS,
+};
+
+pub mod helpers;
+
+#[test]
+fn test_presale_progress_manipulation() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+    let user_pubkey = user.pubkey();
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let deposit_ixs = create_deposit_ix(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            max_amount: presale_state.presale_maximum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+            owner: Rc::clone(&user),
+        },
+    );
+
+    let withdraw_amount =
+        (presale_state.presale_maximum_cap - presale_state.presale_minimum_cap) + 1;
+
+    let withdraw_ixs = create_escrow_withdraw_ix(
+        &lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            amount: withdraw_amount,
+            owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let mut instructions = vec![];
+    instructions.extend_from_slice(&deposit_ixs);
+    instructions.extend_from_slice(&withdraw_ixs);
+
+    let err = process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user])
+        .unwrap_err();
+
+    let expected_err = presale::errors::PresaleError::PresaleNotOpenForWithdraw;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}

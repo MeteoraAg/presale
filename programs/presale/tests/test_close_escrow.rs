@@ -143,7 +143,7 @@ fn test_close_escrow_presale_ongoing() {
         .unwrap();
 
     let amount_0 = presale_state.presale_maximum_cap / 2;
-    let amount_1 = presale_state.presale_maximum_cap - amount_0;
+    let amount_1 = presale_state.presale_maximum_cap - amount_0 - 1;
 
     handle_escrow_deposit(
         &mut lite_svm,

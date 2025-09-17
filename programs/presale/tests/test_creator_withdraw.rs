@@ -46,7 +46,7 @@ fn test_creator_withdraw_presale_token_2022_success() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -120,7 +120,7 @@ fn test_creator_withdraw_presale_token_2022_failed() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -190,7 +190,7 @@ fn test_creator_withdraw_presale_success() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -260,7 +260,7 @@ fn test_creator_withdraw_presale_failed() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)

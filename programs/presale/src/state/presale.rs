@@ -268,7 +268,7 @@ impl Presale {
     pub fn get_presale_progress(&self, current_timestamp: u64) -> PresaleProgress {
         if current_timestamp < self.presale_start_time {
             return PresaleProgress::NotStarted;
-        } else if current_timestamp <= self.presale_end_time {
+        } else if current_timestamp < self.presale_end_time {
             return PresaleProgress::Ongoing;
         }
 

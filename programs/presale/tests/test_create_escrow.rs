@@ -167,7 +167,7 @@ fn test_initialize_escrow_when_deposit_closed() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_create_permissionless_escrow_err(
         &mut lite_svm,
