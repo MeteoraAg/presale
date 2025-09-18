@@ -120,6 +120,20 @@ impl PresaleRegistry {
             refund_fee: registry_refund_fee.safe_cast()?,
         })
     }
+
+    pub fn ensure_escrow_deposit_within_cap(&self, escrow: &Escrow) -> Result<()> {
+        if escrow.total_deposit == 0 {
+            return Ok(());
+        }
+
+        require!(
+            escrow.total_deposit >= self.buyer_minimum_deposit_cap
+                && escrow.total_deposit <= self.buyer_maximum_deposit_cap,
+            PresaleError::DepositAmountOutOfCap
+        );
+
+        Ok(())
+    }
 }
 
 pub struct RemainingQuote {

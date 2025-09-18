@@ -416,3 +416,68 @@ fn test_withdraw_fcfs_presale() {
 
     assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
 }
+
+#[test]
+fn test_withdraw_fixed_price_presale_violate_buyer_cap() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let deposit_amount = 1_000_000;
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let presale_registry = presale_state
+        .get_presale_registry(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.into())
+        .unwrap();
+
+    let max_amount_to_withdraw = deposit_amount - presale_registry.buyer_minimum_deposit_cap;
+
+    let err = handle_escrow_withdraw_err(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: max_amount_to_withdraw + 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::DepositAmountOutOfCap;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+
+    handle_escrow_withdraw(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+}
