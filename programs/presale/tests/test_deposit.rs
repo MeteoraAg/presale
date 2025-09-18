@@ -721,7 +721,7 @@ fn test_deposit_edge_case_0() {
         base_mint,
         quote_mint,
         q_price: calculate_q_price_from_ui_price(
-            0.01,
+            DEFAULT_PRICE,
             base_mint_state.decimals,
             quote_mint_state.decimals,
         ),

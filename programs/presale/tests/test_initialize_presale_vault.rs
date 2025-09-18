@@ -349,7 +349,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
     let user_pubkey = user.pubkey();
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-    let price = 0.01;
+    let price = DEFAULT_PRICE;
 
     handle_initialize_fixed_token_price_presale_params(
         lite_svm,
@@ -385,7 +385,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
     let mut registry = PresaleRegistryArgs::default();
     registry.presale_supply = presale_pool_supply;
     registry.buyer_maximum_deposit_cap = buyer_maximum_deposit_cap;
-    registry.buyer_minimum_deposit_cap = 0;
+    registry.buyer_minimum_deposit_cap = buyer_maximum_deposit_cap;
     presale_registries.push(registry);
 
     let presale_params = PresaleArgs {
@@ -443,7 +443,101 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
     let user_pubkey = user.pubkey();
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-    let price = 0.01;
+    let price = DEFAULT_PRICE;
+
+    handle_initialize_fixed_token_price_presale_params(
+        lite_svm,
+        HandleInitializeFixedTokenPricePresaleParamsArgs {
+            base_mint: mint,
+            quote_mint,
+            q_price: calculate_q_price_from_ui_price(
+                price,
+                DEFAULT_BASE_TOKEN_DECIMALS,
+                DEFAULT_QUOTE_TOKEN_DECIMALS,
+            ),
+            unsold_token_action: UnsoldTokenAction::Refund,
+            owner: user_pubkey,
+            payer: Rc::clone(&user),
+            base: user_pubkey,
+        },
+    );
+
+    let presale_pool_supply = 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()); // 1 million
+
+    let lamport_price = price
+        * 10f64
+            .powi(i32::from(DEFAULT_QUOTE_TOKEN_DECIMALS) - i32::from(DEFAULT_BASE_TOKEN_DECIMALS));
+
+    println!("Lamport price: {}", lamport_price);
+
+    let presale_maximum_cap = ((presale_pool_supply + 1) as f64 * lamport_price) as u64;
+    println!("Presale max cap: {}", presale_maximum_cap);
+
+    let clock: Clock = lite_svm.get_sysvar();
+
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = presale_pool_supply;
+    registry.buyer_maximum_deposit_cap = presale_maximum_cap / 2;
+    registry.buyer_minimum_deposit_cap = registry.buyer_maximum_deposit_cap;
+    presale_registries.push(registry);
+
+    let presale_params = PresaleArgs {
+        presale_start_time: clock.unix_timestamp as u64,
+        presale_end_time: clock.unix_timestamp as u64 + 120,
+        presale_maximum_cap,
+        presale_minimum_cap: 1,
+        presale_mode: PresaleMode::FixedPrice.into(),
+        whitelist_mode: WhitelistMode::Permissionless.into(),
+        ..Default::default()
+    };
+
+    let err = handle_initialize_presale_err(
+        lite_svm,
+        HandleInitializePresaleArgs {
+            base_mint: mint,
+            quote_mint,
+            presale_registries,
+            presale_params,
+            locked_vesting_params: None,
+            creator: user_pubkey,
+            payer: Rc::clone(&user),
+            remaining_accounts: vec![AccountMeta {
+                pubkey: derive_fixed_price_presale_args(
+                    &mint,
+                    &quote_mint,
+                    &user_pubkey,
+                    &presale::ID,
+                ),
+                is_signer: false,
+                is_writable: false,
+            }],
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::InvalidTokenPrice;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+
+    let err_str = format!("Error Number: {}.", err_code);
+
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}
+
+fn assert_err_presale_buyer_minimum_cap_cannot_purchase_any_token(
+    setup_context: &mut SetupContext,
+) {
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+
+    let lite_svm = &mut setup_context.lite_svm;
+    let user = Rc::clone(&setup_context.user);
+
+    let user_pubkey = user.pubkey();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let price = DEFAULT_PRICE;
 
     handle_initialize_fixed_token_price_presale_params(
         lite_svm,
@@ -515,7 +609,7 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
         },
     );
 
-    let expected_err = presale::errors::PresaleError::InvalidTokenPrice;
+    let expected_err = presale::errors::PresaleError::ZeroTokenAmount;
     let err_code = ERROR_CODE_OFFSET + expected_err as u32;
 
     let err_str = format!("Error Number: {}.", err_code);
@@ -528,6 +622,7 @@ fn test_initialize_fixed_token_price_presale_vault_with_invalid_configuration() 
     let mut setup_context = SetupContext::initialize();
     assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(&mut setup_context);
     assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(&mut setup_context);
+    assert_err_presale_buyer_minimum_cap_cannot_purchase_any_token(&mut setup_context);
 }
 
 #[test]
@@ -840,7 +935,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
@@ -1027,7 +1122,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );

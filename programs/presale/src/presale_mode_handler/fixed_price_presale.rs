@@ -71,6 +71,11 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         // But buyer_minimum_deposit_cap = 20, thus it's impossible to fill the gap
         for registry in presale_registries {
             if !registry.is_uninitialized() {
+                // ensure buyer_minimum_deposit_cap and buyer_maximum_deposit_cap can buy at least 1 token and not exceed u64::MAX token
+                ensure_token_buyable(
+                    presale_extra_param.q_price,
+                    registry.buyer_minimum_deposit_cap,
+                )?;
                 ensure_token_buyable(
                     presale_extra_param.q_price,
                     registry.buyer_maximum_deposit_cap,

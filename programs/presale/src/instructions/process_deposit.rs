@@ -54,7 +54,6 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
 
     require!(deposit_amount > 0, PresaleError::ZeroTokenAmount);
 
-    // TODO: Should we ensure that the total deposit amount can buy at least one token? Because during init presale we only validate the max buyer cap.
     let DepositFeeIncludedCalculation {
         fee,
         amount_included_fee: included_fee_deposit_amount,
@@ -63,10 +62,13 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
     presale_registry.validate_escrow_deposit(&escrow)?;
 
-    // 3. Update presale and escrow state
+    // 3. Ensure able to purchase at least 1 token after deposit
+    ensure_escrow_no_zero_base_token_bought(presale_handler.as_ref(), &presale, &escrow)?;
+
+    // 4. Update presale and escrow state
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
 
-    // 4. Transfer
+    // 5. Transfer
     let include_transfer_fee_deposit_amount = calculate_transfer_fee_included_amount(
         &ctx.accounts.quote_mint,
         included_fee_deposit_amount,
