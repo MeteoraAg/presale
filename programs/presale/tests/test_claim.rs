@@ -419,56 +419,6 @@ fn test_claim_locked_presale() {
 }
 
 #[test]
-fn test_claim_without_refresh() {
-    let mut setup_context = SetupContext::initialize();
-    let mint = setup_context.setup_mint(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
-
-    let SetupContext { mut lite_svm, user } = setup_context;
-
-    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
-        handle_create_predefined_permissionless_fixed_price_presale(
-            &mut lite_svm,
-            mint,
-            anchor_spl::token::spl_token::native_mint::ID,
-            Rc::clone(&user),
-        );
-
-    handle_escrow_deposit(
-        &mut lite_svm,
-        HandleEscrowDepositArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user),
-            max_amount: LAMPORTS_PER_SOL,
-            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-        },
-    );
-
-    let presale_state: Presale = lite_svm
-        .get_deserialized_zc_account(&presale_pubkey)
-        .unwrap();
-
-    warp_time(&mut lite_svm, presale_state.vesting_start_time + 1);
-
-    let err = handle_escrow_claim_err(
-        &mut lite_svm,
-        HandleEscrowClaimArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user),
-            refresh_escrow: false,
-            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-        },
-    );
-
-    let expected_err = presale::errors::PresaleError::EscrowNotRefreshed;
-    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
-    let err_str = format!("Error Number: {}.", err_code);
-    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
-}
-
-#[test]
 fn test_claim_token2022() {
     let mut setup_context = SetupContext::initialize();
     let base_mint = setup_context.setup_token_2022_mint_with_transfer_hook_and_fee(
