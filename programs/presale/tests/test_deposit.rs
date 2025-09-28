@@ -3,7 +3,11 @@ pub mod helpers;
 use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
-use anchor_lang::{error::ERROR_CODE_OFFSET, prelude::AccountMeta, AccountDeserialize};
+use anchor_lang::{
+    error::ERROR_CODE_OFFSET,
+    prelude::{AccountMeta, Clock},
+    AccountDeserialize,
+};
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
     token_2022,
@@ -12,10 +16,102 @@ use anchor_spl::{
 use helpers::*;
 use presale::{
     calculate_deposit_fee_included_amount, DepositFeeIncludedCalculation, Escrow, Presale,
-    PresaleMode, PresaleRegistryArgs, Rounding, UnsoldTokenAction, WhitelistMode,
+    PresaleMode, PresaleProgress, PresaleRegistryArgs, Rounding, UnsoldTokenAction, WhitelistMode,
     DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
 use std::rc::Rc;
+
+#[test]
+fn test_deposit_fixed_price_presale_progress_update() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fixed_price_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state_0: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_progress_0 = presale_state_0.get_presale_progress(clock.unix_timestamp as u64);
+
+    assert!(presale_progress_0 == PresaleProgress::Ongoing);
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            max_amount: presale_state_0.presale_maximum_cap,
+            owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let presale_state_1: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_progress_1 = presale_state_1.get_presale_progress(clock.unix_timestamp as u64);
+
+    assert!(presale_progress_1 == PresaleProgress::Completed);
+}
+
+#[test]
+fn test_deposit_fcfs_presale_progress_update() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_fcfs_presale(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    let presale_state_0: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_progress_0 = presale_state_0.get_presale_progress(clock.unix_timestamp as u64);
+
+    assert!(presale_progress_0 == PresaleProgress::Ongoing);
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            max_amount: presale_state_0.presale_maximum_cap,
+            owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let presale_state_1: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_progress_1 = presale_state_1.get_presale_progress(clock.unix_timestamp as u64);
+
+    assert!(presale_progress_1 == PresaleProgress::Completed);
+}
 
 #[test]
 fn test_deposit_below_buyer_minimum_cap() {
@@ -149,7 +245,7 @@ fn test_deposit_when_presale_ended() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_escrow_deposit_err(
         &mut lite_svm,

@@ -254,7 +254,7 @@ fn test_claim_with_immediate_release() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     claim_and_assert(
         &mut lite_svm,
@@ -286,21 +286,21 @@ fn test_claim_empty_escrow() {
             Rc::clone(&user),
         );
 
+    handle_create_permissionless_escrow(
+        &mut lite_svm,
+        HandleCreatePermissionlessEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user_1),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
     handle_escrow_deposit(
         &mut lite_svm,
         HandleEscrowDepositArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
             max_amount: LAMPORTS_PER_SOL,
-            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-        },
-    );
-
-    handle_create_permissionless_escrow(
-        &mut lite_svm,
-        HandleCreatePermissionlessEscrowArgs {
-            presale: presale_pubkey,
-            owner: Rc::clone(&user_1),
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
@@ -353,7 +353,7 @@ fn test_claim_non_completed_presale() {
         HandleEscrowDepositArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
-            max_amount: LAMPORTS_PER_SOL,
+            max_amount: LAMPORTS_PER_SOL / 2,
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
@@ -406,7 +406,7 @@ fn test_claim_locked_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     claim_and_assert(
         &mut lite_svm,

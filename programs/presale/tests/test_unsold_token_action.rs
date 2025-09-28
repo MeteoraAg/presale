@@ -428,7 +428,7 @@ fn test_unsold_token_action_fcfs_presale_with_non_zero_deposit_registry() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_perform_unsold_token_action_err(
         &mut lite_svm,
@@ -478,7 +478,7 @@ fn test_unsold_token_action_prorata_presale_with_non_zero_deposit_registry() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_perform_unsold_token_action_err(
         &mut lite_svm,
@@ -574,7 +574,7 @@ fn test_unsold_token_action_refund_fixed_price_presale_when_presale_failed() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_perform_unsold_token_action_err(
         &mut lite_svm,
@@ -635,7 +635,7 @@ fn test_unsold_token_action_refund_fixed_price_presale_token2022() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let creator_base_token = get_associated_token_address_with_program_id(
         &user.pubkey(),
@@ -738,7 +738,7 @@ fn test_unsold_token_action_refund_fixed_price_presale_with_non_zero_deposit_reg
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let creator_base_token = get_associated_token_address_with_program_id(
         &user.pubkey(),
@@ -841,7 +841,7 @@ fn test_unsold_token_action_burn_fixed_price_presale_with_non_zero_deposit_regis
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let before_base_token_vault = lite_svm
         .get_account(&presale_state.base_token_vault)

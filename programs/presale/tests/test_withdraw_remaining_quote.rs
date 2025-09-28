@@ -47,7 +47,7 @@ fn test_withdraw_remaining_quote_failed_fixed_price_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let user_quote_token_pubkey = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -124,7 +124,7 @@ fn test_withdraw_remaining_quote_failed_fcfs_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let user_quote_token_pubkey = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -201,7 +201,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let user_quote_token_pubkey = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -294,7 +294,7 @@ fn test_withdraw_remaining_quote_success_prorata_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let user_quote_token_pubkey = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -374,7 +374,7 @@ fn test_withdraw_remaining_quote_success_fixed_price_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_escrow_withdraw_remaining_quote_err(
         &mut lite_svm,
@@ -427,7 +427,7 @@ fn test_withdraw_remaining_quote_success_fcfs_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_escrow_withdraw_remaining_quote_err(
         &mut lite_svm,
@@ -533,7 +533,7 @@ fn test_withdraw_remaining_quote_failed_prorata_presale_token2022() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let user_quote_token_pubkey = get_associated_token_address_with_program_id(
         &user_pubkey,

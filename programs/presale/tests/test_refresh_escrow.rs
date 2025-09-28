@@ -10,9 +10,9 @@ use presale::{
 use crate::helpers::{
     derive_escrow, handle_create_predefined_permissionless_fixed_price_presale,
     handle_create_predefined_permissionless_fixed_price_presale_with_immediate_release,
-    handle_escrow_deposit, handle_escrow_refresh, warp_time, HandleCreatePredefinedPresaleResponse,
-    HandleEscrowDepositArgs, HandleEscrowRefreshArgs, LiteSVMExt, SetupContext,
-    DEFAULT_BASE_TOKEN_DECIMALS,
+    handle_escrow_deposit, handle_escrow_refresh, warp_time, warp_to_presale_end,
+    HandleCreatePredefinedPresaleResponse, HandleEscrowDepositArgs, HandleEscrowRefreshArgs,
+    LiteSVMExt, SetupContext, DEFAULT_BASE_TOKEN_DECIMALS,
 };
 
 pub mod helpers;
@@ -49,7 +49,7 @@ fn test_escrow_refresh_with_immediate_release() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let escrow = derive_escrow(
         &presale_pubkey,
