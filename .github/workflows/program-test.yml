@@ -14,7 +14,7 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - run: df -h
+      - run: cd / && df -h
         shell: bash
 
   program_changed_files:
