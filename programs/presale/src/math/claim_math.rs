@@ -48,21 +48,17 @@ pub fn calculate_dripped_amount_for_user(
         return Ok(0);
     }
 
-    if vest_duration == 0 {
-        let user_token = u128::from(vested_amount)
-            .safe_mul(user_deposit.into())?
-            .safe_div(total_deposit.into())?;
+    let dripped_total_sold_token = if vest_duration == 0 {
+        u128::from(vested_amount)
+    } else {
+        let elapsed_seconds = current_timestamp
+            .safe_sub(vesting_start_time)?
+            .min(vest_duration);
 
-        return Ok(user_token);
-    }
-
-    let elapsed_seconds = current_timestamp
-        .safe_sub(vesting_start_time)?
-        .min(vest_duration);
-
-    let dripped_total_sold_token = u128::from(vested_amount)
-        .safe_mul(elapsed_seconds.into())?
-        .safe_div(vest_duration.into())?;
+        u128::from(vested_amount)
+            .safe_mul(elapsed_seconds.into())?
+            .safe_div(vest_duration.into())?
+    };
 
     let dripped_user_token = dripped_total_sold_token
         .safe_mul(user_deposit.into())?

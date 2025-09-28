@@ -205,7 +205,7 @@ impl LockedVestingArgs {
             );
         }
         // Portion of token is immediately release, another part must be vested else it's have same effect as immediate release
-        else if self.immediately_release_bps > 0 {
+        else {
             require!(
                 self.lock_duration > 0 || self.vest_duration > 0,
                 PresaleError::InvalidLockVestingInfo
