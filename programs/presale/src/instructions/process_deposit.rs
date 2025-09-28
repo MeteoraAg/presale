@@ -50,25 +50,27 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     let presale_mode = PresaleMode::from(presale.presale_mode);
     let presale_handler = get_presale_mode_handler(presale_mode);
     let remaining_deposit_quota = presale_handler.get_remaining_deposit_quota(&presale, &escrow)?;
-    let deposit_amount = remaining_deposit_quota.min(max_amount);
+    let max_capped_deposit_amount = remaining_deposit_quota.min(max_amount);
 
-    require!(deposit_amount > 0, PresaleError::ZeroTokenAmount);
+    require!(max_capped_deposit_amount > 0, PresaleError::ZeroTokenAmount);
+
+    let suggested_deposit_amount =
+        presale_handler.suggest_deposit_amount(&presale, max_capped_deposit_amount)?;
+
+    require!(suggested_deposit_amount > 0, PresaleError::ZeroTokenAmount);
 
     let DepositFeeIncludedCalculation {
         fee,
         amount_included_fee: included_fee_deposit_amount,
-    } = presale.deposit(&mut escrow, deposit_amount)?;
+    } = presale.deposit(&mut escrow, suggested_deposit_amount)?;
 
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
     presale_registry.validate_escrow_deposit(&escrow)?;
 
-    // 3. Ensure able to purchase at least 1 token after deposit
-    ensure_escrow_no_zero_base_token_bought(presale_handler.as_ref(), &presale, &escrow)?;
-
-    // 4. Update presale and escrow state
+    // 3. Update presale and escrow state
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
 
-    // 5. Transfer
+    // 4. Transfer
     let include_transfer_fee_deposit_amount = calculate_transfer_fee_included_amount(
         &ctx.accounts.quote_mint,
         included_fee_deposit_amount,
@@ -95,7 +97,7 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     emit_cpi!(EvtDeposit {
         presale: ctx.accounts.presale.key(),
         escrow: ctx.accounts.escrow.key(),
-        deposit_amount,
+        deposit_amount: suggested_deposit_amount,
         escrow_total_deposit_amount: escrow.total_deposit,
         presale_total_deposit_amount: presale.total_deposit,
         owner: ctx.accounts.payer.key(),

@@ -1108,7 +1108,7 @@ fn test_deposit_token2022() {
 
     let presale_registry = presale_state.get_presale_registry(0).unwrap();
 
-    let deposit_amount = presale_registry.buyer_minimum_deposit_cap + 1;
+    let deposit_amount = presale_registry.buyer_minimum_deposit_cap;
 
     handle_escrow_deposit(
         &mut lite_svm,

@@ -59,6 +59,13 @@ pub trait PresaleModeHandler {
         escrow: &Escrow,
         current_timestamp: u64,
     ) -> Result<u64>;
+    fn suggest_deposit_amount(&self, presale: &Presale, max_deposit_amount: u64) -> Result<u64>;
+    fn suggest_withdraw_amount(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        max_withdraw_amount: u64,
+    ) -> Result<u64>;
 }
 
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {
@@ -110,24 +117,5 @@ pub fn process_claim_full_presale_supply_by_share(
     escrow.accumulate_pending_claim_token(claimable_bought_token)?;
     escrow.update_last_refreshed_at(current_timestamp)?;
 
-    Ok(())
-}
-
-pub fn ensure_escrow_no_zero_base_token_bought(
-    presale_handler: &dyn PresaleModeHandler,
-    presale: &Presale,
-    escrow: &Escrow,
-) -> Result<()> {
-    if escrow.total_deposit == 0 {
-        return Ok(());
-    }
-
-    let cumulative_claimable_token =
-        presale_handler.get_escrow_cumulative_claimable_token(presale, escrow, u64::MAX)?;
-
-    require!(
-        cumulative_claimable_token > 0,
-        PresaleError::ZeroTokenAmount
-    );
     Ok(())
 }
