@@ -11,6 +11,12 @@ env:
   ANCHOR_CLI_VERSION: 0.31.1
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - run: df -h
+        shell: bash
+
   program_changed_files:
     runs-on: ubuntu-latest
     outputs:
