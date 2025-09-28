@@ -121,7 +121,7 @@ impl PresaleRegistry {
         })
     }
 
-    pub fn ensure_escrow_deposit_within_cap(&self, escrow: &Escrow) -> Result<()> {
+    pub fn validate_escrow_deposit(&self, escrow: &Escrow) -> Result<()> {
         if escrow.total_deposit == 0 {
             return Ok(());
         }

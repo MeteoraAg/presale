@@ -77,7 +77,7 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     presale_mode_handler.process_withdraw(&mut presale, &mut escrow, amount)?;
 
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
-    presale_registry.ensure_escrow_deposit_within_cap(&escrow)?;
+    presale_registry.validate_escrow_deposit(&escrow)?;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
         &mut &ctx.remaining_accounts[..],

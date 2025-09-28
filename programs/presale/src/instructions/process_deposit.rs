@@ -61,7 +61,7 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     } = presale.deposit(&mut escrow, deposit_amount)?;
 
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
-    presale_registry.ensure_escrow_deposit_within_cap(&escrow)?;
+    presale_registry.validate_escrow_deposit(&escrow)?;
 
     // 3. Update presale and escrow state
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
