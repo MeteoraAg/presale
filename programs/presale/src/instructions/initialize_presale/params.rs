@@ -55,7 +55,7 @@ impl InitializePresaleArgs {
 
         validate_presale_registries(&self.presale_registries, &self.presale_params)?;
 
-        let locked_vesting_params: Option<LockedVestingArgs> = self.locked_vesting_params.into();
+        let locked_vesting_params = self.locked_vesting_params.option();
 
         if let Some(locked_vesting) = locked_vesting_params {
             locked_vesting.validate()?;
@@ -218,27 +218,35 @@ impl LockedVestingArgs {
 
 pub type OptionalNonZeroLockedVestingArgs = LockedVestingArgs;
 
-impl TryFrom<Option<LockedVestingArgs>> for OptionalNonZeroLockedVestingArgs {
-    type Error = anchor_lang::error::Error;
-    fn try_from(args: Option<LockedVestingArgs>) -> std::result::Result<Self, Self::Error> {
-        match args {
-            None => Ok(Self::default()),
-            Some(locked_vesting_args) => {
-                if locked_vesting_args == Self::default() {
-                    Err(PresaleError::InvalidLockVestingInfo.into())
-                } else {
-                    Ok(locked_vesting_args)
-                }
-            }
+impl OptionalNonZeroLockedVestingArgs {
+    pub fn option(self) -> Option<LockedVestingArgs> {
+        if self == LockedVestingArgs::default() {
+            None
+        } else {
+            Some(self)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // Tests to ensure no breaking change on ix data deserialize
     use super::*;
 
+    #[test]
+    fn test_optional_non_zero_locked_vesting_args_conversion() {
+        let args = OptionalNonZeroLockedVestingArgs::default();
+        assert!(args.option().is_none());
+
+        let args = OptionalNonZeroLockedVestingArgs {
+            immediately_release_bps: 1000,
+            lock_duration: 0,
+            vest_duration: 0,
+            padding: [0u8; 32],
+        };
+        assert!(args.option().is_some());
+    }
+
+    // Tests to ensure no breaking change on ix data deserialize
     #[test]
     fn test_ensure_locked_vesting_args_size() {
         let args = LockedVestingArgs::default();

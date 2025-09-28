@@ -163,7 +163,7 @@ pub fn create_initialize_presale_ix(
         params: presale::InitializePresaleArgs {
             presale_registries,
             presale_params,
-            locked_vesting_params: locked_vesting_params.try_into().unwrap(),
+            locked_vesting_params: locked_vesting_params.unwrap_or_default(),
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {
