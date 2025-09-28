@@ -33,6 +33,7 @@ pub struct ClaimCtx<'info> {
     )]
     pub escrow: AccountLoader<'info, Escrow>,
 
+    #[account(mut)]
     pub owner_base_token: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub owner: Signer<'info>,
