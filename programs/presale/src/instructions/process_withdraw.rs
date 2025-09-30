@@ -76,6 +76,9 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     // 5. Update escrow and presale state
     presale_mode_handler.process_withdraw(&mut presale, &mut escrow, amount)?;
 
+    let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+    presale_registry.validate_escrow_deposit(&escrow)?;
+
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
         &mut &ctx.remaining_accounts[..],
         &remaining_accounts_info.slices,
