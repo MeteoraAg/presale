@@ -40,6 +40,8 @@ jobs:
           path: |
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo clean
+        shell: bash
       - run: anchor build
         shell: bash
       - run: cargo test --package presale
