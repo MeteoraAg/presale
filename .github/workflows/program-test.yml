@@ -44,3 +44,5 @@ jobs:
         shell: bash
       - run: cargo test --package presale
         shell: bash
+      - run: cargo clean
+        shell: bash
