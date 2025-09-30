@@ -385,6 +385,7 @@ pub fn create_predefined_fixed_prorata_ix_with_no_vest_nor_lock(
             immediately_release_bps: MAX_FEE_BASIS_POINTS,
             ..Default::default()
         },
+        UnsoldTokenAction::Refund,
     )
 }
 
@@ -426,12 +427,14 @@ pub fn custom_create_predefined_prorata_presale_ix(
     whitelist_mode: WhitelistMode,
     presale_registries: Vec<PresaleRegistryArgs>,
     locked_vesting_params: LockedVestingArgs,
+    unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let user_pubkey = user.pubkey();
 
     let mut presale_params = create_presale_args(lite_svm);
     presale_params.presale_mode = PresaleMode::Prorata.into();
     presale_params.whitelist_mode = whitelist_mode.into();
+    presale_params.unsold_token_action = unsold_token_action.into();
 
     create_initialize_presale_ix(
         lite_svm,
@@ -473,6 +476,7 @@ fn create_predefined_prorata_presale_ix_with_deposit_fee(
         whitelist_mode,
         presale_registries,
         create_locked_vesting_args(),
+        UnsoldTokenAction::Refund,
     )
 }
 
@@ -501,6 +505,7 @@ fn create_predefined_prorata_presale_ix(
         whitelist_mode,
         presale_registries,
         create_locked_vesting_args(),
+        UnsoldTokenAction::Refund,
     )
 }
 
@@ -510,6 +515,7 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
+    unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
 
@@ -529,6 +535,7 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
         whitelist_mode,
         presale_registries,
         create_locked_vesting_args(),
+        unsold_token_action,
     )
 }
 
@@ -940,7 +947,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
     }
 }
 
-pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(
+pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries_refund_unsold(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
@@ -952,6 +959,33 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_w
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::PermissionWithMerkleProof,
+        UnsoldTokenAction::Refund,
+    );
+
+    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+
+    let user_pubkey = user.pubkey();
+
+    HandleCreatePredefinedPresaleResponse {
+        base_mint,
+        quote_mint,
+        presale_pubkey: derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID),
+    }
+}
+
+pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries_burn_unsold(
+    lite_svm: &mut LiteSVM,
+    base_mint: Pubkey,
+    quote_mint: Pubkey,
+    user: Rc<Keypair>,
+) -> HandleCreatePredefinedPresaleResponse {
+    let instructions = create_predefined_prorata_presale_with_multiple_registries_ix(
+        lite_svm,
+        base_mint,
+        quote_mint,
+        Rc::clone(&user),
+        WhitelistMode::PermissionWithMerkleProof,
+        UnsoldTokenAction::Burn,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();

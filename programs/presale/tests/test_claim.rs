@@ -116,7 +116,7 @@ fn test_claim_empty_prorata_presale_registries() {
     let user_1_pubkey = user_1.pubkey();
 
     let HandleCreatePredefinedPresaleResponse {  presale_pubkey, .. } =
-        handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(
+        handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries_refund_unsold(
             &mut lite_svm,
             mint,
             quote_mint,
@@ -765,7 +765,7 @@ fn test_claim_permissioned_prorata_presale_with_multiple_presale_registries() {
     let user_2_pubkey = user_2.pubkey();
 
     let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
-        handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
+        handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_with_multiple_presale_registries_refund_unsold(&mut lite_svm, mint, quote_mint, Rc::clone(&user));
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
