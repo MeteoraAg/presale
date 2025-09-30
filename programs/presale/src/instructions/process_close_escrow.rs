@@ -29,8 +29,11 @@ pub fn handle_close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
     let presale_progress = presale.get_presale_progress(current_timestamp);
 
     match presale_progress {
-        PresaleProgress::Ongoing | PresaleProgress::Failed => {
+        PresaleProgress::Ongoing => {
             ensure_escrow_no_deposit_and_potential_refundable(&escrow)?;
+        }
+        PresaleProgress::Failed => {
+            ensure_escrow_withdrawn_remaining_quote(&escrow)?;
         }
         PresaleProgress::Completed => {
             ensure_escrow_done_claim_and_withdraw_remaining_quote(
@@ -111,6 +114,15 @@ fn ensure_escrow_no_deposit_and_potential_refundable(escrow: &Escrow) -> Result<
     // If there's any, the user must wait until the presale state is concluded (either Completed or Failed)
     require!(
         escrow.total_deposit == 0 && escrow.total_deposit_fee == 0,
+        PresaleError::EscrowNotEmpty
+    );
+    Ok(())
+}
+
+fn ensure_escrow_withdrawn_remaining_quote(escrow: &Escrow) -> Result<()> {
+    require!(
+        escrow.is_remaining_quote_withdrawn()
+            || (escrow.total_deposit == 0 && escrow.total_deposit_fee == 0),
         PresaleError::EscrowNotEmpty
     );
     Ok(())
