@@ -454,7 +454,6 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
                 DEFAULT_BASE_TOKEN_DECIMALS,
                 DEFAULT_QUOTE_TOKEN_DECIMALS,
             ),
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,

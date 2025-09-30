@@ -27,6 +27,7 @@ pub struct InitializeFixedPricePresaleArgsCtx {
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Default)]
 pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
+    pub padding0: u8,
     pub q_price: u128,
     pub padding1: [u64; 8],
 }
@@ -58,6 +59,6 @@ mod tests {
     #[test]
     fn test_ensure_initialize_fixed_price_presale_extra_args_size() {
         let args = InitializeFixedPricePresaleExtraArgs::default();
-        assert_eq!(args.try_to_vec().unwrap().len(), 112);
+        assert_eq!(args.try_to_vec().unwrap().len(), 113);
     }
 }
