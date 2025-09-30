@@ -33,6 +33,24 @@ fn ensure_enough_presale_supply(
     Ok(())
 }
 
+fn calculate_quote_token_without_surplus(presale: &Presale, amount: u64) -> Result<u64> {
+    let base_token_amount = calculate_token_bought(presale.fixed_price_presale_q_price, amount)?;
+
+    let quote_token_needed = base_token_amount
+        .safe_mul(presale.fixed_price_presale_q_price)?
+        .div_ceil(SCALE_MULTIPLIER);
+
+    let quote_token_needed: u64 = quote_token_needed.safe_cast()?;
+
+    // This should never happen
+    require!(
+        quote_token_needed <= amount,
+        PresaleError::UndeterminedError
+    );
+
+    Ok(quote_token_needed)
+}
+
 pub struct FixedPricePresaleHandler;
 
 impl PresaleModeHandler for FixedPricePresaleHandler {
@@ -71,6 +89,11 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         // But buyer_minimum_deposit_cap = 20, thus it's impossible to fill the gap
         for registry in presale_registries {
             if !registry.is_uninitialized() {
+                // ensure buyer_minimum_deposit_cap and buyer_maximum_deposit_cap can buy at least 1 token and not exceed u64::MAX token
+                ensure_token_buyable(
+                    presale_extra_param.q_price,
+                    registry.buyer_minimum_deposit_cap,
+                )?;
                 ensure_token_buyable(
                     presale_extra_param.q_price,
                     registry.buyer_maximum_deposit_cap,
@@ -221,5 +244,47 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         )?;
 
         Ok(claimable_bought_token)
+    }
+
+    fn suggest_deposit_amount(&self, presale: &Presale, max_deposit_amount: u64) -> Result<u64> {
+        calculate_quote_token_without_surplus(presale, max_deposit_amount)
+    }
+
+    fn suggest_withdraw_amount(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        max_withdraw_amount: u64,
+    ) -> Result<u64> {
+        if escrow.total_deposit == max_withdraw_amount {
+            return Ok(max_withdraw_amount);
+        }
+        calculate_quote_token_without_surplus(presale, max_withdraw_amount)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn test_calculate_quote_token_without_surplus() {
+        let mut presale = Presale::default();
+        let lamport_per_price = 5;
+        presale.fixed_price_presale_q_price = lamport_per_price * SCALE_MULTIPLIER; // 5 quote token per base token
+
+        let suggested_deposit_amount = calculate_quote_token_without_surplus(&presale, 7).unwrap();
+        assert_eq!(u128::from(suggested_deposit_amount), lamport_per_price);
+    }
+
+    proptest! {
+        #[test]
+        fn test_calculate_quote_token_without_surplus_prop(lamport_per_price in 1u64..u64::MAX, max_deposit_amount in 1u64..u64::MAX) {
+            let mut presale = Presale::default();
+            presale.fixed_price_presale_q_price = u128::from(lamport_per_price) * SCALE_MULTIPLIER; // lamport_per_price quote token per base token
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(&presale, max_deposit_amount).unwrap();
+            assert!(suggested_deposit_amount <= max_deposit_amount);
+        }
     }
 }

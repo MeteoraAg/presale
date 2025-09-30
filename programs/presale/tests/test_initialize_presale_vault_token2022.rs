@@ -12,7 +12,7 @@ use crate::helpers::{
     derive_fixed_price_presale_args, derive_presale,
     handle_initialize_fixed_token_price_presale_params, handle_initialize_presale,
     HandleInitializeFixedTokenPricePresaleParamsArgs, HandleInitializePresaleArgs, LiteSVMExt,
-    SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_QUOTE_TOKEN_DECIMALS,
+    SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_PRICE, DEFAULT_QUOTE_TOKEN_DECIMALS,
     PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
 };
 
@@ -32,7 +32,7 @@ fn test_initialize_presale_vault_token_2022() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
@@ -118,7 +118,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
@@ -220,7 +220,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );

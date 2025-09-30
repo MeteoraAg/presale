@@ -15,7 +15,7 @@ pub fn test_initialize_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -62,7 +62,7 @@ pub fn test_close_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -111,7 +111,7 @@ pub fn test_non_owner_cannot_close_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,

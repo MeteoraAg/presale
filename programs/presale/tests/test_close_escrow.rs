@@ -126,6 +126,10 @@ fn test_close_escrow_presale_ongoing() {
 
     let user_1 = Rc::new(Keypair::new());
     let funding_amount = LAMPORTS_PER_SOL * 3;
+
+    let user_0_pubkey = user.pubkey();
+    let user_1_pubkey = user_1.pubkey();
+
     transfer_sol(
         &mut lite_svm,
         Rc::clone(&user),
@@ -165,12 +169,29 @@ fn test_close_escrow_presale_ongoing() {
         },
     );
 
+    let escrow_0 = derive_escrow(
+        &presale_pubkey,
+        &user_0_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
+
+    let escrow_1 = derive_escrow(
+        &presale_pubkey,
+        &user_1_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
+
+    let escrow_0_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow_0).unwrap();
+    let escrow_1_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow_1).unwrap();
+
     handle_escrow_withdraw(
         &mut lite_svm,
         HandleEscrowWithdrawArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user),
-            amount: amount_0,
+            amount: escrow_0_state.total_deposit,
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );
@@ -180,7 +201,7 @@ fn test_close_escrow_presale_ongoing() {
         HandleEscrowWithdrawArgs {
             presale: presale_pubkey,
             owner: Rc::clone(&user_1),
-            amount: amount_1,
+            amount: escrow_1_state.total_deposit,
             registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         },
     );

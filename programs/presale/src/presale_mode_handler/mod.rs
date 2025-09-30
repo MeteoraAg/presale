@@ -1,3 +1,5 @@
+use std::u64;
+
 use crate::*;
 
 mod fixed_price_presale;
@@ -56,6 +58,13 @@ pub trait PresaleModeHandler {
         presale: &Presale,
         escrow: &Escrow,
         current_timestamp: u64,
+    ) -> Result<u64>;
+    fn suggest_deposit_amount(&self, presale: &Presale, max_deposit_amount: u64) -> Result<u64>;
+    fn suggest_withdraw_amount(
+        &self,
+        presale: &Presale,
+        escrow: &Escrow,
+        max_withdraw_amount: u64,
     ) -> Result<u64>;
 }
 

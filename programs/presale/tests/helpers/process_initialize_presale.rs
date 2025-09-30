@@ -28,6 +28,8 @@ pub const PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; MAX_PRESALE_RE
 
 pub const DEFAULT_DEPOSIT_BPS: u16 = 500;
 
+pub const DEFAULT_PRICE: f64 = 0.01;
+
 pub fn create_default_presale_registries(
     decimals: u8,
     basis_points: &[u16],
@@ -215,7 +217,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
         base_mint,
         quote_mint,
         q_price: calculate_q_price_from_ui_price(
-            0.01,
+            DEFAULT_PRICE,
             base_mint_state.decimals,
             quote_mint_state.decimals,
         ),

@@ -71,7 +71,7 @@ pub enum TokenProgramFlags {
 }
 
 #[account(zero_copy)]
-#[derive(InitSpace, Debug)]
+#[derive(InitSpace, Debug, Default)]
 pub struct Presale {
     /// Owner of presale
     pub owner: Pubkey,

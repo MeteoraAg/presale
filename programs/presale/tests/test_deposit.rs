@@ -721,7 +721,7 @@ fn test_deposit_edge_case_0() {
         base_mint,
         quote_mint,
         q_price: calculate_q_price_from_ui_price(
-            0.01,
+            DEFAULT_PRICE,
             base_mint_state.decimals,
             quote_mint_state.decimals,
         ),
@@ -1108,7 +1108,7 @@ fn test_deposit_token2022() {
 
     let presale_registry = presale_state.get_presale_registry(0).unwrap();
 
-    let deposit_amount = presale_registry.buyer_minimum_deposit_cap + 1;
+    let deposit_amount = presale_registry.buyer_minimum_deposit_cap;
 
     handle_escrow_deposit(
         &mut lite_svm,
