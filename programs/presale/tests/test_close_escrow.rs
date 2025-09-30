@@ -5,7 +5,7 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::error::ERROR_CODE_OFFSET;
 use helpers::*;
-use presale::{Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
 use std::rc::Rc;
 
 #[test]
@@ -320,4 +320,65 @@ fn test_close_escrow_presale_completed() {
 
     let presale_registry = presale_state.get_presale_registry(0).unwrap();
     assert_eq!(presale_registry.total_escrow, 0);
+}
+
+#[test]
+fn test_close_escrow_with_potential_refundable_deposit_fee() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+    let user_pubkey = user.pubkey();
+
+    let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
+        handle_create_predefined_permissionless_prorata_presale_with_deposit_fee(
+            &mut lite_svm,
+            mint,
+            anchor_spl::token::spl_token::native_mint::ID,
+            Rc::clone(&user),
+        );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: LAMPORTS_PER_SOL,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let escrow = derive_escrow(
+        &presale_pubkey,
+        &user_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        &presale::ID,
+    );
+    let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
+
+    handle_escrow_withdraw(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: escrow_state.total_deposit,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let err = handle_close_escrow_err(
+        &mut lite_svm,
+        HandleCloseEscrowArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::EscrowNotEmpty;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
 }

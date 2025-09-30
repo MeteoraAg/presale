@@ -30,7 +30,7 @@ pub fn handle_close_escrow(ctx: Context<CloseEscrowCtx>) -> Result<()> {
 
     match presale_progress {
         PresaleProgress::Ongoing | PresaleProgress::Failed => {
-            ensure_escrow_no_deposit(&escrow)?;
+            ensure_escrow_no_deposit_and_potential_refundable(&escrow)?;
         }
         PresaleProgress::Completed => {
             ensure_escrow_done_claim_and_withdraw_remaining_quote(
@@ -106,7 +106,12 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
     Ok(())
 }
 
-fn ensure_escrow_no_deposit(escrow: &Escrow) -> Result<()> {
-    require!(escrow.total_deposit == 0, PresaleError::EscrowNotEmpty);
+fn ensure_escrow_no_deposit_and_potential_refundable(escrow: &Escrow) -> Result<()> {
+    // We allow closing of escrow on PresaleProgress::Ongoing only when it have no potential refundable amount and deposit
+    // If there's any, the user must wait until the presale state is concluded (either Completed or Failed)
+    require!(
+        escrow.total_deposit == 0 && escrow.total_deposit_fee == 0,
+        PresaleError::EscrowNotEmpty
+    );
     Ok(())
 }
