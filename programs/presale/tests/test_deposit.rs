@@ -943,6 +943,7 @@ fn test_deposit_2022_with_fee() {
         Rc::clone(&user),
         WhitelistMode::PermissionWithMerkleProof,
         presale_registries,
+        create_locked_vesting_args(),
     );
 
     process_transaction(&mut lite_svm, &create_ixs, Some(&user_pubkey), &[&user]).unwrap();
