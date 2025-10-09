@@ -6,14 +6,12 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::*;
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
-use presale::UnsoldTokenAction;
 
 #[derive(Clone)]
 pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub q_price: u128,
-    pub unsold_token_action: UnsoldTokenAction,
     pub owner: Pubkey,
     pub payer: Rc<Keypair>,
     pub base: Pubkey,
@@ -26,7 +24,6 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         base_mint,
         quote_mint,
         q_price,
-        unsold_token_action,
         owner,
         payer,
         base,
@@ -41,7 +38,6 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         params: presale::InitializeFixedPricePresaleExtraArgs {
             q_price,
             presale,
-            unsold_token_action: unsold_token_action.into(),
             ..Default::default()
         },
     }

@@ -13,9 +13,9 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use presale::{
-    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, UnsoldTokenAction,
-    WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION,
-    MAXIMUM_PRESALE_DURATION, MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION,
+    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, WhitelistMode,
+    MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION,
+    MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION,
 };
 
 fn assert_err_invalid_locked_vesting_param(
@@ -361,7 +361,6 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
                 DEFAULT_BASE_TOKEN_DECIMALS,
                 DEFAULT_QUOTE_TOKEN_DECIMALS,
             ),
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -455,7 +454,6 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
                 DEFAULT_BASE_TOKEN_DECIMALS,
                 DEFAULT_QUOTE_TOKEN_DECIMALS,
             ),
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -549,7 +547,6 @@ fn assert_err_presale_buyer_minimum_cap_cannot_purchase_any_token(
                 DEFAULT_BASE_TOKEN_DECIMALS,
                 DEFAULT_QUOTE_TOKEN_DECIMALS,
             ),
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -940,15 +937,12 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
-    let unsold_token_action = UnsoldTokenAction::Refund;
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: mint,
             quote_mint,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -1080,7 +1074,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
     assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
-    assert_eq!(presale_state.unsold_token_action, unsold_token_action as u8);
+    assert_eq!(
+        presale_state.unsold_token_action,
+        presale_params.unsold_token_action
+    );
     assert_eq!(
         presale_state.immediate_release_bps,
         lock_vesting_params.immediately_release_bps
@@ -1127,15 +1124,12 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
-    let unsold_token_action = UnsoldTokenAction::Refund;
-
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
         HandleInitializeFixedTokenPricePresaleParamsArgs {
             base_mint: mint,
             quote_mint,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -1281,7 +1275,10 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
     assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
-    assert_eq!(presale_state.unsold_token_action, unsold_token_action as u8);
+    assert_eq!(
+        presale_state.unsold_token_action,
+        presale_params.unsold_token_action
+    );
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

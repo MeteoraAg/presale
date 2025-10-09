@@ -725,7 +725,6 @@ fn test_deposit_edge_case_0() {
             base_mint_state.decimals,
             quote_mint_state.decimals,
         ),
-        unsold_token_action: UnsoldTokenAction::Refund,
         owner: user_pubkey,
         payer: Rc::clone(&user),
         base: user_pubkey,
@@ -944,6 +943,7 @@ fn test_deposit_2022_with_fee() {
         WhitelistMode::PermissionWithMerkleProof,
         presale_registries,
         create_locked_vesting_args(),
+        UnsoldTokenAction::Refund,
     );
 
     process_transaction(&mut lite_svm, &create_ixs, Some(&user_pubkey), &[&user]).unwrap();
