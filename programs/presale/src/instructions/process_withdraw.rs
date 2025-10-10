@@ -42,7 +42,7 @@ pub struct WithdrawCtx {
 
 pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, WithdrawCtx<'info>>,
-    amount: u64,
+    max_amount: u64,
     remaining_accounts_info: RemainingAccountsInfo,
 ) -> Result<()> {
     let mut presale = ctx.accounts.presale.load_mut()?;
@@ -57,11 +57,11 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     );
 
     // 2. Ensure withdraw amount > 0
-    require!(amount > 0, PresaleError::ZeroTokenAmount);
+    require!(max_amount > 0, PresaleError::ZeroTokenAmount);
 
     // 3. Have enough balance to withdraw
     require!(
-        escrow.total_deposit >= amount,
+        escrow.total_deposit >= max_amount,
         PresaleError::InsufficientEscrowBalance
     );
 
@@ -73,8 +73,15 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
         PresaleError::PresaleNotOpenForWithdraw
     );
 
+    let suggested_withdraw_amount =
+        presale_mode_handler.suggest_withdraw_amount(&presale, &escrow, max_amount)?;
+    require!(suggested_withdraw_amount > 0, PresaleError::ZeroTokenAmount);
+
     // 5. Update escrow and presale state
-    presale_mode_handler.process_withdraw(&mut presale, &mut escrow, amount)?;
+    presale_mode_handler.process_withdraw(&mut presale, &mut escrow, suggested_withdraw_amount)?;
+
+    let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+    presale_registry.validate_escrow_deposit(&escrow)?;
 
     let transfer_hook_accounts = parse_remaining_accounts_for_transfer_hook(
         &mut &ctx.remaining_accounts[..],
@@ -88,7 +95,7 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
         &ctx.accounts.quote_token_vault,
         &ctx.accounts.owner_quote_token,
         &ctx.accounts.token_program,
-        amount,
+        suggested_withdraw_amount,
         Some(MemoTransferContext {
             memo_program: &ctx.accounts.memo_program,
             memo: PRESALE_MEMO,
@@ -96,10 +103,11 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
         transfer_hook_accounts.transfer_hook_quote,
     )?;
 
-    let exclude_transfer_fee_amount_withdrawn =
-        calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, amount)?.amount;
-
-    // TODO: Should we ensure that the total deposit amount can buy at least one token after withdraw?
+    let exclude_transfer_fee_amount_withdrawn = calculate_transfer_fee_excluded_amount(
+        &ctx.accounts.quote_mint,
+        suggested_withdraw_amount,
+    )?
+    .amount;
 
     emit_cpi!(EvtWithdraw {
         presale: ctx.accounts.presale.key(),

@@ -6,7 +6,10 @@ use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
 use helpers::*;
-use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
+use presale::{
+    Escrow, Presale, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
+    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+};
 use std::rc::Rc;
 
 #[test]
@@ -42,7 +45,7 @@ fn test_withdraw_when_presale_end() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+    warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let err = handle_escrow_withdraw_err(
         &mut lite_svm,
@@ -415,4 +418,91 @@ fn test_withdraw_fcfs_presale() {
     let err_str = format!("Error Number: {}.", err_code);
 
     assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}
+
+#[test]
+fn test_withdraw_fixed_price_presale_violate_buyer_cap() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let ixs = custom_create_predefined_fixed_price_presale_ix(
+        &mut lite_svm,
+        mint,
+        anchor_spl::token::spl_token::native_mint::ID,
+        Rc::clone(&user),
+        WhitelistMode::Permissionless,
+        UnsoldTokenAction::Burn,
+        vec![PresaleRegistryArgs {
+            presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+            buyer_minimum_deposit_cap: 1000,
+            buyer_maximum_deposit_cap: 10_000_000,
+            deposit_fee_bps: 0,
+            ..Default::default()
+        }],
+        create_locked_vesting_args(),
+    );
+
+    process_transaction(
+        &mut lite_svm,
+        &ixs,
+        Some(&user.pubkey()),
+        &[&Rc::clone(&user)],
+    )
+    .unwrap();
+
+    let presale_pubkey = derive_presale(
+        &mint,
+        &anchor_spl::token::spl_token::native_mint::ID,
+        &user.pubkey(),
+        &presale::ID,
+    );
+
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    let presale_registry = presale_state
+        .get_presale_registry(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.into())
+        .unwrap();
+
+    let deposit_amount = presale_registry.buyer_minimum_deposit_cap;
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let err = handle_escrow_withdraw_err(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: deposit_amount / 2,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::DepositAmountOutOfCap;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+
+    handle_escrow_withdraw(
+        &mut lite_svm,
+        HandleEscrowWithdrawArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            amount: deposit_amount,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
 }

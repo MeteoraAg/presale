@@ -25,15 +25,10 @@ pub struct ClosePermissionedServerMetadataCtx<'info> {
 pub fn handle_close_permissioned_server_metadata(
     ctx: Context<ClosePermissionedServerMetadataCtx>,
 ) -> Result<()> {
-    let presale = ctx.accounts.presale.load()?;
-
-    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
-    let progress = presale.get_presale_progress(current_timestamp);
-
-    require!(
-        progress == PresaleProgress::Ongoing || progress == PresaleProgress::NotStarted,
-        PresaleError::PresaleEnded
-    );
+    // We don't check for presale progress since
+    // 1. In NotStarted / Ongoing state, the owner can close the metadata for any correction.
+    // 2. In Completed / Failed state, the metadata is not needed anymore, so closing it is fine.
+    // This covered all presale progress states.
 
     emit_cpi!(EvtPermissionedServerMetadataClose {
         presale: ctx.accounts.presale.key(),

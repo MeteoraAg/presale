@@ -3,7 +3,7 @@ pub mod helpers;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
 use helpers::*;
-use presale::{FixedPricePresaleExtraArgs, UnsoldTokenAction};
+use presale::FixedPricePresaleExtraArgs;
 use std::rc::Rc;
 
 #[test]
@@ -15,7 +15,7 @@ pub fn test_initialize_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -28,7 +28,6 @@ pub fn test_initialize_fixed_token_price_extra_params() {
             base_mint: base_mint_pubkey,
             quote_mint,
             q_price,
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -42,13 +41,11 @@ pub fn test_initialize_fixed_token_price_extra_params() {
         .unwrap();
 
     let FixedPricePresaleExtraArgs {
-        unsold_token_action,
         q_price: q_price_set,
         owner,
         ..
     } = fixed_price_args;
 
-    assert_eq!(unsold_token_action, UnsoldTokenAction::Refund as u8);
     assert_eq!(q_price_set, q_price);
     assert_eq!(owner, user_pubkey);
 }
@@ -62,7 +59,7 @@ pub fn test_close_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -75,7 +72,6 @@ pub fn test_close_fixed_token_price_extra_params() {
             base_mint: base_mint_pubkey,
             quote_mint,
             q_price,
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -111,7 +107,7 @@ pub fn test_non_owner_cannot_close_fixed_token_price_extra_params() {
     let base_mint_pubkey = base_mint.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let ui_price = 0.01; // 0.01 SOL
+    let ui_price = DEFAULT_PRICE;
     let q_price = calculate_q_price_from_ui_price(
         ui_price,
         DEFAULT_BASE_TOKEN_DECIMALS,
@@ -124,7 +120,6 @@ pub fn test_non_owner_cannot_close_fixed_token_price_extra_params() {
             base_mint: base_mint_pubkey,
             quote_mint,
             q_price,
-            unsold_token_action: UnsoldTokenAction::Refund,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,

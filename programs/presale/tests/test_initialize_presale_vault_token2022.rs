@@ -5,14 +5,14 @@ use anchor_lang::prelude::AccountMeta;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
-use presale::{Presale, UnsoldTokenAction};
+use presale::Presale;
 
 use crate::helpers::{
     calculate_q_price_from_ui_price, create_default_presale_registries, create_presale_args,
     derive_fixed_price_presale_args, derive_presale,
     handle_initialize_fixed_token_price_presale_params, handle_initialize_presale,
     HandleInitializeFixedTokenPricePresaleParamsArgs, HandleInitializePresaleArgs, LiteSVMExt,
-    SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_QUOTE_TOKEN_DECIMALS,
+    SetupContext, DEFAULT_BASE_TOKEN_DECIMALS, DEFAULT_PRICE, DEFAULT_QUOTE_TOKEN_DECIMALS,
     PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
 };
 
@@ -32,12 +32,10 @@ fn test_initialize_presale_vault_token_2022() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
-
-    let unsold_token_action = UnsoldTokenAction::Refund;
 
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
@@ -45,7 +43,6 @@ fn test_initialize_presale_vault_token_2022() {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -118,12 +115,10 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
-
-    let unsold_token_action = UnsoldTokenAction::Refund;
 
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
@@ -131,7 +126,6 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
@@ -220,12 +214,10 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
     let user_pubkey = user.pubkey();
 
     let q_price = calculate_q_price_from_ui_price(
-        0.01,
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
         DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
-
-    let unsold_token_action = UnsoldTokenAction::Refund;
 
     handle_initialize_fixed_token_price_presale_params(
         &mut lite_svm,
@@ -233,7 +225,6 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
             base_mint: base_mint_pubkey,
             quote_mint: quote_mint_pubkey,
             q_price,
-            unsold_token_action,
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,

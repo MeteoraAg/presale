@@ -106,4 +106,17 @@ impl PresaleModeHandler for ProrataPresaleHandler {
     fn get_total_base_token_sold(&self, presale: &Presale) -> Result<u64> {
         get_dynamic_price_based_total_base_token_sold(presale)
     }
+
+    fn suggest_deposit_amount(&self, _presale: &Presale, max_deposit_amount: u64) -> Result<u64> {
+        Ok(max_deposit_amount)
+    }
+
+    fn suggest_withdraw_amount(
+        &self,
+        _presale: &Presale,
+        _escrow: &Escrow,
+        max_withdraw_amount: u64,
+    ) -> Result<u64> {
+        Ok(max_withdraw_amount)
+    }
 }

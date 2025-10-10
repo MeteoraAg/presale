@@ -33,6 +33,7 @@ pub struct ClaimCtx<'info> {
     )]
     pub escrow: AccountLoader<'info, Escrow>,
 
+    #[account(mut)]
     pub owner_base_token: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub owner: Signer<'info>,
@@ -59,10 +60,10 @@ pub fn handle_claim<'a, 'b, 'c: 'info, 'info>(
     );
 
     // 2. Process claim
-    require!(
-        escrow.last_refreshed_at == current_timestamp,
-        PresaleError::EscrowNotRefreshed
-    );
+    let presale_mode = PresaleMode::from(presale.presale_mode);
+    let presale_handler = get_presale_mode_handler(presale_mode);
+
+    presale_handler.update_pending_claim_amount(&presale, &mut escrow, current_timestamp)?;
 
     let pending_claim_token = escrow.pending_claim_token;
 

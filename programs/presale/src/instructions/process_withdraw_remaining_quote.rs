@@ -63,7 +63,6 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
     } = presale.validate_and_get_escrow_remaining_quote(&escrow, current_timestamp)?;
 
     let total_refund_amount = refund_deposit_amount.safe_add(refund_fee_amount)?;
-    require!(total_refund_amount > 0, PresaleError::ZeroTokenAmount);
 
     // 3. Update presale and escrow state
     presale.update_total_refunded_quote_token(total_refund_amount, escrow.registry_index)?;
@@ -75,19 +74,21 @@ pub fn handle_withdraw_remaining_quote<'a, 'b, 'c: 'info, 'info>(
         &[AccountsType::TransferHookQuote],
     )?;
 
-    transfer_from_presale_to_user(
-        &ctx.accounts.presale_authority,
-        &ctx.accounts.quote_mint,
-        &ctx.accounts.quote_token_vault,
-        &ctx.accounts.owner_quote_token,
-        &ctx.accounts.token_program,
-        total_refund_amount,
-        Some(MemoTransferContext {
-            memo_program: &ctx.accounts.memo_program,
-            memo: PRESALE_MEMO,
-        }),
-        transfer_hook_accounts.transfer_hook_quote,
-    )?;
+    if total_refund_amount > 0 {
+        transfer_from_presale_to_user(
+            &ctx.accounts.presale_authority,
+            &ctx.accounts.quote_mint,
+            &ctx.accounts.quote_token_vault,
+            &ctx.accounts.owner_quote_token,
+            &ctx.accounts.token_program,
+            total_refund_amount,
+            Some(MemoTransferContext {
+                memo_program: &ctx.accounts.memo_program,
+                memo: PRESALE_MEMO,
+            }),
+            transfer_hook_accounts.transfer_hook_quote,
+        )?;
+    }
 
     let exclude_fee_amount_to_refund =
         calculate_transfer_fee_excluded_amount(&ctx.accounts.quote_mint, total_refund_amount)?

@@ -43,7 +43,6 @@ impl Escrow {
     ) -> Result<()> {
         self.presale = presale;
         self.owner = owner;
-        self.total_deposit = 0;
         self.created_at = created_at;
         self.last_refreshed_at = created_at;
         self.registry_index = registry_index;

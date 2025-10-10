@@ -56,6 +56,9 @@ pub fn create_deposit_ix(
     }
 
     let presale_state: Presale = lite_svm.get_deserialized_zc_account(&presale).unwrap();
+    let presale_registry = presale_state
+        .get_presale_registry(registry_index.into())
+        .unwrap();
 
     let quote_token_program = lite_svm
         .get_account(&presale_state.quote_mint)
@@ -79,10 +82,14 @@ pub fn create_deposit_ix(
     instructions.push(create_payer_quote_token_ix);
 
     if presale_state.quote_mint == anchor_spl::token::spl_token::native_mint::ID {
+        let deposit_fee_included_max_amount = presale_registry
+            .calculate_deposit_fee_included_amount(max_amount)
+            .unwrap();
+
         instructions.push(system_instruction::transfer(
             &owner.pubkey(),
             &payer_quote_token,
-            max_amount,
+            deposit_fee_included_max_amount.amount_included_fee,
         ));
 
         instructions.push(sync_native(&quote_token_program, &payer_quote_token).unwrap());

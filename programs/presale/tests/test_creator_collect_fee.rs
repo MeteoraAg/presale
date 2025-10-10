@@ -111,7 +111,7 @@ fn test_collect_fee_when_claimed() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     handle_creator_collect_fee(
         &mut lite_svm,
@@ -175,7 +175,7 @@ fn test_creator_collect_fee_on_zero_deposit_fee_presale() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     let owner_quote_token_address = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -271,7 +271,7 @@ fn test_creator_collect_fee_prorata_presale() {
         },
     );
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     // Collect all fund raised first, implicitly test escrow refund deposit fee won't drain the reserve
     handle_creator_withdraw_token(
@@ -398,7 +398,7 @@ fn test_creator_collect_fee_fixed_price_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     // Collect all fund raised first, implicitly test escrow refund deposit fee won't drain the reserve
     handle_creator_withdraw_token(
@@ -513,7 +513,7 @@ fn test_creator_collect_fee_fcfs_price_presale() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     // Collect all fund raised first, implicitly test escrow refund deposit fee won't drain the reserve
     handle_creator_withdraw_token(
@@ -637,7 +637,7 @@ fn test_creator_collect_fee_token_2022() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    warp_time(&mut lite_svm, presale_state.presale_end_time + 1);
+        warp_to_presale_end(&mut lite_svm, &presale_state);
 
     // Collect all fund raised first, implicitly test escrow refund deposit fee won't drain the reserve
     handle_creator_withdraw_token(

@@ -50,22 +50,22 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     let presale_mode = PresaleMode::from(presale.presale_mode);
     let presale_handler = get_presale_mode_handler(presale_mode);
     let remaining_deposit_quota = presale_handler.get_remaining_deposit_quota(&presale, &escrow)?;
-    let deposit_amount = remaining_deposit_quota.min(max_amount);
+    let max_capped_deposit_amount = remaining_deposit_quota.min(max_amount);
 
-    require!(deposit_amount > 0, PresaleError::ZeroTokenAmount);
+    require!(max_capped_deposit_amount > 0, PresaleError::ZeroTokenAmount);
 
-    // TODO: Should we ensure that the total deposit amount can buy at least one token? Because during init presale we only validate the max buyer cap.
+    let suggested_deposit_amount =
+        presale_handler.suggest_deposit_amount(&presale, max_capped_deposit_amount)?;
+
+    require!(suggested_deposit_amount > 0, PresaleError::ZeroTokenAmount);
+
     let DepositFeeIncludedCalculation {
         fee,
         amount_included_fee: included_fee_deposit_amount,
-    } = presale.deposit(&mut escrow, deposit_amount)?;
+    } = presale.deposit(&mut escrow, suggested_deposit_amount)?;
 
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
-    require!(
-        escrow.total_deposit >= presale_registry.buyer_minimum_deposit_cap
-            && escrow.total_deposit <= presale_registry.buyer_maximum_deposit_cap,
-        PresaleError::DepositAmountOutOfCap
-    );
+    presale_registry.validate_escrow_deposit(&escrow)?;
 
     // 3. Update presale and escrow state
     presale_handler.end_presale_if_max_cap_reached(&mut presale, current_timestamp)?;
@@ -97,7 +97,7 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     emit_cpi!(EvtDeposit {
         presale: ctx.accounts.presale.key(),
         escrow: ctx.accounts.escrow.key(),
-        deposit_amount,
+        deposit_amount: suggested_deposit_amount,
         escrow_total_deposit_amount: escrow.total_deposit,
         presale_total_deposit_amount: presale.total_deposit,
         owner: ctx.accounts.payer.key(),

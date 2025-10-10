@@ -25,6 +25,7 @@ use anchor_spl::token_2022::spl_token_2022::instruction::{mint_to, transfer_chec
 use anchor_spl::token_2022::spl_token_2022::state::Mint;
 use litesvm::types::{FailedTransactionMetadata, SimulatedTransactionInfo};
 use litesvm::LiteSVM;
+use presale::Presale;
 
 use crate::helpers::{
     add_extra_account_metas_for_execute, create_token_2022_ix, create_token_ix,
@@ -651,4 +652,9 @@ pub fn warp_time(lite_svm: &mut LiteSVM, timestamp: u64) {
     let mut clock: Clock = lite_svm.get_sysvar();
     clock.unix_timestamp = timestamp as i64;
     lite_svm.set_sysvar(&clock);
+}
+
+pub fn warp_to_presale_end(lite_svm: &mut LiteSVM, presale: &Presale) {
+    let presale_end_time = presale.presale_end_time;
+    warp_time(lite_svm, presale_end_time);
 }
