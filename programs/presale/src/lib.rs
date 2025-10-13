@@ -32,13 +32,12 @@ pub use token2022::*;
 mod presale_mode_handler;
 pub use presale_mode_handler::*;
 
-declare_id!("EkY6mLB685Ek1PpQ7AvWkHn2WngBKLbc1CUQKD5ewNqP");
+declare_id!("presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj");
 
 #[program]
 pub mod presale {
     use super::*;
 
-    /// Create presale vault related functions
     pub fn initialize_fixed_price_presale_args(
         ctx: Context<InitializeFixedPricePresaleArgsCtx>,
         params: InitializeFixedPricePresaleExtraArgs,

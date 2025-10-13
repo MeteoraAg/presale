@@ -1,6 +1,6 @@
-# Presale Smart Contract
+# Meteora Presale
 
-This is an Anchor-based smart contract for conducting a token presale on the Solana blockchain. It enables users to contribute using any token and claim a specified amount of presale tokens after the presale ends. The presale is considered failed if the minimum cap is not reached. Additionally, lock and vesting schedules can be configured for claiming.
+This is an Anchor-based smart contract for conducting a token presale on the Solana blockchain. It enables users to contribute using any token and claim a specified amount of presale tokens after the presale ends. Each presale contains multiple registries also known as "user buckets". Each registry can have a different buyer minimum and maximum deposit cap. The presale is considered failed if the presale minimum cap is not reached. Additionally, lock and vesting schedules can be configured for claiming.
 
 The program does not manage the deployment of liquidity for the raised capital. This means the presale creator must manually withdraw the raised funds and deploy the liquidity themselves.
 
@@ -41,3 +41,7 @@ The program does not manage the deployment of liquidity for the raised capital. 
 - The presale can be oversubscribed.
 - Any oversubscribed amount will be refunded to users once the presale ends.
 - There will be no unsold tokens.
+
+## SDK
+
+Please refer to https://github.com/MeteoraAg/presale-sdk
