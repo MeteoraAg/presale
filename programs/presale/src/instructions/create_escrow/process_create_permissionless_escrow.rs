@@ -17,7 +17,7 @@ pub struct CreatePermissionlessEscrowCtx<'info> {
             crate::constants::seeds::ESCROW_PREFIX,
             presale.key().as_ref(),
             owner.key().as_ref(),
-            &crate::constants::DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.to_be_bytes(),
+            &crate::constants::DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.to_le_bytes(),
         ],
         bump,
         payer = payer,
