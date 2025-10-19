@@ -61,14 +61,10 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()> {
-        if presale.total_deposit >= presale.presale_maximum_cap {
-            presale.advance_progress_to_completed(current_timestamp)?;
-        }
-
-        Ok(())
+        super::end_presale_if_max_cap_reached(presale, current_timestamp)
     }
 
-    fn can_withdraw(&self) -> bool {
+    fn can_withdraw(&self, _presale: &Presale) -> bool {
         // FCFS do not allow withdraw
         false
     }

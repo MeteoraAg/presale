@@ -1,6 +1,10 @@
 use crate::PresaleModeHandler;
 use crate::*;
 
+fn is_withdraw_disabled(flags: u8) -> bool {
+    (flags & DISABLE_WITHDRAW_MASK) != 0
+}
+
 fn calculate_token_bought(q_price: u128, amount: u64) -> Result<u128> {
     let q_amount = u128::from(amount).safe_shl(SCALE_OFFSET)?;
     let token_bought = q_amount.safe_div(q_price)?;
@@ -158,16 +162,12 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()> {
-        if presale.total_deposit >= presale.presale_maximum_cap {
-            presale.advance_progress_to_completed(current_timestamp)?;
-        }
-
-        Ok(())
+        super::end_presale_if_max_cap_reached(presale, current_timestamp)
     }
 
-    fn can_withdraw(&self) -> bool {
+    fn can_withdraw(&self, presale: &Presale) -> bool {
         // Fixed price presale allow withdraw
-        true
+        !is_withdraw_disabled(presale.fixed_price_presale_flags)
     }
 
     fn process_withdraw(

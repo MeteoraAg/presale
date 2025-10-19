@@ -119,7 +119,8 @@ pub struct PresaleArgs {
     pub whitelist_mode: u8,
     pub presale_mode: u8,
     pub unsold_token_action: u8,
-    pub padding: [u8; 31],
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+    pub padding: [u8; 30],
 }
 
 impl PresaleArgs {
@@ -173,6 +174,13 @@ impl PresaleArgs {
         require!(
             maybe_unsold_token_action.is_ok(),
             PresaleError::InvalidUnsoldTokenAction
+        );
+
+        let maybe_disable_earlier_presale_end_once_cap_reached =
+            Bool::try_from(self.disable_earlier_presale_end_once_cap_reached);
+        require!(
+            maybe_disable_earlier_presale_end_once_cap_reached.is_ok(),
+            PresaleError::InvalidType
         );
 
         Ok(())

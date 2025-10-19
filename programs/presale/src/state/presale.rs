@@ -85,13 +85,15 @@ pub struct Presale {
     pub quote_token_vault: Pubkey,
     /// Base key
     pub base: Pubkey,
-    /// Padding
-    pub padding0: u8,
+    /// Fixed price presale extra flags. Only applicable for fixed price presale mode
+    pub fixed_price_presale_flags: u8,
     /// Presale mode
     pub presale_mode: u8,
     /// Whitelist mode
     pub whitelist_mode: u8,
-    pub padding1: [u8; 5],
+    /// Presale flags. Applicable for various presale modes
+    pub presale_flags: u8,
+    pub padding1: [u8; 4],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -227,6 +229,7 @@ impl Presale {
             whitelist_mode,
             presale_mode,
             unsold_token_action,
+            disable_earlier_presale_end_once_cap_reached,
             ..
         } = presale_params;
 
@@ -239,6 +242,12 @@ impl Presale {
         self.presale_mode = presale_mode;
         self.unsold_token_action = unsold_token_action;
         self.created_at = current_timestamp;
+
+        let mut presale_flags = 0u8;
+        if disable_earlier_presale_end_once_cap_reached > 0 {
+            presale_flags |= DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK;
+        }
+        self.presale_flags = presale_flags;
 
         if let Some(LockedVestingArgs {
             lock_duration,
@@ -254,8 +263,19 @@ impl Presale {
             self.recalculate_presale_timing(self.presale_end_time)?;
         }
 
-        if let Some(FixedPricePresaleExtraArgs { q_price, .. }) = fixed_price_presale_params {
+        if let Some(FixedPricePresaleExtraArgs {
+            q_price,
+            disable_withdraw,
+            ..
+        }) = fixed_price_presale_params
+        {
             self.fixed_price_presale_q_price = q_price;
+
+            let mut fixed_price_presale_flags = 0u8;
+            if disable_withdraw > 0 {
+                fixed_price_presale_flags |= DISABLE_WITHDRAW_MASK;
+            }
+            self.fixed_price_presale_flags = fixed_price_presale_flags;
         }
 
         Ok(())
@@ -494,6 +514,10 @@ impl Presale {
             }
             PresaleMode::Fcfs | PresaleMode::FixedPrice => Ok(self.total_deposit_fee),
         }
+    }
+
+    pub fn disable_earlier_presale_end(&self) -> bool {
+        (self.presale_flags & DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK) != 0
     }
 }
 

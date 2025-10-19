@@ -39,7 +39,7 @@ pub trait PresaleModeHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()>;
-    fn can_withdraw(&self) -> bool;
+    fn can_withdraw(&self, presale: &Presale) -> bool;
     fn process_withdraw(
         &self,
         presale: &mut Presale,
@@ -74,6 +74,18 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
         PresaleMode::Prorata => Box::new(ProrataPresaleHandler),
         PresaleMode::Fcfs => Box::new(FcfsPresaleHandler),
     }
+}
+
+pub fn end_presale_if_max_cap_reached(presale: &mut Presale, current_timestamp: u64) -> Result<()> {
+    if presale.disable_earlier_presale_end() {
+        return Ok(());
+    }
+
+    if presale.total_deposit >= presale.presale_maximum_cap {
+        presale.advance_progress_to_completed(current_timestamp)?;
+    }
+
+    Ok(())
 }
 
 pub fn get_dynamic_price_based_total_base_token_sold(presale: &Presale) -> Result<u64> {

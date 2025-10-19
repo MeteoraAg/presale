@@ -62,7 +62,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         Ok(())
     }
 
-    fn can_withdraw(&self) -> bool {
+    fn can_withdraw(&self, _presale: &Presale) -> bool {
         // Prorata presale allows withdraw
         true
     }
