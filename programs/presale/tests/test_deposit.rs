@@ -19,7 +19,7 @@ use presale::{
     PresaleMode, PresaleProgress, PresaleRegistryArgs, Rounding, UnsoldTokenAction, WhitelistMode,
     DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
-use std::rc::Rc;
+use std::{rc::Rc, vec};
 
 #[test]
 fn test_deposit_fixed_price_presale_progress_update() {
@@ -320,16 +320,18 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
     };
     presale_registries.push(registry_args_1);
 
-    let instructions = custom_create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
-        mint,
+    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
+        base_mint: mint,
         quote_mint,
-        Rc::clone(&user),
-        WhitelistMode::PermissionWithAuthority,
-        UnsoldTokenAction::Refund,
-        presale_registries.clone(),
-        create_locked_vesting_args(),
-    );
+        whitelist_mode: WhitelistMode::PermissionWithAuthority,
+        unsold_token_action: UnsoldTokenAction::Refund,
+        presale_registries: presale_registries.clone(),
+        locked_vesting_args: create_locked_vesting_args(),
+        ..Default::default()
+    };
+
+    let instructions =
+        custom_create_predefined_fixed_price_presale_ix(&mut lite_svm, Rc::clone(&user), args);
 
     process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
 
@@ -421,6 +423,9 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
     assert!(after_presale_state.vesting_start_time < before_presale_state.vesting_start_time);
     assert!(after_presale_state.vesting_end_time < before_presale_state.vesting_end_time);
 }
+
+#[test]
+fn test_deposit_fcfs_presale_with_disable_earlier_end() {}
 
 #[test]
 fn test_deposit() {
@@ -728,6 +733,7 @@ fn test_deposit_edge_case_0() {
         owner: user_pubkey,
         payer: Rc::clone(&user),
         base: user_pubkey,
+        disable_withdraw: false,
     };
     let init_fixed_token_price_presale_args_ix =
         create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
@@ -1142,4 +1148,157 @@ fn test_deposit_token2022() {
 
     assert_eq!(presale_state.total_deposit, deposit_amount);
     assert_eq!(escrow_state.total_deposit, deposit_amount);
+}
+
+#[test]
+fn test_deposit_fixed_price_presale_with_end_earlier_disabled() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let ixs = custom_create_predefined_fixed_price_presale_ix(
+        &mut lite_svm,
+        Rc::clone(&user),
+        CustomCreatePredefinedFixedPricePresaleIxArgs {
+            base_mint: mint,
+            quote_mint,
+            whitelist_mode: WhitelistMode::Permissionless,
+            disable_withdraw: true,
+            disable_presale_end_earlier: true,
+            unsold_token_action: UnsoldTokenAction::Burn,
+            presale_registries: vec![PresaleRegistryArgs {
+                buyer_minimum_deposit_cap: 100,
+                buyer_maximum_deposit_cap: 1_000_000_000,
+                presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+                ..PresaleRegistryArgs::default()
+            }],
+            locked_vesting_args: create_locked_vesting_args(),
+        },
+    );
+
+    process_transaction(&mut lite_svm, &ixs, Some(&user_pubkey), &[&user]).unwrap();
+
+    let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
+
+    let before_presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    assert!(before_presale_state.is_earlier_presale_end_disabled());
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: before_presale_state.presale_maximum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let after_presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    assert_eq!(
+        before_presale_state.presale_end_time,
+        after_presale_state.presale_end_time
+    );
+    assert_eq!(
+        before_presale_state.lock_start_time,
+        after_presale_state.lock_start_time
+    );
+    assert_eq!(
+        before_presale_state.lock_end_time,
+        after_presale_state.lock_end_time
+    );
+    assert_eq!(
+        before_presale_state.vesting_start_time,
+        after_presale_state.vesting_start_time
+    );
+    assert_eq!(
+        before_presale_state.vesting_end_time,
+        after_presale_state.vesting_end_time
+    );
+}
+
+#[test]
+fn test_deposit_fcfs_presale_with_end_earlier_disabled() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let ixs = custom_create_predefined_fcfs_presale_ix(
+        &mut lite_svm,
+        Rc::clone(&user),
+        CustomCreatePredefinedFcfsPresaleIxArgs {
+            base_mint: mint,
+            quote_mint,
+            whitelist_mode: WhitelistMode::Permissionless,
+            disable_presale_end_earlier: true,
+            presale_registries: vec![PresaleRegistryArgs {
+                buyer_minimum_deposit_cap: 100,
+                buyer_maximum_deposit_cap: 1_000_000_000,
+                presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+                ..PresaleRegistryArgs::default()
+            }],
+        },
+    );
+
+    process_transaction(&mut lite_svm, &ixs, Some(&user_pubkey), &[&user]).unwrap();
+
+    let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
+
+    let before_presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    assert!(before_presale_state.is_earlier_presale_end_disabled());
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: before_presale_state.presale_maximum_cap,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let after_presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
+    assert_eq!(
+        before_presale_state.presale_end_time,
+        after_presale_state.presale_end_time
+    );
+    assert_eq!(
+        before_presale_state.lock_start_time,
+        after_presale_state.lock_start_time
+    );
+    assert_eq!(
+        before_presale_state.lock_end_time,
+        after_presale_state.lock_end_time
+    );
+    assert_eq!(
+        before_presale_state.vesting_start_time,
+        after_presale_state.vesting_start_time
+    );
+    assert_eq!(
+        before_presale_state.vesting_end_time,
+        after_presale_state.vesting_end_time
+    );
 }

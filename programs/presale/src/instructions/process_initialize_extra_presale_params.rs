@@ -29,8 +29,7 @@ pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
     pub disable_withdraw: u8,
     pub q_price: u128,
-    pub padding0: [u8; 7],
-    pub padding1: [u64; 7],
+    pub padding1: [u64; 8],
 }
 
 impl InitializeFixedPricePresaleExtraArgs {

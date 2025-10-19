@@ -256,6 +256,8 @@ fn test_zero_vest_duration_dos_escrow_claim() {
 // https://www.notion.so/offsidelabs/Meteora-Presale-Audit-Draft-24dd5242e8af806f8703cdb86b093639#26bd5242e8af80d08ad3e750f85fa025
 pub mod fixed_price_deposit_surplus_stuck_tests {
 
+    use crate::helpers::CustomCreatePredefinedFixedPricePresaleIxArgs;
+
     use super::*;
 
     struct SetupResult {
@@ -305,16 +307,18 @@ pub mod fixed_price_deposit_surplus_stuck_tests {
             token_lamport_price
         };
 
-        let instructions = custom_create_predefined_fixed_price_presale_ix(
-            &mut lite_svm,
+        let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
             base_mint,
             quote_mint,
-            Rc::clone(&user),
-            WhitelistMode::Permissionless,
-            UnsoldTokenAction::Refund,
+            whitelist_mode: WhitelistMode::Permissionless,
+            unsold_token_action: UnsoldTokenAction::Refund,
             presale_registries,
-            create_locked_vesting_args(),
-        );
+            locked_vesting_args: create_locked_vesting_args(),
+            ..Default::default()
+        };
+
+        let instructions =
+            custom_create_predefined_fixed_price_presale_ix(&mut lite_svm, Rc::clone(&user), args);
 
         assert!(
             process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).is_ok()

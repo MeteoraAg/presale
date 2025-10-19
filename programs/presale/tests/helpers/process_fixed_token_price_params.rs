@@ -15,6 +15,7 @@ pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
     pub owner: Pubkey,
     pub payer: Rc<Keypair>,
     pub base: Pubkey,
+    pub disable_withdraw: bool,
 }
 
 pub fn create_initialize_fixed_token_price_presale_params_args_ix(
@@ -27,6 +28,7 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         owner,
         payer,
         base,
+        disable_withdraw,
     } = args;
 
     let presale = derive_presale(&base_mint, &quote_mint, &base, &presale::ID);
@@ -38,6 +40,7 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         params: presale::InitializeFixedPricePresaleExtraArgs {
             q_price,
             presale,
+            disable_withdraw: u8::from(disable_withdraw),
             ..Default::default()
         },
     }

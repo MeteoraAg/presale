@@ -13,10 +13,10 @@ pub enum PresaleMode {
     Fcfs,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive, Default)]
 #[repr(u8)]
 pub enum WhitelistMode {
-    #[num_enum(default)]
+    #[default]
     /// No whitelist
     Permissionless,
     /// Whitelist using merkle proof
@@ -36,11 +36,11 @@ impl WhitelistMode {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive, Default)]
 #[repr(u8)]
 pub enum UnsoldTokenAction {
+    #[default]
     /// Refund unsold token back to creator
-    #[num_enum(default)]
     Refund,
     /// Burn unsold token
     Burn,
@@ -516,7 +516,7 @@ impl Presale {
         }
     }
 
-    pub fn disable_earlier_presale_end(&self) -> bool {
+    pub fn is_earlier_presale_end_disabled(&self) -> bool {
         (self.presale_flags & DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK) != 0
     }
 }

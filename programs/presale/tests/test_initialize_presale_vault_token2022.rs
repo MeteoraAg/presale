@@ -46,6 +46,7 @@ fn test_initialize_presale_vault_token_2022() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -128,6 +129,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
             q_price,
             owner: user_pubkey,
             payer: Rc::clone(&user),
+            disable_withdraw: false,
             base: user_pubkey,
         },
     );
@@ -228,6 +230,7 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 

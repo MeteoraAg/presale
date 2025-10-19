@@ -364,6 +364,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -457,6 +458,7 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -550,6 +552,7 @@ fn assert_err_presale_buyer_minimum_cap_cannot_purchase_any_token(
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -946,6 +949,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -1133,6 +1137,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -1279,6 +1284,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
     );
+    assert!(!presale_state.is_earlier_presale_end_disabled());
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

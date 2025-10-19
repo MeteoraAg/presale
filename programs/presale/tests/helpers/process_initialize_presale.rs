@@ -193,16 +193,34 @@ pub struct HandleCreatePredefinedPresaleResponse {
     pub presale_pubkey: Pubkey,
 }
 
+#[derive(Default)]
+pub struct CustomCreatePredefinedFixedPricePresaleIxArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub whitelist_mode: WhitelistMode,
+    pub disable_withdraw: bool,
+    pub disable_presale_end_earlier: bool,
+    pub unsold_token_action: UnsoldTokenAction,
+    pub presale_registries: Vec<PresaleRegistryArgs>,
+    pub locked_vesting_args: LockedVestingArgs,
+}
+
 pub fn custom_create_predefined_fixed_price_presale_ix(
     lite_svm: &mut LiteSVM,
-    base_mint: Pubkey,
-    quote_mint: Pubkey,
     user: Rc<Keypair>,
-    whitelist_mode: WhitelistMode,
-    unsold_token_action: UnsoldTokenAction,
-    presale_registries: Vec<PresaleRegistryArgs>,
-    locked_vesting_args: LockedVestingArgs,
+    args: CustomCreatePredefinedFixedPricePresaleIxArgs,
 ) -> Vec<Instruction> {
+    let CustomCreatePredefinedFixedPricePresaleIxArgs {
+        base_mint,
+        quote_mint,
+        whitelist_mode,
+        disable_withdraw,
+        disable_presale_end_earlier,
+        unsold_token_action,
+        presale_registries,
+        locked_vesting_args,
+    } = args;
+
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
@@ -225,6 +243,7 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
         owner: user_pubkey,
         payer: Rc::clone(&user),
         base: user_pubkey,
+        disable_withdraw,
     };
     let init_fixed_token_price_presale_args_ix =
         create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
@@ -233,6 +252,8 @@ pub fn custom_create_predefined_fixed_price_presale_ix(
     presale_params.unsold_token_action = unsold_token_action.into();
     presale_params.presale_mode = PresaleMode::FixedPrice.into();
     presale_params.whitelist_mode = whitelist_mode.into();
+    presale_params.disable_earlier_presale_end_once_cap_reached =
+        u8::from(disable_presale_end_earlier);
 
     let init_presale_ix = create_initialize_presale_ix(
         lite_svm,
@@ -285,16 +306,17 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
     let mut locked_vesting_args = create_locked_vesting_args();
     locked_vesting_args.immediately_release_bps = 5000;
 
-    custom_create_predefined_fixed_price_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         unsold_token_action,
         presale_registries,
         locked_vesting_args,
-    )
+        ..Default::default()
+    };
+
+    custom_create_predefined_fixed_price_presale_ix(lite_svm, user, args)
 }
 
 pub fn create_predefined_fixed_price_presale_ix(
@@ -315,16 +337,17 @@ pub fn create_predefined_fixed_price_presale_ix(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fixed_price_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         unsold_token_action,
         presale_registries,
-        create_locked_vesting_args(),
-    )
+        locked_vesting_args: create_locked_vesting_args(),
+        ..Default::default()
+    };
+
+    custom_create_predefined_fixed_price_presale_ix(lite_svm, user, args)
 }
 
 pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
@@ -345,16 +368,17 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fixed_price_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         unsold_token_action,
         presale_registries,
-        create_locked_vesting_args(),
-    )
+        locked_vesting_args: create_locked_vesting_args(),
+        ..Default::default()
+    };
+
+    custom_create_predefined_fixed_price_presale_ix(lite_svm, user, args)
 }
 
 pub fn create_predefined_fixed_prorata_ix_with_no_vest_nor_lock(
@@ -407,16 +431,17 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fixed_price_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         unsold_token_action,
         presale_registries,
-        create_locked_vesting_args(),
-    )
+        locked_vesting_args: create_locked_vesting_args(),
+        ..Default::default()
+    };
+
+    custom_create_predefined_fixed_price_presale_ix(lite_svm, user, args)
 }
 
 pub fn custom_create_predefined_prorata_presale_ix(
@@ -539,19 +564,35 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
     )
 }
 
-fn custom_create_predefined_fcfs_presale_ix(
+#[derive(Default)]
+pub struct CustomCreatePredefinedFcfsPresaleIxArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub whitelist_mode: WhitelistMode,
+    pub disable_presale_end_earlier: bool,
+    pub presale_registries: Vec<PresaleRegistryArgs>,
+}
+
+pub fn custom_create_predefined_fcfs_presale_ix(
     lite_svm: &mut LiteSVM,
-    base_mint: Pubkey,
-    quote_mint: Pubkey,
     user: Rc<Keypair>,
-    whitelist_mode: WhitelistMode,
-    presale_registries: Vec<PresaleRegistryArgs>,
+    args: CustomCreatePredefinedFcfsPresaleIxArgs,
 ) -> Vec<Instruction> {
     let user_pubkey = user.pubkey();
 
-    let mut presale_params = create_presale_args(&lite_svm);
+    let CustomCreatePredefinedFcfsPresaleIxArgs {
+        base_mint,
+        quote_mint,
+        whitelist_mode,
+        presale_registries,
+        disable_presale_end_earlier,
+    } = args;
+
+    let mut presale_params = create_presale_args(lite_svm);
     presale_params.presale_mode = PresaleMode::Fcfs.into();
     presale_params.whitelist_mode = whitelist_mode.into();
+    presale_params.disable_earlier_presale_end_once_cap_reached =
+        u8::from(disable_presale_end_earlier);
 
     let locked_vesting_params = create_locked_vesting_args();
 
@@ -587,14 +628,15 @@ fn create_predefined_fcfs_presale_ix(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fcfs_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFcfsPresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         presale_registries,
-    )
+        ..Default::default()
+    };
+
+    custom_create_predefined_fcfs_presale_ix(lite_svm, user, args)
 }
 
 fn create_predefined_fcfs_presale_ix_with_deposit_fee(
@@ -614,14 +656,15 @@ fn create_predefined_fcfs_presale_ix_with_deposit_fee(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fcfs_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFcfsPresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         presale_registries,
-    )
+        ..Default::default()
+    };
+
+    custom_create_predefined_fcfs_presale_ix(lite_svm, user, args)
 }
 
 fn create_predefined_fcfs_presale_with_multiple_registries_ix(
@@ -641,14 +684,15 @@ fn create_predefined_fcfs_presale_with_multiple_registries_ix(
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
     );
 
-    custom_create_predefined_fcfs_presale_ix(
-        lite_svm,
+    let args = CustomCreatePredefinedFcfsPresaleIxArgs {
         base_mint,
         quote_mint,
-        user,
         whitelist_mode,
         presale_registries,
-    )
+        ..Default::default()
+    };
+
+    custom_create_predefined_fcfs_presale_ix(lite_svm, user, args)
 }
 
 pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {

@@ -77,7 +77,7 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
 }
 
 pub fn end_presale_if_max_cap_reached(presale: &mut Presale, current_timestamp: u64) -> Result<()> {
-    if presale.disable_earlier_presale_end() {
+    if presale.is_earlier_presale_end_disabled() {
         return Ok(());
     }
 
