@@ -1063,7 +1063,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
 
     assert_eq!(
         presale_state.lock_start_time,
-        presale_state.presale_end_time + 1
+        presale_state.presale_end_time
     );
     assert_eq!(
         presale_state.lock_end_time,
@@ -1071,7 +1071,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     );
     assert_eq!(
         presale_state.vesting_start_time,
-        presale_state.lock_end_time + 1
+        presale_state.lock_end_time
     );
     assert_eq!(
         presale_state.vesting_end_time,
@@ -1265,7 +1265,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
 
     assert_eq!(
         presale_state.lock_start_time,
-        presale_state.presale_end_time + 1
+        presale_state.presale_end_time
     );
     assert_eq!(
         presale_state.lock_end_time,
@@ -1273,7 +1273,7 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
     );
     assert_eq!(
         presale_state.vesting_start_time,
-        presale_state.lock_end_time + 1
+        presale_state.lock_end_time
     );
     assert_eq!(
         presale_state.vesting_end_time,

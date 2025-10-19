@@ -312,10 +312,10 @@ impl Presale {
     fn recalculate_presale_timing(&mut self, new_presale_end_time: u64) -> Result<()> {
         self.presale_end_time = new_presale_end_time;
 
-        self.lock_start_time = self.presale_end_time.safe_add(1)?;
+        self.lock_start_time = self.presale_end_time;
         self.lock_end_time = self.lock_start_time.safe_add(self.lock_duration)?;
 
-        self.vesting_start_time = self.lock_end_time.safe_add(1)?;
+        self.vesting_start_time = self.lock_end_time;
         self.vesting_end_time = self.vesting_start_time.safe_add(self.vest_duration)?;
 
         Ok(())
