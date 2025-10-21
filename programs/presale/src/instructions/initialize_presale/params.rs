@@ -257,11 +257,18 @@ impl LockedVestingArgs {
 
             // Backward compatibility
             if self.immediate_release_timestamp > 0 {
-                require!(
-                    self.immediate_release_timestamp >= presale_end_time
-                        && self.immediate_release_timestamp <= vesting_end_time,
-                    PresaleError::InvalidLockVestingInfo
-                );
+                if self.immediately_release_bps == 0 {
+                    require!(
+                        self.immediate_release_timestamp == presale_end_time,
+                        PresaleError::InvalidLockVestingInfo
+                    );
+                } else {
+                    require!(
+                        self.immediate_release_timestamp >= presale_end_time
+                            && self.immediate_release_timestamp <= vesting_end_time,
+                        PresaleError::InvalidLockVestingInfo
+                    );
+                }
             }
         }
 
