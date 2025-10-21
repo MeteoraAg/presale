@@ -18,6 +18,7 @@ mod constants;
 pub use constants::*;
 
 mod state;
+use solana_security_txt::security_txt;
 pub use state::*;
 
 mod events;
@@ -33,6 +34,18 @@ mod presale_mode_handler;
 pub use presale_mode_handler::*;
 
 declare_id!("presSVxnf9UU8jMxhgSMqaRwNiT36qeBdNeTRKjTdbj");
+
+#[cfg(not(feature = "no-entrypoint"))]
+security_txt! {
+    // Required fields
+    name: "Presale",
+    project_url: "https://meteora.ag/",
+    contacts: "email:feedback@raccoons.dev",
+    policy: "https://github.com/MeteoraAg/presale",
+    // Optional Fields
+    preferred_languages: "en",
+    source_code: "https://github.com/MeteoraAg/presale"
+}
 
 #[program]
 pub mod presale {

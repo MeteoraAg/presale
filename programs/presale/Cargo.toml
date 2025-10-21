@@ -24,6 +24,7 @@ num_enum = "0.7.4"
 static_assertions = "1.1.0"
 bytemuck = { version = "1.23.1", features = ["derive", "min_const_generics"] }
 spl-transfer-hook-interface = "0.10.0"
+solana-security-txt = "1.1.1"
 
 [dev-dependencies]
 litesvm = "0.6.1"

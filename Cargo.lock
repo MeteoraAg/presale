@@ -2927,6 +2927,7 @@ dependencies = [
  "num_enum",
  "proptest",
  "serde_json",
+ "solana-security-txt",
  "spl-discriminator",
  "spl-tlv-account-resolution 0.10.0",
  "spl-transfer-hook-interface 0.10.0",
