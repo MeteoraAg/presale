@@ -19,7 +19,7 @@ use anchor_client::solana_sdk::signer::keypair::Keypair;
 use anchor_lang::AccountDeserialize;
 use anchor_spl::token_interface::Mint;
 use litesvm::LiteSVM;
-use presale::{UnsoldTokenAction, WhitelistMode, SCALE_OFFSET};
+use presale::{UnsoldTokenAction, WhitelistMode};
 
 use crate::helpers::{
     calculate_q_price_from_ui_price, create_default_presale_registries, create_locked_vesting_args,
@@ -256,7 +256,9 @@ fn test_zero_vest_duration_dos_escrow_claim() {
 // https://www.notion.so/offsidelabs/Meteora-Presale-Audit-Draft-24dd5242e8af806f8703cdb86b093639#26bd5242e8af80d08ad3e750f85fa025
 pub mod fixed_price_deposit_surplus_stuck_tests {
 
-    use crate::helpers::CustomCreatePredefinedFixedPricePresaleIxArgs;
+    use presale::{PresaleMode, SCALE_OFFSET};
+
+    use crate::helpers::{create_presale_args, CustomCreatePredefinedFixedPricePresaleIxArgs};
 
     use super::*;
 
@@ -288,18 +290,23 @@ pub mod fixed_price_deposit_surplus_stuck_tests {
         let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
             .expect("Failed to deserialize quote mint state");
 
+        let q_price = calculate_q_price_from_ui_price(
+            DEFAULT_PRICE,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        );
+
         let mut presale_registries = create_default_presale_registries(
             base_mint_state.decimals,
             &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+            q_price,
+            WhitelistMode::Permissionless,
+            PresaleMode::FixedPrice,
+            create_presale_args(&lite_svm).presale_maximum_cap,
         );
 
         let buyer_minimum_deposit_cap = {
             let presale_registry_args_0 = presale_registries.get_mut(0).unwrap();
-            let q_price = calculate_q_price_from_ui_price(
-                DEFAULT_PRICE,
-                base_mint_state.decimals,
-                quote_mint_state.decimals,
-            );
             let token_lamport_price =
                 (q_price as f64 / 2.0f64.powi(i32::try_from(SCALE_OFFSET).unwrap())).ceil() as u64;
 

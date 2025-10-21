@@ -15,7 +15,7 @@ use anchor_client::solana_sdk::{
 use presale::{
     LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, WhitelistMode,
     MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION,
-    MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION,
+    MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION, SCALE_MULTIPLIER,
 };
 
 fn assert_err_invalid_locked_vesting_param(
@@ -720,11 +720,22 @@ fn test_initialize_fixed_token_price_presale_vault_missing_fixed_price_extra_arg
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
+    let presale_params = create_presale_args(&lite_svm);
+
+    let q_price = calculate_q_price_from_ui_price(
+        DEFAULT_PRICE,
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        DEFAULT_QUOTE_TOKEN_DECIMALS,
+    );
+
     let presale_registries = create_default_presale_registries(
         DEFAULT_BASE_TOKEN_DECIMALS,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        q_price,
+        WhitelistMode::from(presale_params.whitelist_mode),
+        PresaleMode::FixedPrice,
+        create_presale_args(&lite_svm).presale_maximum_cap,
     );
-    let presale_params = create_presale_args(&lite_svm);
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
@@ -760,12 +771,23 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
     let SetupContext { mut lite_svm, user } = setup_context;
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
 
-    let presale_registries = create_default_presale_registries(
+    let q_price = calculate_q_price_from_ui_price(
+        DEFAULT_PRICE,
         DEFAULT_BASE_TOKEN_DECIMALS,
-        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        DEFAULT_QUOTE_TOKEN_DECIMALS,
     );
 
     let presale_params = create_presale_args(&lite_svm);
+
+    let presale_registries = create_default_presale_registries(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        q_price,
+        WhitelistMode::from(presale_params.whitelist_mode),
+        PresaleMode::from(presale_params.presale_mode),
+        create_presale_args(&lite_svm).presale_maximum_cap,
+    );
+
     let locked_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
         vest_duration: 3600 * 2,
@@ -804,13 +826,6 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let mut presale_registries = vec![];
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    presale_registries.push(registry);
-
     let clock: Clock = lite_svm.get_sysvar();
 
     let presale_params = PresaleArgs {
@@ -819,9 +834,16 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Fcfs.into(),
-        whitelist_mode: WhitelistMode::PermissionWithAuthority.into(),
+        whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
+
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    presale_registries.push(registry);
 
     let lock_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
@@ -884,7 +906,7 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Prorata.into(),
-        whitelist_mode: WhitelistMode::PermissionWithMerkleProof.into(),
+        whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
 
@@ -1134,24 +1156,6 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         },
     );
 
-    let mut presale_registries = vec![];
-
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    registry.deposit_fee_bps = 100; // 1%
-
-    presale_registries.push(registry);
-
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    registry.deposit_fee_bps = 200; // 2%
-
-    presale_registries.push(registry);
-
     let clock: Clock = lite_svm.get_sysvar();
 
     let presale_params = PresaleArgs {
@@ -1163,6 +1167,26 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         whitelist_mode: WhitelistMode::PermissionWithMerkleProof.into(),
         ..Default::default()
     };
+
+    let mut presale_registries = vec![];
+
+    let minimum_deposit_cap: u64 = q_price.div_ceil(SCALE_MULTIPLIER).try_into().unwrap();
+
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = presale_params.presale_maximum_cap;
+    registry.buyer_minimum_deposit_cap = minimum_deposit_cap;
+    registry.deposit_fee_bps = 100; // 1%
+
+    presale_registries.push(registry);
+
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
+    registry.buyer_maximum_deposit_cap = presale_params.presale_maximum_cap;
+    registry.buyer_minimum_deposit_cap = minimum_deposit_cap;
+    registry.deposit_fee_bps = 200; // 2%
+
+    presale_registries.push(registry);
 
     let lock_vesting_params = LockedVestingArgs {
         lock_duration: 3600,

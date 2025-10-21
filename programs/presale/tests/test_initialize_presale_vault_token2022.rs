@@ -5,7 +5,7 @@ use anchor_lang::prelude::AccountMeta;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id, token_interface::TokenAccount,
 };
-use presale::Presale;
+use presale::{Presale, PresaleMode, WhitelistMode};
 
 use crate::helpers::{
     calculate_q_price_from_ui_price, create_default_presale_registries, create_presale_args,
@@ -50,12 +50,16 @@ fn test_initialize_presale_vault_token_2022() {
         },
     );
 
+    let presale_params = create_presale_args(&lite_svm);
+
     let presale_registries = create_default_presale_registries(
         DEFAULT_BASE_TOKEN_DECIMALS,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        q_price,
+        WhitelistMode::from(presale_params.whitelist_mode),
+        PresaleMode::FixedPrice,
+        create_presale_args(&lite_svm).presale_maximum_cap,
     );
-
-    let presale_params = create_presale_args(&lite_svm);
 
     handle_initialize_presale(
         &mut lite_svm,
@@ -134,12 +138,16 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         },
     );
 
+    let presale_params = create_presale_args(&lite_svm);
+
     let presale_registries = create_default_presale_registries(
         DEFAULT_BASE_TOKEN_DECIMALS,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        q_price,
+        WhitelistMode::from(presale_params.whitelist_mode),
+        PresaleMode::FixedPrice,
+        create_presale_args(&lite_svm).presale_maximum_cap,
     );
-
-    let presale_params = create_presale_args(&lite_svm);
 
     let user_base_ata = get_associated_token_address_with_program_id(
         &user_pubkey,
@@ -234,11 +242,16 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         },
     );
 
+    let presale_params = create_presale_args(&lite_svm);
+
     let presale_registries = create_default_presale_registries(
         DEFAULT_BASE_TOKEN_DECIMALS,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        q_price,
+        WhitelistMode::from(presale_params.whitelist_mode),
+        PresaleMode::FixedPrice,
+        create_presale_args(&lite_svm).presale_maximum_cap,
     );
-    let presale_params = create_presale_args(&lite_svm);
 
     handle_initialize_presale(
         &mut lite_svm,

@@ -123,7 +123,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                     );
 
                     require!(
-                        registry.buyer_maximum_deposit_cap == u64::MAX,
+                        registry.buyer_maximum_deposit_cap == presale_params.presale_maximum_cap,
                         PresaleError::InvalidBuyerCapRange
                     );
                 }

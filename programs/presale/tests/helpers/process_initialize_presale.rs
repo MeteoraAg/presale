@@ -18,7 +18,7 @@ use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{
     AccountsType, LockedVestingArgs, PresaleArgs, PresaleMode, PresaleRegistryArgs,
     RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction, WhitelistMode,
-    MAX_PRESALE_REGISTRY_COUNT,
+    MAX_PRESALE_REGISTRY_COUNT, SCALE_MULTIPLIER,
 };
 
 pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; 1] = [10_000];
@@ -31,18 +31,40 @@ pub const DEFAULT_DEPOSIT_BPS: u16 = 500;
 pub const DEFAULT_PRICE: f64 = 0.01;
 
 pub fn create_default_presale_registries(
-    decimals: u8,
+    base_decimals: u8,
     basis_points: &[u16],
+    fixed_point_q_price: u128,
+    whitelist_mode: WhitelistMode,
+    presale_mode: PresaleMode,
+    presale_max_cap: u64,
 ) -> Vec<PresaleRegistryArgs> {
     let mut presale_registries = vec![];
     for bps in basis_points.iter() {
         if *bps > 0 {
             let mut presale_registry = PresaleRegistryArgs::default();
             let presale_supply =
-                1_000_000_000u128 * 10u128.pow(decimals.into()) * u128::from(*bps) / 10_000u128;
+                1_000_000_000u128 * 10u128.pow(base_decimals.into()) * u128::from(*bps)
+                    / 10_000u128;
             presale_registry.presale_supply = presale_supply.try_into().unwrap();
-            presale_registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-            presale_registry.buyer_minimum_deposit_cap = 1_000;
+
+            if whitelist_mode.is_permissioned() {
+                match presale_mode {
+                    PresaleMode::FixedPrice => {
+                        presale_registry.buyer_minimum_deposit_cap = fixed_point_q_price
+                            .div_ceil(SCALE_MULTIPLIER)
+                            .try_into()
+                            .unwrap();
+                    }
+                    PresaleMode::Prorata | PresaleMode::Fcfs => {
+                        presale_registry.buyer_minimum_deposit_cap = 1;
+                    }
+                }
+                presale_registry.buyer_maximum_deposit_cap = presale_max_cap;
+            } else {
+                presale_registry.buyer_minimum_deposit_cap = 1_000;
+                presale_registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+            }
+
             presale_registries.push(presale_registry);
         }
     }
@@ -52,8 +74,19 @@ pub fn create_default_presale_registries(
 pub fn create_default_presale_registries_with_deposit_fee(
     decimals: u8,
     basis_points: &[u16],
+    fixed_point_q_price: u128,
+    whitelist_mode: WhitelistMode,
+    presale_mode: PresaleMode,
+    presale_max_cap: u64,
 ) -> Vec<PresaleRegistryArgs> {
-    let mut presale_registries = create_default_presale_registries(decimals, basis_points);
+    let mut presale_registries = create_default_presale_registries(
+        decimals,
+        basis_points,
+        fixed_point_q_price,
+        whitelist_mode,
+        presale_mode,
+        presale_max_cap,
+    );
 
     for presale_registry in presale_registries.iter_mut() {
         presale_registry.deposit_fee_bps = DEFAULT_DEPOSIT_BPS;
@@ -301,17 +334,32 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
     immediate_release_delta_from_presale_end: i64,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
+    let fp_price = calculate_q_price_from_ui_price(
+        DEFAULT_PRICE,
+        base_mint_state.decimals,
+        quote_mint_state.decimals,
+    );
+
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        fp_price,
+        whitelist_mode,
+        PresaleMode::FixedPrice,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let mut locked_vesting_args = create_locked_vesting_args();
     locked_vesting_args.immediately_release_bps = 5000;
+
     let (_presale_start_time, presale_end_time) = get_default_presale_start_and_end_time(lite_svm);
     locked_vesting_args.immediate_release_timestamp = (presale_end_time as i64
         + immediate_release_delta_from_presale_end)
@@ -340,13 +388,25 @@ pub fn create_predefined_fixed_price_presale_ix(
     unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        calculate_q_price_from_ui_price(
+            DEFAULT_PRICE,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        ),
+        whitelist_mode,
+        PresaleMode::FixedPrice,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
@@ -371,13 +431,25 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
     unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
     let presale_registries = create_default_presale_registries_with_deposit_fee(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        calculate_q_price_from_ui_price(
+            DEFAULT_PRICE,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        ),
+        whitelist_mode,
+        PresaleMode::FixedPrice,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
@@ -393,7 +465,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
     custom_create_predefined_fixed_price_presale_ix(lite_svm, user, args)
 }
 
-pub fn create_predefined_fixed_prorata_ix_with_no_vest_nor_lock(
+pub fn create_predefined_prorata_ix_with_no_vest_nor_lock(
     lite_svm: &mut LiteSVM,
     base_mint: Pubkey,
     quote_mint: Pubkey,
@@ -408,6 +480,10 @@ pub fn create_predefined_fixed_prorata_ix_with_no_vest_nor_lock(
     let presale_registries = create_default_presale_registries_with_deposit_fee(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Prorata,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     custom_create_predefined_prorata_presale_ix(
@@ -434,13 +510,25 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
     unsold_token_action: UnsoldTokenAction,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
+    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
+    let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
+        .expect("Failed to deserialize quote mint state");
+
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        calculate_q_price_from_ui_price(
+            DEFAULT_PRICE,
+            base_mint_state.decimals,
+            quote_mint_state.decimals,
+        ),
+        whitelist_mode,
+        PresaleMode::FixedPrice,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
@@ -503,6 +591,10 @@ fn create_predefined_prorata_presale_ix_with_deposit_fee(
     let presale_registries = create_default_presale_registries_with_deposit_fee(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Prorata,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     custom_create_predefined_prorata_presale_ix(
@@ -532,6 +624,10 @@ fn create_predefined_prorata_presale_ix(
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Prorata,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     custom_create_predefined_prorata_presale_ix(
@@ -562,6 +658,10 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Prorata,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     custom_create_predefined_prorata_presale_ix(
@@ -638,6 +738,10 @@ fn create_predefined_fcfs_presale_ix(
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Fcfs,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFcfsPresaleIxArgs {
@@ -666,6 +770,10 @@ fn create_predefined_fcfs_presale_ix_with_deposit_fee(
     let presale_registries = create_default_presale_registries_with_deposit_fee(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Fcfs,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFcfsPresaleIxArgs {
@@ -694,6 +802,10 @@ fn create_predefined_fcfs_presale_with_multiple_registries_ix(
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
+        0,
+        whitelist_mode,
+        PresaleMode::Fcfs,
+        create_presale_args(lite_svm).presale_maximum_cap,
     );
 
     let args = CustomCreatePredefinedFcfsPresaleIxArgs {
@@ -908,7 +1020,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale_with_no_vest_nor_
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_prorata_ix_with_no_vest_nor_lock(
+    let instructions = create_predefined_prorata_ix_with_no_vest_nor_lock(
         lite_svm,
         base_mint,
         quote_mint,
