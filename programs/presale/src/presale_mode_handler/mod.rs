@@ -68,6 +68,21 @@ pub trait PresaleModeHandler {
     ) -> Result<u64>;
 }
 
+pub fn enforce_dynamic_price_registries_max_buyer_cap_range(
+    registries: &[PresaleRegistryArgs],
+) -> Result<()> {
+    for registry in registries {
+        if !registry.is_uninitialized() {
+            require!(
+                registry.buyer_minimum_deposit_cap == 1
+                    && registry.buyer_maximum_deposit_cap == u64::MAX,
+                PresaleError::InvalidBuyerCapRange
+            );
+        }
+    }
+    Ok(())
+}
+
 pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {
     match presale_mode {
         PresaleMode::FixedPrice => Box::new(FixedPricePresaleHandler),

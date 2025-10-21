@@ -1,6 +1,12 @@
 use crate::PresaleModeHandler;
 use crate::*;
 
+// Calculate min quote amount needed to purchase at least 1 base lamport. If price < 1 quote token, min quote amount will be > 1
+fn calculate_min_quote_amount_for_base_lamport(q_price: u128) -> Result<u64> {
+    let min_quote_amount = q_price.div_ceil(SCALE_MULTIPLIER);
+    Ok(min_quote_amount.safe_cast()?)
+}
+
 fn is_withdraw_disabled(flags: u8) -> bool {
     (flags & DISABLE_WITHDRAW_MASK) != 0
 }
@@ -86,6 +92,8 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             PresaleError::MissingPresaleExtraParams
         );
 
+        let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
+
         // 2. Validate fixed price presale parameters
         // TODO: Should we make sure there's no impossible to fill gap?
         // For example: 1 token = 1 USDC, presale_maximum_cap = 100 USDC, buyer_minimum_deposit_cap = 20 USDC, buyer_maximum_deposit_cap = 90 USDC
@@ -102,6 +110,23 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                     presale_extra_param.q_price,
                     registry.buyer_maximum_deposit_cap,
                 )?;
+
+                // In permissioned whitelist mode, ensure buyer min/max cap is set to minimum and maximum allowed range
+                // This reduces the mistake of setting unusable buyer cap in permissioned presale at offchain
+                if whitelist_mode.is_permissioned() {
+                    let min_quote_amount =
+                        calculate_min_quote_amount_for_base_lamport(presale_extra_param.q_price)?;
+
+                    require!(
+                        registry.buyer_minimum_deposit_cap == min_quote_amount,
+                        PresaleError::InvalidBuyerCapRange
+                    );
+
+                    require!(
+                        registry.buyer_maximum_deposit_cap == u64::MAX,
+                        PresaleError::InvalidBuyerCapRange
+                    );
+                }
             }
         }
 
@@ -277,6 +302,30 @@ mod tests {
 
         let suggested_deposit_amount = calculate_quote_token_without_surplus(&presale, 7).unwrap();
         assert_eq!(u128::from(suggested_deposit_amount), lamport_per_price);
+    }
+
+    #[test]
+    fn test_calculate_quote_token_for_base_lamport() {
+        let lamport_price: u128 = 10;
+        let q_price = lamport_price * SCALE_MULTIPLIER; // 10 quote token per base token
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 1);
+
+        let lamport_price2: u128 = 1;
+        let q_price = lamport_price2 * SCALE_MULTIPLIER; // 1 quote token per base token
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 1);
+
+        let lamport_price: f64 = 0.1;
+        let q_price = (lamport_price * 2.0f64.powi(SCALE_OFFSET.try_into().unwrap())) as u128;
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 9);
     }
 
     proptest! {

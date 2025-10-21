@@ -128,4 +128,7 @@ pub enum PresaleError {
 
     #[msg("Invalid type")]
     InvalidType,
+
+    #[msg("Invalid buyer cap range")]
+    InvalidBuyerCapRange,
 }

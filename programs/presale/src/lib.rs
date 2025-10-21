@@ -1,6 +1,7 @@
 #![allow(unexpected_cfgs)]
-
 use anchor_lang::prelude::*;
+#[cfg(not(feature = "no-entrypoint"))]
+use solana_security_txt::security_txt;
 
 #[macro_use]
 pub mod macros;
@@ -18,7 +19,7 @@ mod constants;
 pub use constants::*;
 
 mod state;
-use solana_security_txt::security_txt;
+
 pub use state::*;
 
 mod events;

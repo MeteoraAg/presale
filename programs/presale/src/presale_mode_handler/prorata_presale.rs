@@ -16,6 +16,11 @@ impl PresaleModeHandler for ProrataPresaleHandler {
     ) -> Result<()> {
         let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
+        let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
+        if whitelist_mode.is_permissioned() {
+            enforce_dynamic_price_registries_max_buyer_cap_range(presale_registries)?;
+        }
+
         let InitializePresaleVaultAccountPubkeys {
             base_mint,
             quote_mint,
