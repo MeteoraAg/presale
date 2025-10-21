@@ -23,7 +23,7 @@ fn test_escrow_refresh_with_immediate_release() {
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
         1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-    );
+);
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
@@ -33,6 +33,7 @@ fn test_escrow_refresh_with_immediate_release() {
             mint,
             anchor_spl::token::spl_token::native_mint::ID,
             Rc::clone(&user),
+            0,
         );
 
     let presale_state: Presale = lite_svm
@@ -67,14 +68,19 @@ fn test_escrow_refresh_with_immediate_release() {
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     let presale_registry = presale_state
         .get_presale_registry(DEFAULT_PERMISSIONLESS_REGISTRY_INDEX.into())
         .unwrap();
 
-    let registry_sold_token: u64 = (u128::from(presale_registry.total_deposit)
-        << u128::from(SCALE_OFFSET) / presale_state.fixed_price_presale_q_price)
+    let registry_sold_token: u64 = ((u128::from(presale_registry.total_deposit)
+        << u128::from(SCALE_OFFSET))
+        / presale_state.fixed_price_presale_q_price)
         .try_into()
         .unwrap();
 

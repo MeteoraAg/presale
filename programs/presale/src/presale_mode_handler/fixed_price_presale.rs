@@ -235,6 +235,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
         let claimable_bought_token = calculate_cumulative_claimable_amount_for_user(
             presale.immediate_release_bps,
+            presale.immediate_release_timestamp,
             total_sold_token,
             presale.vesting_start_time,
             presale.vest_duration,

@@ -232,17 +232,16 @@ fn test_claim_with_immediate_release() {
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
+    let immediate_release_delta_from_presale_end = 60; // 1 minute after presale end
+
     let HandleCreatePredefinedPresaleResponse { presale_pubkey, .. } =
         handle_create_predefined_permissionless_fixed_price_presale_with_immediate_release(
             &mut lite_svm,
             mint,
             anchor_spl::token::spl_token::native_mint::ID,
             Rc::clone(&user),
+            immediate_release_delta_from_presale_end,
         );
-
-    let presale_state: Presale = lite_svm
-        .get_deserialized_zc_account(&presale_pubkey)
-        .unwrap();
 
     handle_escrow_deposit(
         &mut lite_svm,
@@ -254,6 +253,10 @@ fn test_claim_with_immediate_release() {
         },
     );
 
+    let presale_state: Presale = lite_svm
+        .get_deserialized_zc_account(&presale_pubkey)
+        .unwrap();
+
     warp_to_presale_end(&mut lite_svm, &presale_state);
 
     claim_and_assert(
@@ -262,6 +265,50 @@ fn test_claim_with_immediate_release() {
         presale_pubkey,
         DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
         Cmp::Equal,
+        None,
+    );
+
+    warp_time(&mut lite_svm, presale_state.immediate_release_timestamp - 1);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
+
+    warp_time(&mut lite_svm, presale_state.immediate_release_timestamp + 1);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::GreaterThan,
+        None,
+    );
+
+    warp_time(&mut lite_svm, presale_state.immediate_release_timestamp + 2);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::Equal,
+        None,
+    );
+
+    warp_time(&mut lite_svm, presale_state.vesting_end_time);
+
+    claim_and_assert(
+        &mut lite_svm,
+        Rc::clone(&user),
+        presale_pubkey,
+        DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        Cmp::GreaterThan,
         None,
     );
 }

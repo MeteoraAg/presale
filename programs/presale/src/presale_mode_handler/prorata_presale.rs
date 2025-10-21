@@ -94,6 +94,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         calculate_cumulative_claimable_amount_for_user(
             presale.immediate_release_bps,
+            presale.immediate_release_timestamp,
             presale_registry.presale_supply,
             presale.vesting_start_time,
             presale.vest_duration,

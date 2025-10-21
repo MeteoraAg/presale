@@ -1062,18 +1062,6 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     );
 
     assert_eq!(
-        presale_state.lock_start_time,
-        presale_state.presale_end_time
-    );
-    assert_eq!(
-        presale_state.lock_end_time,
-        presale_state.lock_start_time + lock_vesting_params.lock_duration
-    );
-    assert_eq!(
-        presale_state.vesting_start_time,
-        presale_state.lock_end_time
-    );
-    assert_eq!(
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
@@ -1085,6 +1073,11 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     assert_eq!(
         presale_state.immediate_release_bps,
         lock_vesting_params.immediately_release_bps
+    );
+
+    assert_eq!(
+        presale_state.immediate_release_timestamp,
+        lock_vesting_params.immediate_release_timestamp
     );
 
     let base_vault_token_account: TokenAccount = lite_svm
@@ -1263,18 +1256,6 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         lock_vesting_params.lock_duration
     );
 
-    assert_eq!(
-        presale_state.lock_start_time,
-        presale_state.presale_end_time
-    );
-    assert_eq!(
-        presale_state.lock_end_time,
-        presale_state.lock_start_time + lock_vesting_params.lock_duration
-    );
-    assert_eq!(
-        presale_state.vesting_start_time,
-        presale_state.lock_end_time
-    );
     assert_eq!(
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration

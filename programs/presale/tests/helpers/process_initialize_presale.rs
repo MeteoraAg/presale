@@ -62,10 +62,16 @@ pub fn create_default_presale_registries_with_deposit_fee(
     presale_registries
 }
 
-pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
+pub fn get_default_presale_start_and_end_time(lite_svm: &LiteSVM) -> (u64, u64) {
     let clock: Clock = lite_svm.get_sysvar();
     let presale_start_time = clock.unix_timestamp as u64;
     let presale_end_time = presale_start_time + 120; // 2 minutes later
+
+    (presale_start_time, presale_end_time)
+}
+
+pub fn create_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
+    let (presale_start_time, presale_end_time) = get_default_presale_start_and_end_time(lite_svm);
 
     PresaleArgs {
         presale_start_time,
@@ -292,6 +298,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
     unsold_token_action: UnsoldTokenAction,
+    immediate_release_delta_from_presale_end: i64,
 ) -> Vec<Instruction> {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
 
@@ -305,6 +312,11 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
 
     let mut locked_vesting_args = create_locked_vesting_args();
     locked_vesting_args.immediately_release_bps = 5000;
+    let (_presale_start_time, presale_end_time) = get_default_presale_start_and_end_time(lite_svm);
+    locked_vesting_args.immediate_release_timestamp = (presale_end_time as i64
+        + immediate_release_delta_from_presale_end)
+        .try_into()
+        .unwrap();
 
     let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
         base_mint,
@@ -816,14 +828,16 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale_with_immediat
     base_mint: Pubkey,
     quote_mint: Pubkey,
     user: Rc<Keypair>,
+    immediate_release_delta_from_presale_end: i64,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix_with_deposit_fees(
+    let instructions = create_predefined_fixed_price_presale_ix_with_immediate_release(
         lite_svm,
         base_mint,
         quote_mint,
         Rc::clone(&user),
         WhitelistMode::Permissionless,
         UnsoldTokenAction::Burn,
+        immediate_release_delta_from_presale_end,
     );
 
     process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();

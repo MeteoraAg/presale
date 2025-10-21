@@ -418,10 +418,16 @@ fn test_deposit_with_multiple_presale_registries_with_different_max_cap() {
 
     // End presale earlier
     assert!(after_presale_state.presale_end_time < before_presale_state.presale_end_time);
-    assert!(after_presale_state.lock_start_time < before_presale_state.lock_start_time);
-    assert!(after_presale_state.lock_end_time < before_presale_state.lock_end_time);
     assert!(after_presale_state.vesting_start_time < before_presale_state.vesting_start_time);
     assert!(after_presale_state.vesting_end_time < before_presale_state.vesting_end_time);
+
+    let lock_duration =
+        after_presale_state.vesting_start_time - after_presale_state.presale_end_time;
+    assert_eq!(lock_duration, after_presale_state.lock_duration);
+
+    let vest_duration =
+        after_presale_state.vesting_end_time - after_presale_state.vesting_start_time;
+    assert_eq!(vest_duration, after_presale_state.vest_duration);
 }
 
 #[test]
@@ -592,10 +598,16 @@ fn test_deposit_with_max_presale_cap() {
 
     // End presale earlier
     assert!(after_presale_state.presale_end_time < before_presale_state.presale_end_time);
-    assert!(after_presale_state.lock_start_time < before_presale_state.lock_start_time);
-    assert!(after_presale_state.lock_end_time < before_presale_state.lock_end_time);
     assert!(after_presale_state.vesting_start_time < before_presale_state.vesting_start_time);
     assert!(after_presale_state.vesting_end_time < before_presale_state.vesting_end_time);
+
+    let lock_duration =
+        after_presale_state.vesting_start_time - after_presale_state.presale_end_time;
+    assert_eq!(lock_duration, after_presale_state.lock_duration);
+
+    let vest_duration =
+        after_presale_state.vesting_end_time - after_presale_state.vesting_start_time;
+    assert_eq!(vest_duration, after_presale_state.vest_duration);
 }
 
 #[test]
@@ -1211,14 +1223,6 @@ fn test_deposit_fixed_price_presale_with_end_earlier_disabled() {
         after_presale_state.presale_end_time
     );
     assert_eq!(
-        before_presale_state.lock_start_time,
-        after_presale_state.lock_start_time
-    );
-    assert_eq!(
-        before_presale_state.lock_end_time,
-        after_presale_state.lock_end_time
-    );
-    assert_eq!(
         before_presale_state.vesting_start_time,
         after_presale_state.vesting_start_time
     );
@@ -1284,14 +1288,6 @@ fn test_deposit_fcfs_presale_with_end_earlier_disabled() {
     assert_eq!(
         before_presale_state.presale_end_time,
         after_presale_state.presale_end_time
-    );
-    assert_eq!(
-        before_presale_state.lock_start_time,
-        after_presale_state.lock_start_time
-    );
-    assert_eq!(
-        before_presale_state.lock_end_time,
-        after_presale_state.lock_end_time
     );
     assert_eq!(
         before_presale_state.vesting_start_time,

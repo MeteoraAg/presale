@@ -50,6 +50,17 @@ pub struct InitializePresaleArgs {
 
 impl InitializePresaleArgs {
     pub fn validate(&self) -> Result<()> {
+        // Timings
+        //
+        //                                                                     | --> Immediate release portion of token (immediate_release_timestamp). Anytime between presale end and vest end timestamp
+        //                                                                     |
+        //                                                                     |
+        // Open --> Start (presale_start_time) --> End (presale_end_time) | ---|
+        //                                                                     |
+        //                                                                     |
+        //                                                                     | --> Lock start (lock_start_time) --> Lock end (lock_end_time) --> Vest start (vest_start_time) --> Vest end (vest_end_time)
+        //
+        //
         let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
         self.presale_params.validate(current_timestamp)?;
 
@@ -58,7 +69,7 @@ impl InitializePresaleArgs {
         let locked_vesting_params = self.locked_vesting_params.option();
 
         if let Some(locked_vesting) = locked_vesting_params {
-            locked_vesting.validate()?;
+            locked_vesting.validate(self.presale_params.presale_end_time)?;
         }
 
         Ok(())
@@ -196,11 +207,13 @@ pub struct LockedVestingArgs {
     pub lock_duration: u64,
     /// Vesting duration until buyer can claim the token
     pub vest_duration: u64,
-    pub padding: [u8; 32],
+    /// Timestamp when the immediate release portion is released
+    pub immediate_release_timestamp: u64,
+    pub padding: [u8; 24],
 }
 
 impl LockedVestingArgs {
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self, presale_end_time: u64) -> Result<()> {
         let total_duration = self.vest_duration.safe_add(self.lock_duration)?;
         require!(
             total_duration < MAXIMUM_LOCK_AND_VEST_DURATION,
@@ -218,6 +231,14 @@ impl LockedVestingArgs {
                 self.lock_duration == 0 && self.vest_duration == 0,
                 PresaleError::InvalidLockVestingInfo
             );
+
+            // Backward compatibility
+            if self.immediate_release_timestamp > 0 {
+                require!(
+                    self.immediate_release_timestamp == presale_end_time,
+                    PresaleError::InvalidLockVestingInfo
+                );
+            }
         }
         // Portion of token is immediately release, another part must be vested else it's have same effect as immediate release
         else {
@@ -225,6 +246,23 @@ impl LockedVestingArgs {
                 self.lock_duration > 0 || self.vest_duration > 0,
                 PresaleError::InvalidLockVestingInfo
             );
+
+            let PresaleTimings {
+                vesting_end_time, ..
+            } = Presale::calculate_presale_vest_and_lock_timings(
+                presale_end_time,
+                self.lock_duration,
+                self.vest_duration,
+            )?;
+
+            // Backward compatibility
+            if self.immediate_release_timestamp > 0 {
+                require!(
+                    self.immediate_release_timestamp >= presale_end_time
+                        && self.immediate_release_timestamp <= vesting_end_time,
+                    PresaleError::InvalidLockVestingInfo
+                );
+            }
         }
 
         Ok(())
@@ -256,7 +294,8 @@ mod tests {
             immediately_release_bps: 1000,
             lock_duration: 0,
             vest_duration: 0,
-            padding: [0u8; 32],
+            immediate_release_timestamp: 0,
+            padding: [0u8; 24],
         };
         assert!(args.option().is_some());
     }
