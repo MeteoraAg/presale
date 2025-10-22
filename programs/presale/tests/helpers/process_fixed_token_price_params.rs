@@ -6,21 +6,17 @@ use anchor_client::solana_sdk::{
 };
 use anchor_lang::*;
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
+use presale::accounts::InitializeFixedPricePresaleArgsCtx as InitializeFixedPricePresaleArgsAccounts;
+use presale::instruction::InitializeFixedPricePresaleArgs;
 
-#[derive(Clone)]
-pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
-    pub base_mint: Pubkey,
-    pub quote_mint: Pubkey,
-    pub q_price: u128,
-    pub owner: Pubkey,
-    pub payer: Rc<Keypair>,
-    pub base: Pubkey,
-    pub disable_withdraw: bool,
+pub struct CreateInitializeFixedTokenPricePresaleParamsArgsWrapper {
+    pub args: InitializeFixedPricePresaleArgs,
+    pub accounts: InitializeFixedPricePresaleArgsAccounts,
 }
 
-pub fn create_initialize_fixed_token_price_presale_params_args_ix(
+pub fn create_initialize_fixed_token_price_presale_params_args_wrapper(
     args: HandleInitializeFixedTokenPricePresaleParamsArgs,
-) -> Instruction {
+) -> CreateInitializeFixedTokenPricePresaleParamsArgsWrapper {
     let HandleInitializeFixedTokenPricePresaleParamsArgs {
         base_mint,
         quote_mint,
@@ -36,15 +32,14 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
     let fixed_price_presale_params =
         derive_fixed_price_presale_args(&base_mint, &quote_mint, &base, &presale::ID);
 
-    let ix_data = presale::instruction::InitializeFixedPricePresaleArgs {
+    let args = presale::instruction::InitializeFixedPricePresaleArgs {
         params: presale::InitializeFixedPricePresaleExtraArgs {
             q_price,
             presale,
             disable_withdraw: u8::from(disable_withdraw),
             ..Default::default()
         },
-    }
-    .data();
+    };
 
     let accounts = presale::accounts::InitializeFixedPricePresaleArgsCtx {
         fixed_price_presale_params,
@@ -55,10 +50,30 @@ pub fn create_initialize_fixed_token_price_presale_params_args_ix(
         program: presale::ID,
     };
 
+    CreateInitializeFixedTokenPricePresaleParamsArgsWrapper { args, accounts }
+}
+
+#[derive(Clone)]
+pub struct HandleInitializeFixedTokenPricePresaleParamsArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub q_price: u128,
+    pub owner: Pubkey,
+    pub payer: Rc<Keypair>,
+    pub base: Pubkey,
+    pub disable_withdraw: bool,
+}
+
+pub fn create_initialize_fixed_token_price_presale_params_args_ix(
+    args: HandleInitializeFixedTokenPricePresaleParamsArgs,
+) -> Instruction {
+    let CreateInitializeFixedTokenPricePresaleParamsArgsWrapper { args, accounts } =
+        create_initialize_fixed_token_price_presale_params_args_wrapper(args);
+
     Instruction {
         program_id: presale::ID,
         accounts: accounts.to_account_metas(None),
-        data: ix_data,
+        data: args.data(),
     }
 }
 

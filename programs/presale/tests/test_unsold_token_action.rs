@@ -619,25 +619,25 @@ fn test_unsold_token_action_refund_fixed_price_presale_before_presale_complete()
     let SetupContext { mut lite_svm, user } = setup_context;
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let presale_pubkey = derive_presale(&mint, &quote_mint, &user.pubkey(), &presale::ID);
-
-    let init_fp_presale_ix = create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         mint,
         quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        WhitelistMode::Permissionless,
-        UnsoldTokenAction::Refund,
+        user_pubkey,
     );
 
-    process_transaction(
-        &mut lite_svm,
-        &init_fp_presale_ix,
-        Some(&user.pubkey()),
-        &[&user],
-    )
-    .unwrap();
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
+
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let err = handle_perform_unsold_token_action_err(
         &mut lite_svm,
@@ -664,25 +664,25 @@ fn test_unsold_token_action_refund_fixed_price_presale_when_presale_failed() {
     let SetupContext { mut lite_svm, user } = setup_context;
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let presale_pubkey = derive_presale(&mint, &quote_mint, &user.pubkey(), &presale::ID);
-
-    let init_fp_presale_ix = create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         mint,
         quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        WhitelistMode::Permissionless,
-        UnsoldTokenAction::Refund,
+        user_pubkey,
     );
 
-    process_transaction(
-        &mut lite_svm,
-        &init_fp_presale_ix,
-        Some(&user.pubkey()),
-        &[&user],
-    )
-    .unwrap();
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
+
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -715,25 +715,25 @@ fn test_unsold_token_action_refund_fixed_price_presale_token2022() {
     let SetupContext { mut lite_svm, user } = setup_context;
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let presale_pubkey = derive_presale(&mint, &quote_mint, &user.pubkey(), &presale::ID);
-
-    let init_fp_presale_ix = create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         mint,
         quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        WhitelistMode::Permissionless,
-        UnsoldTokenAction::Refund,
+        user_pubkey,
     );
 
-    process_transaction(
-        &mut lite_svm,
-        &init_fp_presale_ix,
-        Some(&user.pubkey()),
-        &[&user],
-    )
-    .unwrap();
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
+
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -818,25 +818,25 @@ fn test_unsold_token_action_refund_fixed_price_presale_with_non_zero_deposit_reg
     let SetupContext { mut lite_svm, user } = setup_context;
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let presale_pubkey = derive_presale(&mint, &quote_mint, &user.pubkey(), &presale::ID);
-
-    let init_fp_presale_ix = create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         mint,
         quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        WhitelistMode::Permissionless,
-        UnsoldTokenAction::Refund,
+        user_pubkey,
     );
 
-    process_transaction(
-        &mut lite_svm,
-        &init_fp_presale_ix,
-        Some(&user.pubkey()),
-        &[&user],
-    )
-    .unwrap();
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
+
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -921,26 +921,25 @@ fn test_unsold_token_action_burn_fixed_price_presale_with_non_zero_deposit_regis
     let SetupContext { mut lite_svm, user } = setup_context;
 
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let presale_pubkey = derive_presale(&mint, &quote_mint, &user.pubkey(), &presale::ID);
-
-    let init_fp_presale_ix = create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         mint,
         quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        WhitelistMode::Permissionless,
-        UnsoldTokenAction::Burn,
+        user_pubkey,
     );
 
-    process_transaction(
-        &mut lite_svm,
-        &init_fp_presale_ix,
-        Some(&user.pubkey()),
-        &[&user],
-    )
-    .unwrap();
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.unsold_token_action = UnsoldTokenAction::Burn.into();
 
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();

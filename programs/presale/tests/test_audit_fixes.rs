@@ -16,16 +16,11 @@ use crate::helpers::{
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signer::keypair::Keypair;
-use anchor_lang::AccountDeserialize;
-use anchor_spl::token_interface::Mint;
 use litesvm::LiteSVM;
-use presale::{UnsoldTokenAction, WhitelistMode};
+use presale::WhitelistMode;
 
 use crate::helpers::{
-    calculate_q_price_from_ui_price, create_default_presale_registries, create_locked_vesting_args,
-    custom_create_predefined_fixed_price_presale_ix, derive_presale, handle_escrow_deposit_err,
-    handle_escrow_withdraw, handle_escrow_withdraw_err, DEFAULT_PRICE,
-    PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    derive_presale, handle_escrow_deposit_err, handle_escrow_withdraw, handle_escrow_withdraw_err,
 };
 
 pub mod helpers;
@@ -255,12 +250,9 @@ fn test_zero_vest_duration_dos_escrow_claim() {
 
 // https://www.notion.so/offsidelabs/Meteora-Presale-Audit-Draft-24dd5242e8af806f8703cdb86b093639#26bd5242e8af80d08ad3e750f85fa025
 pub mod fixed_price_deposit_surplus_stuck_tests {
-
-    use presale::{PresaleMode, SCALE_OFFSET};
-
-    use crate::helpers::{create_presale_args, CustomCreatePredefinedFixedPricePresaleIxArgs};
-
     use super::*;
+    use crate::helpers::create_default_fixed_price_presale_args_wrapper;
+    use presale::SCALE_MULTIPLIER;
 
     struct SetupResult {
         lite_svm: LiteSVM,
@@ -279,53 +271,37 @@ pub mod fixed_price_deposit_surplus_stuck_tests {
         let SetupContext { mut lite_svm, user } = setup_context;
 
         let user_pubkey = user.pubkey();
-        let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
-
         let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
-        let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
+        let whitelist_mode = WhitelistMode::Permissionless;
 
-        let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
-            .expect("Failed to deserialize base mint state");
-
-        let quote_mint_state = Mint::try_deserialize(&mut quote_mint_account.data.as_ref())
-            .expect("Failed to deserialize quote mint state");
-
-        let q_price = calculate_q_price_from_ui_price(
-            DEFAULT_PRICE,
-            base_mint_state.decimals,
-            quote_mint_state.decimals,
+        let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+            base_mint,
+            quote_mint,
+            &lite_svm,
+            whitelist_mode,
+            Rc::clone(&user),
+            user_pubkey,
         );
 
-        let mut presale_registries = create_default_presale_registries(
-            base_mint_state.decimals,
-            &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
-            q_price,
-            WhitelistMode::Permissionless,
-            PresaleMode::FixedPrice,
-            create_presale_args(&lite_svm).presale_maximum_cap,
-        );
+        let presale_registries = &mut wrapper
+            .presale_params_wrapper
+            .args
+            .params
+            .presale_registries;
+
+        let fixed_price_args = &wrapper.fixed_point_params_wrapper.args.params;
 
         let buyer_minimum_deposit_cap = {
             let presale_registry_args_0 = presale_registries.get_mut(0).unwrap();
-            let token_lamport_price =
-                (q_price as f64 / 2.0f64.powi(i32::try_from(SCALE_OFFSET).unwrap())).ceil() as u64;
 
-            presale_registry_args_0.buyer_minimum_deposit_cap = token_lamport_price;
-            token_lamport_price
+            let token_lamport_price = fixed_price_args.q_price.div_ceil(SCALE_MULTIPLIER);
+            let buyer_minimum_deposit_cap: u64 = token_lamport_price.try_into().unwrap();
+
+            presale_registry_args_0.buyer_minimum_deposit_cap = buyer_minimum_deposit_cap;
+            buyer_minimum_deposit_cap
         };
 
-        let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
-            base_mint,
-            quote_mint,
-            whitelist_mode: WhitelistMode::Permissionless,
-            unsold_token_action: UnsoldTokenAction::Refund,
-            presale_registries,
-            locked_vesting_args: create_locked_vesting_args(),
-            ..Default::default()
-        };
-
-        let instructions =
-            custom_create_predefined_fixed_price_presale_ix(&mut lite_svm, Rc::clone(&user), args);
+        let instructions = wrapper.to_instructions();
 
         assert!(
             process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).is_ok()

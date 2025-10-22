@@ -7,8 +7,7 @@ use anchor_spl::{
 };
 use helpers::*;
 use presale::{
-    Escrow, Presale, PresaleRegistryArgs, UnsoldTokenAction, WhitelistMode,
-    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+    Escrow, Presale, PresaleRegistryArgs, WhitelistMode, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
 };
 use std::rc::Rc;
 
@@ -429,28 +428,38 @@ fn test_withdraw_fixed_price_presale_violate_buyer_cap() {
     );
     let SetupContext { mut lite_svm, user } = setup_context;
 
-    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
-        base_mint: mint,
-        quote_mint: anchor_spl::token::spl_token::native_mint::ID,
-        whitelist_mode: WhitelistMode::Permissionless,
-        unsold_token_action: UnsoldTokenAction::Burn,
-        presale_registries: vec![PresaleRegistryArgs {
-            presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-            buyer_minimum_deposit_cap: 1000,
-            buyer_maximum_deposit_cap: 10_000_000,
-            deposit_fee_bps: 0,
-            ..Default::default()
-        }],
-        locked_vesting_args: create_locked_vesting_args(),
-        ..Default::default()
-    };
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let ixs =
-        custom_create_predefined_fixed_price_presale_ix(&mut lite_svm, Rc::clone(&user), args);
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user_pubkey,
+    );
+
+    let presale_registries = &mut wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .presale_registries;
+
+    *presale_registries = vec![PresaleRegistryArgs {
+        presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+        buyer_minimum_deposit_cap: 1000,
+        buyer_maximum_deposit_cap: 10_000_000,
+        deposit_fee_bps: 0,
+        ..Default::default()
+    }];
+
+    let instructions = wrapper.to_instructions();
 
     process_transaction(
         &mut lite_svm,
-        &ixs,
+        &instructions,
         Some(&user.pubkey()),
         &[&Rc::clone(&user)],
     )
@@ -518,27 +527,28 @@ fn test_withdraw_fixed_price_presale_with_withdraw_disabled() {
     );
     let SetupContext { mut lite_svm, user } = setup_context;
 
-    let args = CustomCreatePredefinedFixedPricePresaleIxArgs {
-        base_mint: mint,
-        quote_mint: anchor_spl::token::spl_token::native_mint::ID,
-        whitelist_mode: WhitelistMode::Permissionless,
-        unsold_token_action: UnsoldTokenAction::Burn,
-        presale_registries: vec![PresaleRegistryArgs {
-            presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-            buyer_minimum_deposit_cap: 1000,
-            buyer_maximum_deposit_cap: 10_000_000,
-            deposit_fee_bps: 0,
-            ..Default::default()
-        }],
-        locked_vesting_args: create_locked_vesting_args(),
-        disable_withdraw: true,
-        ..Default::default()
-    };
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let ixs =
-        custom_create_predefined_fixed_price_presale_ix(&mut lite_svm, Rc::clone(&user), args);
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user_pubkey,
+    );
 
-    process_transaction(&mut lite_svm, &ixs, Some(&user.pubkey()), &[&user]).unwrap();
+    wrapper
+        .fixed_point_params_wrapper
+        .args
+        .params
+        .disable_withdraw = u8::from(true);
+
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(
         &mint,

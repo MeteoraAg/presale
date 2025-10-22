@@ -11,7 +11,7 @@ use anchor_spl::{
 use helpers::*;
 use presale::{
     calculate_deposit_fee_included_amount, DepositFeeIncludedCalculation, Escrow, Presale,
-    PresaleProgress, PresaleRegistryArgs, Rounding, UnsoldTokenAction, WhitelistMode,
+    PresaleProgress, PresaleRegistryArgs, Rounding, WhitelistMode,
     DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER,
 };
 use std::{rc::Rc, vec};
@@ -564,37 +564,40 @@ fn test_deposit_2022_with_fee() {
         100_000_000 * 10u64.pow(DEFAULT_QUOTE_TOKEN_DECIMALS.into()),
     );
 
-    let default_presale_args = create_presale_args(&lite_svm);
+    let mut wrapper = create_default_prorata_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        &lite_svm,
+        WhitelistMode::PermissionWithMerkleProof,
+        Rc::clone(&user),
+        user_pubkey,
+    );
 
-    let presale_registries = vec![
+    let presale_args = &wrapper.args.params.presale_params;
+    let presale_registries = &mut wrapper.args.params.presale_registries;
+
+    let new_presale_registries = vec![
         PresaleRegistryArgs {
             buyer_minimum_deposit_cap: 1,
-            buyer_maximum_deposit_cap: default_presale_args.presale_maximum_cap,
+            buyer_maximum_deposit_cap: presale_args.presale_maximum_cap,
             presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
             deposit_fee_bps: 100, // 1%
             ..PresaleRegistryArgs::default()
         },
         PresaleRegistryArgs {
             buyer_minimum_deposit_cap: 1,
-            buyer_maximum_deposit_cap: default_presale_args.presale_maximum_cap,
+            buyer_maximum_deposit_cap: presale_args.presale_maximum_cap,
             presale_supply: 2_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
             deposit_fee_bps: 200, // 2%
             ..PresaleRegistryArgs::default()
         },
     ];
 
-    let create_ixs = custom_create_predefined_prorata_presale_ix(
-        &mut lite_svm,
-        base_mint,
-        quote_mint,
-        Rc::clone(&user),
-        WhitelistMode::PermissionWithMerkleProof,
-        presale_registries,
-        create_locked_vesting_args(),
-        UnsoldTokenAction::Refund,
-    );
+    *presale_registries = new_presale_registries;
 
-    process_transaction(&mut lite_svm, &create_ixs, Some(&user_pubkey), &[&user]).unwrap();
+    let instructions = wrapper.to_instructions();
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID);
 
@@ -803,28 +806,25 @@ fn test_deposit_fixed_price_presale_with_end_earlier_disabled() {
 
     let user_pubkey = user.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let ixs = custom_create_predefined_fixed_price_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        CustomCreatePredefinedFixedPricePresaleIxArgs {
-            base_mint: mint,
-            quote_mint,
-            whitelist_mode: WhitelistMode::Permissionless,
-            disable_withdraw: true,
-            disable_presale_end_earlier: true,
-            unsold_token_action: UnsoldTokenAction::Burn,
-            presale_registries: vec![PresaleRegistryArgs {
-                buyer_minimum_deposit_cap: 100,
-                buyer_maximum_deposit_cap: 1_000_000_000,
-                presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-                ..PresaleRegistryArgs::default()
-            }],
-            locked_vesting_args: create_locked_vesting_args(),
-        },
+        user_pubkey,
     );
 
-    process_transaction(&mut lite_svm, &ixs, Some(&user_pubkey), &[&user]).unwrap();
+    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_args.disable_earlier_presale_end_once_cap_reached = u8::from(true);
+
+    let fixed_price_args = &mut wrapper.fixed_point_params_wrapper.args.params;
+    fixed_price_args.disable_withdraw = u8::from(true);
+
+    let instructions = wrapper.to_instructions();
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
 
@@ -873,25 +873,22 @@ fn test_deposit_fcfs_presale_with_end_earlier_disabled() {
 
     let user_pubkey = user.pubkey();
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
 
-    let ixs = custom_create_predefined_fcfs_presale_ix(
-        &mut lite_svm,
+    let mut wrapper = create_default_fcfs_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
         Rc::clone(&user),
-        CustomCreatePredefinedFcfsPresaleIxArgs {
-            base_mint: mint,
-            quote_mint,
-            whitelist_mode: WhitelistMode::Permissionless,
-            disable_presale_end_earlier: true,
-            presale_registries: vec![PresaleRegistryArgs {
-                buyer_minimum_deposit_cap: 100,
-                buyer_maximum_deposit_cap: 1_000_000_000,
-                presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-                ..PresaleRegistryArgs::default()
-            }],
-        },
+        user_pubkey,
     );
 
-    process_transaction(&mut lite_svm, &ixs, Some(&user_pubkey), &[&user]).unwrap();
+    let presale_args = &mut wrapper.args.params.presale_params;
+    presale_args.disable_earlier_presale_end_once_cap_reached = u8::from(true);
+
+    let instructions = wrapper.to_instructions();
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
 
