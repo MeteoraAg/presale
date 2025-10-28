@@ -4,9 +4,6 @@ pub use pda::*;
 mod process_initialize_presale;
 pub use process_initialize_presale::*;
 
-mod process_fixed_token_price_params;
-pub use process_fixed_token_price_params::*;
-
 mod math;
 pub use math::*;
 

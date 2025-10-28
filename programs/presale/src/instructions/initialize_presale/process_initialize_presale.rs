@@ -80,28 +80,26 @@ pub struct InitializePresaleCtx<'info> {
     pub system_program: Program<'info, System>,
 }
 
+pub struct HandleInitializePresaleArgs<'a> {
+    pub common_args: &'a CommonPresaleArgs,
+    pub presale_mode: PresaleMode,
+    pub disable_earlier_presale_end_once_cap_reached: bool,
+    pub q_price: u128,
+    pub disable_withdraw: bool,
+}
+
 pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
-    args: InitializePresaleArgs,
+    args: HandleInitializePresaleArgs,
     remaining_account_info: RemainingAccountsInfo,
 ) -> Result<()> {
-    // 1. Validate params
-    args.validate()?;
-
     let mut remaining_account_slice = &ctx.remaining_accounts[..];
 
-    // 2. Ensure base and quote token extensions are permissionless
+    // 1. Ensure base and quote token extensions are permissionless
     ensure_supported_token2022_extensions(&ctx.accounts.quote_token_mint)?;
     ensure_supported_token2022_extensions(&ctx.accounts.presale_mint)?;
 
-    let InitializePresaleArgs {
-        presale_params,
-        locked_vesting_params,
-        presale_registries,
-        ..
-    } = args;
-
-    // 3. Initialize vault
+    // 2. Initialize vault
     let mint_pubkeys = InitializePresaleVaultAccountPubkeys {
         base_mint: ctx.accounts.presale_mint.key(),
         quote_mint: ctx.accounts.quote_token_mint.key(),
@@ -113,16 +111,17 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         quote_token_program: ctx.accounts.quote_token_program.key(),
     };
 
-    let locked_vesting_params = locked_vesting_params.option();
-
     process_create_presale_vault(ProcessCreatePresaleVaultArgs {
         presale: &ctx.accounts.presale,
-        presale_params: &presale_params,
-        presale_registries: &presale_registries,
-        locked_vesting_params: locked_vesting_params.as_ref(),
+        args: &args,
         mint_pubkeys,
-        remaining_accounts: &mut remaining_account_slice,
     })?;
+
+    let HandleInitializePresaleArgs { common_args, .. } = args;
+
+    let CommonPresaleArgs {
+        presale_registries, ..
+    } = common_args;
 
     let presale_pool_supply = presale_registries
         .iter()
@@ -149,26 +148,6 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         None,
         transfer_hook_accounts.transfer_hook_base,
     )?;
-
-    emit_cpi!(EvtPresaleVaultCreate {
-        base_mint: ctx.accounts.presale_mint.key(),
-        quote_mint: ctx.accounts.quote_token_mint.key(),
-        presale_registries,
-        lock_duration: locked_vesting_params
-            .as_ref()
-            .map(|p| p.lock_duration)
-            .unwrap_or(0),
-        vest_duration: locked_vesting_params
-            .as_ref()
-            .map(|p| p.vest_duration)
-            .unwrap_or(0),
-        whitelist_mode: presale_params.whitelist_mode,
-        presale_mode: presale_params.presale_mode,
-        presale_start_time: presale_params.presale_start_time,
-        presale_end_time: presale_params.presale_end_time,
-        presale_maximum_cap: presale_params.presale_maximum_cap,
-        presale_minimum_cap: presale_params.presale_minimum_cap,
-    });
 
     Ok(())
 }

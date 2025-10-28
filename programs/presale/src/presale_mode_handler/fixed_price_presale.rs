@@ -7,10 +7,6 @@ fn calculate_min_quote_amount_for_base_lamport(q_price: u128) -> Result<u64> {
     Ok(min_quote_amount.safe_cast()?)
 }
 
-fn is_withdraw_disabled(flags: u8) -> bool {
-    (flags & DISABLE_WITHDRAW_MASK) != 0
-}
-
 fn calculate_token_bought(q_price: u128, amount: u64) -> Result<u128> {
     let q_amount = u128::from(amount).safe_shl(SCALE_OFFSET)?;
     let token_bought = q_amount.safe_div(q_price)?;
@@ -66,35 +62,22 @@ pub struct FixedPricePresaleHandler;
 impl PresaleModeHandler for FixedPricePresaleHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
-        presale_pubkey: Pubkey,
         presale: &mut Presale,
-        presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
+        common_args: &'e CommonPresaleArgs,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        remaining_accounts: &'e mut &'c [AccountInfo<'info>],
+        disable_withdraw: bool,
+        q_price: u128,
+        disable_earlier_presale_end_once_cap_reached: bool,
     ) -> Result<()> {
-        // 1. Get extra params about fixed price presale mode
-        let slice = remaining_accounts.split_first();
-
-        let Some((presale_extra_param_ai, remaining_account_slice)) = slice else {
-            return Err(PresaleError::MissingPresaleExtraParams.into());
-        };
-
-        *remaining_accounts = remaining_account_slice;
-
-        let presale_extra_param_al =
-            AccountLoader::<FixedPricePresaleExtraArgs>::try_from(presale_extra_param_ai)?;
-
-        let presale_extra_param = presale_extra_param_al.load()?;
-        require!(
-            presale_extra_param.presale == presale_pubkey,
-            PresaleError::MissingPresaleExtraParams
-        );
+        let CommonPresaleArgs {
+            presale_params,
+            presale_registries,
+            ..
+        } = common_args;
 
         let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
 
-        // 2. Validate fixed price presale parameters
+        // 1. Validate fixed price presale parameters
         // TODO: Should we make sure there's no impossible to fill gap?
         // For example: 1 token = 1 USDC, presale_maximum_cap = 100 USDC, buyer_minimum_deposit_cap = 20 USDC, buyer_maximum_deposit_cap = 90 USDC
         // User 1 deposit 90 USDC, remaining_presale_cap = 100 - 90 = 10
@@ -102,20 +85,13 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         for registry in presale_registries {
             if !registry.is_uninitialized() {
                 // ensure buyer_minimum_deposit_cap and buyer_maximum_deposit_cap can buy at least 1 token and not exceed u64::MAX token
-                ensure_token_buyable(
-                    presale_extra_param.q_price,
-                    registry.buyer_minimum_deposit_cap,
-                )?;
-                ensure_token_buyable(
-                    presale_extra_param.q_price,
-                    registry.buyer_maximum_deposit_cap,
-                )?;
+                ensure_token_buyable(q_price, registry.buyer_minimum_deposit_cap)?;
+                ensure_token_buyable(q_price, registry.buyer_maximum_deposit_cap)?;
 
                 // In permissioned whitelist mode, ensure buyer min/max cap is set to minimum and maximum allowed range
                 // This reduces the mistake of setting unusable buyer cap in permissioned presale at offchain
                 if whitelist_mode.is_permissioned() {
-                    let min_quote_amount =
-                        calculate_min_quote_amount_for_base_lamport(presale_extra_param.q_price)?;
+                    let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price)?;
 
                     require!(
                         registry.buyer_minimum_deposit_cap == min_quote_amount,
@@ -145,10 +121,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
 
         // 3. Create presale vault
         presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            presale_registries,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            fixed_price_presale_params: Some(*presale_extra_param),
+            common_args,
             base_mint,
             quote_mint,
             base_token_vault,
@@ -158,11 +131,15 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             base,
             base_token_program,
             quote_token_program,
+            disable_earlier_presale_end_once_cap_reached,
+            disable_withdraw,
+            q_price,
+            presale_mode: PresaleMode::FixedPrice,
         })?;
 
         // Ensure presale supply is enough to fulfill presale maximum cap
         ensure_enough_presale_supply(
-            presale_extra_param.q_price,
+            q_price,
             presale.presale_supply,
             presale_params.presale_maximum_cap,
         )?;
@@ -188,11 +165,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         current_timestamp: u64,
     ) -> Result<()> {
         super::end_presale_if_max_cap_reached(presale, current_timestamp)
-    }
-
-    fn can_withdraw(&self, presale: &Presale) -> bool {
-        // Fixed price presale allow withdraw
-        !is_withdraw_disabled(presale.fixed_price_presale_flags)
     }
 
     fn process_withdraw(

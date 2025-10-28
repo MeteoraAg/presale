@@ -441,11 +441,7 @@ fn test_withdraw_fixed_price_presale_violate_buyer_cap() {
         user_pubkey,
     );
 
-    let presale_registries = &mut wrapper
-        .presale_params_wrapper
-        .args
-        .params
-        .presale_registries;
+    let presale_registries = &mut wrapper.args.params.common_args.presale_registries;
 
     *presale_registries = vec![PresaleRegistryArgs {
         presale_supply: 1_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
@@ -455,11 +451,11 @@ fn test_withdraw_fixed_price_presale_violate_buyer_cap() {
         ..Default::default()
     }];
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
     process_transaction(
         &mut lite_svm,
-        &instructions,
+        &[instruction],
         Some(&user.pubkey()),
         &[&Rc::clone(&user)],
     )
@@ -540,15 +536,17 @@ fn test_withdraw_fixed_price_presale_with_withdraw_disabled() {
         user_pubkey,
     );
 
-    wrapper
-        .fixed_point_params_wrapper
-        .args
-        .params
-        .disable_withdraw = u8::from(true);
+    wrapper.args.params.disable_withdraw = u8::from(true);
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 
     let presale_pubkey = derive_presale(
         &mint,

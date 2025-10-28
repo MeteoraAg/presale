@@ -6,22 +6,27 @@ pub struct FcfsPresaleHandler;
 impl PresaleModeHandler for FcfsPresaleHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
-        _presale_pubkey: Pubkey,
         presale: &mut Presale,
-        presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
+        common_args: &'e CommonPresaleArgs,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
+        disable_withdraw: bool,
+        q_price: u128,
+        disable_earlier_presale_end_once_cap_reached: bool,
     ) -> Result<()> {
+        require!(disable_withdraw, PresaleError::UndeterminedError);
+        require!(q_price == 0, PresaleError::UndeterminedError);
+
         let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
+
+        let CommonPresaleArgs {
+            presale_params,
+            presale_registries,
+            ..
+        } = common_args;
 
         let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
         if whitelist_mode.is_permissioned() {
-            enforce_dynamic_price_registries_max_buyer_cap_range(
-                presale_params,
-                presale_registries,
-            )?;
+            enforce_dynamic_price_registries_max_buyer_cap_range(presale_registries)?;
         }
 
         let InitializePresaleVaultAccountPubkeys {
@@ -36,10 +41,7 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         } = mint_pubkeys;
 
         presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            presale_registries,
-            fixed_price_presale_params: None,
+            common_args,
             base_mint,
             quote_mint,
             base_token_vault,
@@ -49,6 +51,10 @@ impl PresaleModeHandler for FcfsPresaleHandler {
             base,
             base_token_program,
             quote_token_program,
+            disable_earlier_presale_end_once_cap_reached,
+            disable_withdraw,
+            q_price,
+            presale_mode: PresaleMode::Fcfs,
         })?;
 
         Ok(())
@@ -70,11 +76,6 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         current_timestamp: u64,
     ) -> Result<()> {
         super::end_presale_if_max_cap_reached(presale, current_timestamp)
-    }
-
-    fn can_withdraw(&self, _presale: &Presale) -> bool {
-        // FCFS do not allow withdraw
-        false
     }
 
     fn process_withdraw(

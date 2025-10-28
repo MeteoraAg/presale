@@ -36,23 +36,6 @@ pub fn derive_event_authority(program_id: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[b"__event_authority"], program_id).0
 }
 
-pub fn derive_fixed_price_presale_args(
-    mint: &Pubkey,
-    quote: &Pubkey,
-    base: &Pubkey,
-    program_id: &Pubkey,
-) -> Pubkey {
-    let presale = derive_presale(mint, quote, base, program_id);
-    Pubkey::find_program_address(
-        &[
-            presale::seeds::FIXED_PRICE_PRESALE_PARAM_PREFIX.as_ref(),
-            presale.as_ref(),
-        ],
-        program_id,
-    )
-    .0
-}
-
 pub fn derive_escrow(
     presale: &Pubkey,
     owner: &Pubkey,

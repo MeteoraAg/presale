@@ -52,25 +52,28 @@ security_txt! {
 pub mod presale {
     use super::*;
 
-    pub fn initialize_fixed_price_presale_args(
-        ctx: Context<InitializeFixedPricePresaleArgsCtx>,
-        params: InitializeFixedPricePresaleExtraArgs,
-    ) -> Result<()> {
-        instructions::handle_initialize_fixed_price_presale_args(ctx, params)
-    }
-
-    pub fn close_fixed_price_presale_args(
-        _ctx: Context<CloseFixedPricePresaleArgsCtx>,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn initialize_presale<'a, 'b, 'c: 'info, 'info>(
+    pub fn initialize_prorata_presale<'a, 'b, 'c: 'info, 'info>(
         ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
-        params: InitializePresaleArgs,
+        params: InitializeProrataPresaleArgs,
         remaining_account_info: RemainingAccountsInfo,
     ) -> Result<()> {
-        instructions::handle_initialize_presale(ctx, params, remaining_account_info)
+        instructions::handle_initialize_prorata_presale(ctx, params, remaining_account_info)
+    }
+
+    pub fn initialize_fixed_price_presale<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
+        params: InitializeFixedPricePresaleArgs,
+        remaining_account_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_initialize_fixed_price_presale(ctx, params, remaining_account_info)
+    }
+
+    pub fn initialize_fcfs_presale<'a, 'b, 'c: 'info, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
+        params: InitializeFcfsPresaleArgs,
+        remaining_account_info: RemainingAccountsInfo,
+    ) -> Result<()> {
+        instructions::handle_initialize_fcfs_presale(ctx, params, remaining_account_info)
     }
 
     pub fn create_merkle_root_config(

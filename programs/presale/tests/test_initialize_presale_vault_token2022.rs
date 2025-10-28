@@ -36,8 +36,8 @@ fn test_initialize_presale_vault_token_2022() {
         user_pubkey,
     );
 
-    let instructions = wrapper.to_instructions();
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    let instruction = wrapper.to_instruction();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&derive_presale(
@@ -93,8 +93,8 @@ fn test_initialize_presale_vault_token_2022_with_transfer_fee() {
         user_pubkey,
     );
 
-    let instructions = wrapper.to_instructions();
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    let instruction = wrapper.to_instruction();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let after_user_base_token: TokenAccount =
         lite_svm.get_deserialized_account(&user_base_ata).unwrap();
@@ -148,8 +148,8 @@ fn test_initialize_presale_vault_token_2022_with_transfer_hook() {
         user_pubkey,
     );
 
-    let instructions = wrapper.to_instructions();
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    let instruction = wrapper.to_instruction();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&derive_presale(

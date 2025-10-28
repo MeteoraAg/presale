@@ -283,28 +283,24 @@ pub mod fixed_price_deposit_surplus_stuck_tests {
             user_pubkey,
         );
 
-        let presale_registries = &mut wrapper
-            .presale_params_wrapper
-            .args
-            .params
-            .presale_registries;
-
-        let fixed_price_args = &wrapper.fixed_point_params_wrapper.args.params;
+        let presale_registries = &mut wrapper.args.params.common_args.presale_registries;
+        let q_price = wrapper.args.params.q_price;
 
         let buyer_minimum_deposit_cap = {
             let presale_registry_args_0 = presale_registries.get_mut(0).unwrap();
 
-            let token_lamport_price = fixed_price_args.q_price.div_ceil(SCALE_MULTIPLIER);
+            let token_lamport_price = q_price.div_ceil(SCALE_MULTIPLIER);
             let buyer_minimum_deposit_cap: u64 = token_lamport_price.try_into().unwrap();
 
             presale_registry_args_0.buyer_minimum_deposit_cap = buyer_minimum_deposit_cap;
             buyer_minimum_deposit_cap
         };
 
-        let instructions = wrapper.to_instructions();
+        let instruction = wrapper.to_instruction();
 
         assert!(
-            process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).is_ok()
+            process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user])
+                .is_ok()
         );
 
         let presale_pubkey = derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID);

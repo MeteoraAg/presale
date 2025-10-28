@@ -573,8 +573,8 @@ fn test_deposit_2022_with_fee() {
         user_pubkey,
     );
 
-    let presale_args = &wrapper.args.params.presale_params;
-    let presale_registries = &mut wrapper.args.params.presale_registries;
+    let presale_args = &wrapper.args.params.common_args.presale_params;
+    let presale_registries = &mut wrapper.args.params.common_args.presale_registries;
 
     let new_presale_registries = vec![
         PresaleRegistryArgs {
@@ -595,9 +595,9 @@ fn test_deposit_2022_with_fee() {
 
     *presale_registries = new_presale_registries;
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&base_mint, &quote_mint, &user_pubkey, &presale::ID);
 
@@ -817,14 +817,12 @@ fn test_deposit_fixed_price_presale_with_end_earlier_disabled() {
         user_pubkey,
     );
 
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
-    presale_args.disable_earlier_presale_end_once_cap_reached = u8::from(true);
+    let presale_params = &mut wrapper.args.params;
+    presale_params.disable_earlier_presale_end_once_cap_reached = u8::from(true);
+    presale_params.disable_withdraw = u8::from(true);
 
-    let fixed_price_args = &mut wrapper.fixed_point_params_wrapper.args.params;
-    fixed_price_args.disable_withdraw = u8::from(true);
-
-    let instructions = wrapper.to_instructions();
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    let instruction = wrapper.to_instruction();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
 
@@ -884,11 +882,11 @@ fn test_deposit_fcfs_presale_with_end_earlier_disabled() {
         user_pubkey,
     );
 
-    let presale_args = &mut wrapper.args.params.presale_params;
-    presale_args.disable_earlier_presale_end_once_cap_reached = u8::from(true);
+    let presale_params = &mut wrapper.args.params;
+    presale_params.disable_earlier_presale_end_once_cap_reached = u8::from(true);
 
-    let instructions = wrapper.to_instructions();
-    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+    let instruction = wrapper.to_instruction();
+    process_transaction(&mut lite_svm, &[instruction], Some(&user_pubkey), &[&user]).unwrap();
 
     let presale_pubkey = derive_presale(&mint, &quote_mint, &user_pubkey, &presale::ID);
 

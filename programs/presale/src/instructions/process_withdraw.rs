@@ -65,13 +65,14 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
         PresaleError::InsufficientEscrowBalance
     );
 
-    // 4. Ensure presale mode allows withdraw
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_mode_handler = get_presale_mode_handler(presale_mode);
+    // 4. Ensure presale allows withdraw
     require!(
-        presale_mode_handler.can_withdraw(&presale),
+        presale.can_withdraw(),
         PresaleError::PresaleNotOpenForWithdraw
     );
+
+    let presale_mode = PresaleMode::from(presale.presale_mode);
+    let presale_mode_handler = get_presale_mode_handler(presale_mode);
 
     let suggested_withdraw_amount =
         presale_mode_handler.suggest_withdraw_amount(&presale, &escrow, max_amount)?;

@@ -25,13 +25,12 @@ pub struct InitializePresaleVaultAccountPubkeys {
 pub trait PresaleModeHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
-        presale_pubkey: Pubkey,
         presale: &mut Presale,
-        presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
+        common_args: &'e CommonPresaleArgs,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        remaining_accounts: &'e mut &'c [AccountInfo<'info>],
+        disable_withdraw: bool,
+        q_price: u128,
+        disable_earlier_presale_end_once_cap_reached: bool,
     ) -> Result<()>;
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64>;
     fn end_presale_if_max_cap_reached(
@@ -39,7 +38,6 @@ pub trait PresaleModeHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()>;
-    fn can_withdraw(&self, presale: &Presale) -> bool;
     fn process_withdraw(
         &self,
         presale: &mut Presale,
@@ -69,14 +67,13 @@ pub trait PresaleModeHandler {
 }
 
 pub fn enforce_dynamic_price_registries_max_buyer_cap_range(
-    presale_params: &PresaleArgs,
     registries: &[PresaleRegistryArgs],
 ) -> Result<()> {
     for registry in registries {
         if !registry.is_uninitialized() {
             require!(
                 registry.buyer_minimum_deposit_cap == 1
-                    && registry.buyer_maximum_deposit_cap == presale_params.presale_maximum_cap,
+                    && registry.buyer_maximum_deposit_cap == u64::MAX,
                 PresaleError::InvalidBuyerCapRange
             );
         }
@@ -93,7 +90,7 @@ pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleMod
 }
 
 pub fn end_presale_if_max_cap_reached(presale: &mut Presale, current_timestamp: u64) -> Result<()> {
-    if presale.is_earlier_presale_end_disabled() {
+    if presale.disable_earlier_presale_end_once_cap_reached == 1 {
         return Ok(());
     }
 

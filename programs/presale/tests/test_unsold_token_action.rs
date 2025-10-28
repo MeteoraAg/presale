@@ -631,13 +631,19 @@ fn test_unsold_token_action_refund_fixed_price_presale_before_presale_complete()
         user_pubkey,
     );
 
-    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    let presale_pubkey = wrapper.accounts.presale;
+    let presale_args = &mut wrapper.args.params.common_args.presale_params;
     presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 
     let err = handle_perform_unsold_token_action_err(
         &mut lite_svm,
@@ -676,13 +682,19 @@ fn test_unsold_token_action_refund_fixed_price_presale_when_presale_failed() {
         user_pubkey,
     );
 
-    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    let presale_pubkey = wrapper.accounts.presale;
+    let presale_args = &mut wrapper.args.params.common_args.presale_params;
     presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -727,13 +739,19 @@ fn test_unsold_token_action_refund_fixed_price_presale_token2022() {
         user_pubkey,
     );
 
-    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    let presale_pubkey = wrapper.accounts.presale;
+    let presale_args = &mut wrapper.args.params.common_args.presale_params;
     presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -830,13 +848,19 @@ fn test_unsold_token_action_refund_fixed_price_presale_with_non_zero_deposit_reg
         user_pubkey,
     );
 
-    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    let presale_pubkey = wrapper.accounts.presale;
+    let presale_args = &mut wrapper.args.params.common_args.presale_params;
     presale_args.unsold_token_action = UnsoldTokenAction::Refund.into();
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
 
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
@@ -933,13 +957,19 @@ fn test_unsold_token_action_burn_fixed_price_presale_with_non_zero_deposit_regis
         user_pubkey,
     );
 
-    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
-    let presale_args = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    let presale_pubkey = wrapper.accounts.presale;
+    let presale_args = &mut wrapper.args.params.common_args.presale_params;
     presale_args.unsold_token_action = UnsoldTokenAction::Burn.into();
 
-    let instructions = wrapper.to_instructions();
+    let instruction = wrapper.to_instruction();
 
-    process_transaction(&mut lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(
+        &mut lite_svm,
+        &[instruction],
+        Some(&user.pubkey()),
+        &[&user],
+    )
+    .unwrap();
     let presale_state: Presale = lite_svm
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();

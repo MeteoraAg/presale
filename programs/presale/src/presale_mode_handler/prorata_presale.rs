@@ -6,22 +6,24 @@ pub struct ProrataPresaleHandler;
 impl PresaleModeHandler for ProrataPresaleHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
         &self,
-        _presale_pubkey: Pubkey,
         presale: &mut Presale,
-        presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
+        common_args: &'e CommonPresaleArgs,
         mint_pubkeys: InitializePresaleVaultAccountPubkeys,
-        _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
+        disable_withdraw: bool,
+        q_price: u128,
+        disable_earlier_presale_end_once_cap_reached: bool,
     ) -> Result<()> {
+        let CommonPresaleArgs {
+            presale_params,
+            presale_registries,
+            ..
+        } = common_args;
+
         let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
         let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
         if whitelist_mode.is_permissioned() {
-            enforce_dynamic_price_registries_max_buyer_cap_range(
-                presale_params,
-                presale_registries,
-            )?;
+            enforce_dynamic_price_registries_max_buyer_cap_range(presale_registries)?;
         }
 
         let InitializePresaleVaultAccountPubkeys {
@@ -37,10 +39,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
 
         // 3. Create presale vault
         presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            presale_registries,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            fixed_price_presale_params: None,
+            common_args,
             base_mint,
             quote_mint,
             base_token_vault,
@@ -50,6 +49,10 @@ impl PresaleModeHandler for ProrataPresaleHandler {
             base,
             base_token_program,
             quote_token_program,
+            disable_earlier_presale_end_once_cap_reached,
+            disable_withdraw,
+            q_price,
+            presale_mode: PresaleMode::Prorata,
         })?;
 
         Ok(())
@@ -68,11 +71,6 @@ impl PresaleModeHandler for ProrataPresaleHandler {
     ) -> Result<()> {
         // Do nothing because prorata allow over subscription
         Ok(())
-    }
-
-    fn can_withdraw(&self, _presale: &Presale) -> bool {
-        // Prorata presale allows withdraw
-        true
     }
 
     fn process_withdraw(

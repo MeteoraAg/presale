@@ -16,9 +16,9 @@ use anchor_spl::{
 };
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{
-    AccountsType, LockedVestingArgs, PresaleArgs, PresaleMode, PresaleRegistryArgs,
-    RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction, WhitelistMode,
-    MAX_PRESALE_REGISTRY_COUNT, SCALE_MULTIPLIER,
+    AccountsType, CommonPresaleArgs, LockedVestingArgs, PresaleArgs, PresaleMode,
+    PresaleRegistryArgs, RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction,
+    WhitelistMode, MAX_PRESALE_REGISTRY_COUNT, SCALE_MULTIPLIER,
 };
 
 pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; 1] = [10_000];
@@ -90,17 +90,17 @@ pub fn create_default_presale_args(lite_svm: &LiteSVM) -> PresaleArgs {
         presale_end_time,
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
-        presale_mode: PresaleMode::FixedPrice.into(),
         whitelist_mode: WhitelistMode::Permissionless.into(),
         unsold_token_action: UnsoldTokenAction::Refund.into(),
         ..Default::default()
     }
 }
 
-pub fn create_default_locked_vesting_args() -> LockedVestingArgs {
+pub fn create_default_locked_vesting_args(presale_end_time: u64) -> LockedVestingArgs {
     LockedVestingArgs {
         lock_duration: 3600,  // 1 hour
         vest_duration: 86400, // 1 day
+        immediate_release_timestamp: presale_end_time,
         ..Default::default()
     }
 }
@@ -151,57 +151,54 @@ pub fn build_initialize_presale_accounts(
     }
 }
 
-pub struct CreateDefaultPresaleArgsWrapper {
-    pub args: presale::instruction::InitializePresale,
+fn to_instruction(
+    args: &impl InstructionData,
+    accounts: &impl ToAccountMetas,
+    remaining_account: Vec<AccountMeta>,
+) -> Instruction {
+    let mut accounts = accounts.to_account_metas(None);
+    accounts.extend(remaining_account);
+
+    Instruction {
+        program_id: presale::ID,
+        accounts,
+        data: args.data(),
+    }
+}
+
+pub struct CreateDefaultProrataPresaleArgsWrapper {
+    pub args: presale::instruction::InitializeProrataPresale,
     pub accounts: presale::accounts::InitializePresaleCtx,
     pub remaining_accounts: Vec<AccountMeta>,
 }
 
-impl CreateDefaultPresaleArgsWrapper {
-    pub fn to_instructions(self) -> Vec<Instruction> {
-        let CreateDefaultPresaleArgsWrapper {
-            args,
-            accounts,
-            remaining_accounts,
-        } = self;
-
-        let mut accounts = accounts.to_account_metas(None);
-        accounts.extend_from_slice(&remaining_accounts);
-
-        vec![Instruction {
-            program_id: presale::ID,
-            accounts,
-            data: args.data(),
-        }]
+impl CreateDefaultProrataPresaleArgsWrapper {
+    pub fn to_instruction(&self) -> Instruction {
+        to_instruction(&self.args, &self.accounts, self.remaining_accounts.clone())
     }
 }
 
 pub struct CreateDefaultFixedPricePresaleArgsWrapper {
-    pub presale_params_wrapper: CreateDefaultPresaleArgsWrapper,
-    pub fixed_point_params_wrapper: CreateInitializeFixedTokenPricePresaleParamsArgsWrapper,
+    pub args: presale::instruction::InitializeFixedPricePresale,
+    pub accounts: presale::accounts::InitializePresaleCtx,
+    pub remaining_accounts: Vec<AccountMeta>,
 }
 
 impl CreateDefaultFixedPricePresaleArgsWrapper {
-    pub fn to_instructions(self) -> Vec<Instruction> {
-        let CreateDefaultFixedPricePresaleArgsWrapper {
-            presale_params_wrapper,
-            fixed_point_params_wrapper,
-        } = self;
+    pub fn to_instruction(&self) -> Instruction {
+        to_instruction(&self.args, &self.accounts, self.remaining_accounts.clone())
+    }
+}
 
-        let CreateInitializeFixedTokenPricePresaleParamsArgsWrapper { accounts, args, .. } =
-            fixed_point_params_wrapper;
+pub struct CreateDefaultFcfsPresaleArgsWrapper {
+    pub args: presale::instruction::InitializeFcfsPresale,
+    pub accounts: presale::accounts::InitializePresaleCtx,
+    pub remaining_accounts: Vec<AccountMeta>,
+}
 
-        let init_fixed_price_params_ix = Instruction {
-            program_id: presale::ID,
-            accounts: accounts.to_account_metas(None),
-            data: args.data(),
-        };
-
-        let init_presale_ix = presale_params_wrapper.to_instructions();
-        let mut instructions = vec![init_fixed_price_params_ix];
-        instructions.extend(init_presale_ix);
-
-        instructions
+impl CreateDefaultFcfsPresaleArgsWrapper {
+    pub fn to_instruction(&self) -> Instruction {
+        to_instruction(&self.args, &self.accounts, self.remaining_accounts.clone())
     }
 }
 
@@ -212,7 +209,7 @@ pub fn create_default_fcfs_presale_args_wrapper(
     whitelist_mode: WhitelistMode,
     payer: Rc<Keypair>,
     creator_pubkey: Pubkey,
-) -> CreateDefaultPresaleArgsWrapper {
+) -> CreateDefaultFcfsPresaleArgsWrapper {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
@@ -220,10 +217,9 @@ pub fn create_default_fcfs_presale_args_wrapper(
         .expect("Failed to deserialize base mint state");
 
     let mut presale_args = create_default_presale_args(lite_svm);
-    presale_args.presale_mode = PresaleMode::Fcfs.into();
     presale_args.whitelist_mode = whitelist_mode.into();
 
-    let locked_vesting_args = create_default_locked_vesting_args();
+    let locked_vesting_args = create_default_locked_vesting_args(presale_args.presale_end_time);
 
     let payer_pubkey = payer.pubkey();
 
@@ -232,7 +228,7 @@ pub fn create_default_fcfs_presale_args_wrapper(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        PresaleMode::Fcfs,
         presale_args.presale_maximum_cap,
     );
 
@@ -254,11 +250,15 @@ pub fn create_default_fcfs_presale_args_wrapper(
         lite_svm,
     );
 
-    let args = presale::instruction::InitializePresale {
-        params: presale::InitializePresaleArgs {
-            presale_registries,
-            presale_params: presale_args,
-            locked_vesting_params: locked_vesting_args,
+    let args = presale::instruction::InitializeFcfsPresale {
+        params: presale::InitializeFcfsPresaleArgs {
+            common_args: CommonPresaleArgs {
+                presale_registries,
+                presale_params: presale_args,
+                locked_vesting_params: locked_vesting_args,
+                ..Default::default()
+            },
+            disable_earlier_presale_end_once_cap_reached: false.into(),
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {
@@ -269,7 +269,7 @@ pub fn create_default_fcfs_presale_args_wrapper(
         },
     };
 
-    CreateDefaultPresaleArgsWrapper {
+    CreateDefaultFcfsPresaleArgsWrapper {
         args,
         accounts,
         remaining_accounts: base_token_transfer_hook_accounts,
@@ -283,7 +283,7 @@ pub fn create_default_prorata_presale_args_wrapper(
     whitelist_mode: WhitelistMode,
     payer: Rc<Keypair>,
     creator_pubkey: Pubkey,
-) -> CreateDefaultPresaleArgsWrapper {
+) -> CreateDefaultProrataPresaleArgsWrapper {
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
 
@@ -291,10 +291,9 @@ pub fn create_default_prorata_presale_args_wrapper(
         .expect("Failed to deserialize base mint state");
 
     let mut presale_args = create_default_presale_args(lite_svm);
-    presale_args.presale_mode = PresaleMode::Prorata.into();
     presale_args.whitelist_mode = whitelist_mode.into();
 
-    let locked_vesting_args = create_default_locked_vesting_args();
+    let locked_vesting_args = create_default_locked_vesting_args(presale_args.presale_end_time);
 
     let payer_pubkey = payer.pubkey();
 
@@ -303,7 +302,7 @@ pub fn create_default_prorata_presale_args_wrapper(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        PresaleMode::Prorata,
         presale_args.presale_maximum_cap,
     );
 
@@ -325,11 +324,14 @@ pub fn create_default_prorata_presale_args_wrapper(
         lite_svm,
     );
 
-    let args = presale::instruction::InitializePresale {
-        params: presale::InitializePresaleArgs {
-            presale_registries,
-            presale_params: presale_args,
-            locked_vesting_params: locked_vesting_args,
+    let args = presale::instruction::InitializeProrataPresale {
+        params: presale::InitializeProrataPresaleArgs {
+            common_args: CommonPresaleArgs {
+                presale_registries,
+                presale_params: presale_args,
+                locked_vesting_params: locked_vesting_args,
+                ..Default::default()
+            },
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {
@@ -340,7 +342,7 @@ pub fn create_default_prorata_presale_args_wrapper(
         },
     };
 
-    CreateDefaultPresaleArgsWrapper {
+    CreateDefaultProrataPresaleArgsWrapper {
         args,
         accounts,
         remaining_accounts: base_token_transfer_hook_accounts,
@@ -365,10 +367,9 @@ pub fn create_default_fixed_price_presale_args_wrapper(
         .expect("Failed to deserialize quote mint state");
 
     let mut presale_args = create_default_presale_args(lite_svm);
-    presale_args.presale_mode = PresaleMode::FixedPrice.into();
     presale_args.whitelist_mode = whitelist_mode.into();
 
-    let locked_vesting_args = create_default_locked_vesting_args();
+    let locked_vesting_args = create_default_locked_vesting_args(presale_args.presale_end_time);
 
     let fixed_point_q_price = calculate_q_price_from_ui_price(
         DEFAULT_PRICE,
@@ -378,25 +379,12 @@ pub fn create_default_fixed_price_presale_args_wrapper(
 
     let payer_pubkey = payer.pubkey();
 
-    let fixed_point_params_wrapper =
-        create_initialize_fixed_token_price_presale_params_args_wrapper(
-            HandleInitializeFixedTokenPricePresaleParamsArgs {
-                base_mint,
-                quote_mint,
-                q_price: fixed_point_q_price,
-                owner: creator_pubkey,
-                payer: Rc::clone(&payer),
-                base: payer_pubkey,
-                disable_withdraw: false,
-            },
-        );
-
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         fixed_point_q_price,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        PresaleMode::FixedPrice,
         presale_args.presale_maximum_cap,
     );
 
@@ -409,12 +397,7 @@ pub fn create_default_fixed_price_presale_args_wrapper(
         creator_pubkey,
     );
 
-    let fixed_price_args_pda =
-        derive_fixed_price_presale_args(&base_mint, &quote_mint, &payer_pubkey, &presale::ID);
-
-    let mut remaining_accounts = vec![AccountMeta::new_readonly(fixed_price_args_pda, false)];
-
-    let base_token_transfer_hook_accounts = get_extra_account_metas_for_transfer_hook(
+    let remaining_accounts = get_extra_account_metas_for_transfer_hook(
         &base_mint_account.owner,
         &accounts.payer_presale_token,
         &base_mint,
@@ -423,30 +406,31 @@ pub fn create_default_fixed_price_presale_args_wrapper(
         lite_svm,
     );
 
-    remaining_accounts.extend_from_slice(&base_token_transfer_hook_accounts);
-
-    let args = presale::instruction::InitializePresale {
-        params: presale::InitializePresaleArgs {
-            presale_registries,
-            presale_params: presale_args,
-            locked_vesting_params: locked_vesting_args,
+    let args = presale::instruction::InitializeFixedPricePresale {
+        params: presale::InitializeFixedPricePresaleArgs {
+            common_args: CommonPresaleArgs {
+                presale_registries,
+                presale_params: presale_args,
+                locked_vesting_params: locked_vesting_args,
+                ..Default::default()
+            },
+            q_price: fixed_point_q_price,
+            disable_earlier_presale_end_once_cap_reached: false.into(),
+            disable_withdraw: false.into(),
             ..Default::default()
         },
         remaining_account_info: RemainingAccountsInfo {
             slices: vec![RemainingAccountsSlice {
                 accounts_type: AccountsType::TransferHookBase,
-                length: base_token_transfer_hook_accounts.len() as u8,
+                length: remaining_accounts.len() as u8,
             }],
         },
     };
 
     CreateDefaultFixedPricePresaleArgsWrapper {
-        presale_params_wrapper: CreateDefaultPresaleArgsWrapper {
-            args,
-            accounts,
-            remaining_accounts,
-        },
-        fixed_point_params_wrapper,
+        args,
+        accounts,
+        remaining_accounts,
     }
 }
 
@@ -463,7 +447,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
     immediate_release_delta_from_presale_end: i64,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -472,14 +456,11 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
         Rc::clone(&user),
         user.pubkey(),
     );
-    let CreateDefaultFixedPricePresaleArgsWrapper {
-        presale_params_wrapper,
-        ..
-    } = &mut wrapper;
+    let CreateDefaultFixedPricePresaleArgsWrapper { args, .. } = &mut wrapper;
 
-    let args = &mut presale_params_wrapper.args;
-    let presale_args = &args.params.presale_params;
-    let locked_vesting_args = &mut args.params.locked_vesting_params;
+    let common_args = &mut args.params.common_args;
+    let presale_args = &common_args.presale_params;
+    let locked_vesting_args = &mut common_args.locked_vesting_params;
 
     locked_vesting_args.immediately_release_bps = 5000;
     locked_vesting_args.immediate_release_timestamp = i64::try_from(presale_args.presale_end_time)
@@ -489,7 +470,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_immediate_release(
         .try_into()
         .unwrap();
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 pub fn create_predefined_fixed_price_presale_ix(
@@ -498,7 +479,7 @@ pub fn create_predefined_fixed_price_presale_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let wrapper = create_default_fixed_price_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -508,7 +489,7 @@ pub fn create_predefined_fixed_price_presale_ix(
         user.pubkey(),
     );
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
@@ -517,7 +498,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -527,16 +508,12 @@ pub fn create_predefined_fixed_price_presale_ix_with_deposit_fees(
         user.pubkey(),
     );
 
-    let CreateDefaultFixedPricePresaleArgsWrapper {
-        presale_params_wrapper,
-        ..
-    } = &mut wrapper;
+    let CreateDefaultFixedPricePresaleArgsWrapper { args, .. } = &mut wrapper;
 
-    let args = &mut presale_params_wrapper.args;
-    let presale_registries = &mut args.params.presale_registries;
+    let presale_registries = &mut args.params.common_args.presale_registries;
     update_presale_registries_with_default_deposit_fee(presale_registries);
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 pub fn create_predefined_prorata_ix_with_no_vest_nor_lock(
@@ -545,7 +522,7 @@ pub fn create_predefined_prorata_ix_with_no_vest_nor_lock(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_prorata_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -555,12 +532,12 @@ pub fn create_predefined_prorata_ix_with_no_vest_nor_lock(
         user.pubkey(),
     );
 
-    let locked_vesting_args = &mut wrapper.args.params.locked_vesting_params;
+    let locked_vesting_args = &mut wrapper.args.params.common_args.locked_vesting_params;
     locked_vesting_args.lock_duration = 0;
     locked_vesting_args.vest_duration = 0;
     locked_vesting_args.immediately_release_bps = MAX_FEE_BASIS_POINTS;
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
@@ -569,7 +546,7 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_fixed_price_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -579,29 +556,26 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
         user.pubkey(),
     );
 
-    let CreateDefaultFixedPricePresaleArgsWrapper {
-        presale_params_wrapper,
-        fixed_point_params_wrapper,
-    } = &mut wrapper;
+    let CreateDefaultFixedPricePresaleArgsWrapper { args, .. } = &mut wrapper;
 
     let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
-    let presale_args = &presale_params_wrapper.args.params.presale_params;
+    let presale_args = &args.params.common_args.presale_params;
 
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
-        fixed_point_params_wrapper.args.params.q_price,
+        args.params.q_price,
         presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        PresaleMode::FixedPrice,
         presale_args.presale_maximum_cap,
     );
 
-    presale_params_wrapper.args.params.presale_registries = presale_registries;
+    args.params.common_args.presale_registries = presale_registries;
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 fn create_predefined_prorata_presale_ix_with_deposit_fee(
@@ -610,7 +584,7 @@ fn create_predefined_prorata_presale_ix_with_deposit_fee(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_prorata_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -620,10 +594,10 @@ fn create_predefined_prorata_presale_ix_with_deposit_fee(
         user.pubkey(),
     );
 
-    let presale_registries = &mut wrapper.args.params.presale_registries;
+    let presale_registries = &mut wrapper.args.params.common_args.presale_registries;
     update_presale_registries_with_default_deposit_fee(presale_registries);
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 fn create_predefined_prorata_presale_ix(
@@ -632,7 +606,7 @@ fn create_predefined_prorata_presale_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let wrapper = create_default_prorata_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -642,7 +616,7 @@ fn create_predefined_prorata_presale_ix(
         user.pubkey(),
     );
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 fn create_predefined_prorata_presale_with_multiple_registries_ix(
@@ -652,7 +626,7 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
     unsold_token_action: UnsoldTokenAction,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_prorata_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -667,20 +641,23 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
-    let presale_args = &wrapper.args.params.presale_params;
+    let presale_args = &wrapper.args.params.common_args.presale_params;
 
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        PresaleMode::Prorata,
         presale_args.presale_maximum_cap,
     );
 
-    wrapper.args.params.presale_registries = presale_registries;
-    wrapper.args.params.presale_params.unsold_token_action = unsold_token_action.into();
-    wrapper.to_instructions()
+    let common_args = &mut wrapper.args.params.common_args;
+
+    common_args.presale_registries = presale_registries;
+    common_args.presale_params.unsold_token_action = unsold_token_action.into();
+
+    wrapper.to_instruction()
 }
 
 fn create_predefined_fcfs_presale_ix(
@@ -689,7 +666,7 @@ fn create_predefined_fcfs_presale_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let wrapper = create_default_fcfs_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -699,7 +676,7 @@ fn create_predefined_fcfs_presale_ix(
         user.pubkey(),
     );
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 fn create_predefined_fcfs_presale_ix_with_deposit_fee(
@@ -708,7 +685,7 @@ fn create_predefined_fcfs_presale_ix_with_deposit_fee(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_fcfs_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -718,10 +695,10 @@ fn create_predefined_fcfs_presale_ix_with_deposit_fee(
         user.pubkey(),
     );
 
-    let presale_registries = &mut wrapper.args.params.presale_registries;
+    let presale_registries = &mut wrapper.args.params.common_args.presale_registries;
     update_presale_registries_with_default_deposit_fee(presale_registries);
 
-    wrapper.to_instructions()
+    wrapper.to_instruction()
 }
 
 fn create_predefined_fcfs_presale_with_multiple_registries_ix(
@@ -730,7 +707,7 @@ fn create_predefined_fcfs_presale_with_multiple_registries_ix(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
     whitelist_mode: WhitelistMode,
-) -> Vec<Instruction> {
+) -> Instruction {
     let mut wrapper = create_default_fcfs_presale_args_wrapper(
         base_mint,
         quote_mint,
@@ -745,34 +722,19 @@ fn create_predefined_fcfs_presale_with_multiple_registries_ix(
     let base_mint_state = Mint::try_deserialize(&mut base_mint_account.data.as_ref())
         .expect("Failed to deserialize base mint state");
 
-    let presale_args = &wrapper.args.params.presale_params;
+    let presale_args = &wrapper.args.params.common_args.presale_params;
 
     let presale_registries = create_default_presale_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        PresaleMode::Fcfs,
         presale_args.presale_maximum_cap,
     );
 
-    wrapper.args.params.presale_registries = presale_registries;
-    wrapper.to_instructions()
-}
-
-pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
-    let HandleInitializePresaleArgs { payer, .. } = args.clone();
-    let instructions = create_initialize_presale_ix(lite_svm, args);
-    process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap();
-}
-
-pub fn handle_initialize_presale_err(
-    lite_svm: &mut LiteSVM,
-    args: HandleInitializePresaleArgs,
-) -> FailedTransactionMetadata {
-    let HandleInitializePresaleArgs { payer, .. } = args.clone();
-    let instructions = create_initialize_presale_ix(lite_svm, args);
-    process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap_err()
+    wrapper.args.params.common_args.presale_registries = presale_registries;
+    wrapper.to_instruction()
 }
 
 pub fn handle_create_predefined_permissionless_prorata_presale(
@@ -781,7 +743,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_prorata_presale_ix(
+    let instruction = create_predefined_prorata_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -789,7 +751,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale(
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -806,7 +768,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fcfs_presale_ix(
+    let instruction = create_predefined_fcfs_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -814,7 +776,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale(
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -831,7 +793,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale_with_deposit_fees(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fcfs_presale_ix_with_deposit_fee(
+    let instruction = create_predefined_fcfs_presale_ix_with_deposit_fee(
         lite_svm,
         base_mint,
         quote_mint,
@@ -839,7 +801,7 @@ pub fn handle_create_predefined_permissionless_fcfs_presale_with_deposit_fees(
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -856,7 +818,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix(
+    let instruction = create_predefined_fixed_price_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -864,7 +826,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale(
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -882,7 +844,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale_with_immediat
     user: Rc<Keypair>,
     immediate_release_delta_from_presale_end: i64,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix_with_immediate_release(
+    let instruction = create_predefined_fixed_price_presale_ix_with_immediate_release(
         lite_svm,
         base_mint,
         quote_mint,
@@ -891,7 +853,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale_with_immediat
         immediate_release_delta_from_presale_end,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -908,7 +870,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale_with_deposit_fee(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_prorata_presale_ix_with_deposit_fee(
+    let instruction = create_predefined_prorata_presale_ix_with_deposit_fee(
         lite_svm,
         base_mint,
         quote_mint,
@@ -916,7 +878,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale_with_deposit_fee(
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -933,7 +895,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale_with_deposit_
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix_with_deposit_fees(
+    let instruction = create_predefined_fixed_price_presale_ix_with_deposit_fees(
         lite_svm,
         base_mint,
         quote_mint,
@@ -941,7 +903,7 @@ pub fn handle_create_predefined_permissionless_fixed_price_presale_with_deposit_
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -958,7 +920,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale_with_no_vest_nor_
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_prorata_ix_with_no_vest_nor_lock(
+    let instruction = create_predefined_prorata_ix_with_no_vest_nor_lock(
         lite_svm,
         base_mint,
         quote_mint,
@@ -966,7 +928,7 @@ pub fn handle_create_predefined_permissionless_prorata_presale_with_no_vest_nor_
         WhitelistMode::Permissionless,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -983,7 +945,7 @@ pub fn handle_create_predefined_permissioned_with_authority_fixed_price_presale(
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix(
+    let instruction = create_predefined_fixed_price_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -991,7 +953,7 @@ pub fn handle_create_predefined_permissioned_with_authority_fixed_price_presale(
         WhitelistMode::PermissionWithAuthority,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1008,7 +970,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix(
+    let instruction = create_predefined_fixed_price_presale_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -1016,7 +978,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
         WhitelistMode::PermissionWithMerkleProof,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1033,7 +995,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fixed_price_presale_ix_with_multiple_registries(
+    let instruction = create_predefined_fixed_price_presale_ix_with_multiple_registries(
         lite_svm,
         base_mint,
         quote_mint,
@@ -1041,7 +1003,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fixed_price_presa
         WhitelistMode::PermissionWithMerkleProof,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1058,7 +1020,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_w
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_prorata_presale_with_multiple_registries_ix(
+    let instruction = create_predefined_prorata_presale_with_multiple_registries_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -1067,7 +1029,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_w
         UnsoldTokenAction::Refund,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1084,7 +1046,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_w
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_prorata_presale_with_multiple_registries_ix(
+    let instruction = create_predefined_prorata_presale_with_multiple_registries_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -1093,7 +1055,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_prorata_presale_w
         UnsoldTokenAction::Burn,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1110,7 +1072,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with
     quote_mint: Pubkey,
     user: Rc<Keypair>,
 ) -> HandleCreatePredefinedPresaleResponse {
-    let instructions = create_predefined_fcfs_presale_with_multiple_registries_ix(
+    let instruction = create_predefined_fcfs_presale_with_multiple_registries_ix(
         lite_svm,
         base_mint,
         quote_mint,
@@ -1118,7 +1080,7 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with
         WhitelistMode::PermissionWithMerkleProof,
     );
 
-    process_transaction(lite_svm, &instructions, Some(&user.pubkey()), &[&user]).unwrap();
+    process_transaction(lite_svm, &[instruction], Some(&user.pubkey()), &[&user]).unwrap();
 
     let user_pubkey = user.pubkey();
 
@@ -1129,102 +1091,17 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with
     }
 }
 
-#[derive(Clone)]
-pub struct HandleInitializePresaleArgs {
-    pub base_mint: Pubkey,
-    pub quote_mint: Pubkey,
-    pub presale_params: PresaleArgs,
-    pub presale_registries: Vec<PresaleRegistryArgs>,
-    pub locked_vesting_params: Option<LockedVestingArgs>,
-    pub creator: Pubkey,
-    pub payer: Rc<Keypair>,
-    pub remaining_accounts: Vec<AccountMeta>,
-}
+// pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
+//     let HandleInitializePresaleArgs { payer, .. } = args.clone();
+//     let instructions = create_initialize_presale_ix(lite_svm, args);
+//     process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap();
+// }
 
-pub fn create_initialize_presale_ix(
-    lite_svm: &LiteSVM,
-    args: HandleInitializePresaleArgs,
-) -> Vec<Instruction> {
-    let HandleInitializePresaleArgs {
-        base_mint,
-        quote_mint,
-        presale_params,
-        presale_registries,
-        locked_vesting_params,
-        creator,
-        payer,
-        remaining_accounts,
-    } = args;
-
-    let payer_pubkey = payer.pubkey();
-
-    let presale = derive_presale(&base_mint, &quote_mint, &payer_pubkey, &presale::ID);
-    let presale_vault = derive_presale_vault(&presale, &presale::ID);
-    let quote_vault = derive_quote_vault(&presale, &presale::ID);
-    let event_authority = derive_event_authority(&presale::ID);
-
-    let base_mint_account = lite_svm.get_account(&base_mint).unwrap();
-    let quote_mint_account = lite_svm.get_account(&quote_mint).unwrap();
-
-    let base_mint_owner = base_mint_account.owner;
-    let quote_mint_owner = quote_mint_account.owner;
-
-    let payer_presale_token =
-        get_associated_token_address_with_program_id(&payer_pubkey, &base_mint, &base_mint_owner);
-
-    let mut accounts = presale::accounts::InitializePresaleCtx {
-        presale,
-        presale_mint: base_mint,
-        presale_authority: presale::presale_authority::ID,
-        quote_token_mint: quote_mint,
-        presale_vault,
-        quote_token_vault: quote_vault,
-        creator,
-        payer: payer_pubkey,
-        system_program: anchor_lang::solana_program::system_program::ID,
-        event_authority,
-        base_token_program: base_mint_owner,
-        quote_token_program: quote_mint_owner,
-        program: presale::ID,
-        payer_presale_token,
-        base: payer_pubkey,
-    }
-    .to_account_metas(None);
-
-    accounts.extend_from_slice(&remaining_accounts);
-
-    let base_token_transfer_hook_accounts = get_extra_account_metas_for_transfer_hook(
-        &base_mint_owner,
-        &payer_presale_token,
-        &base_mint,
-        &presale_vault,
-        &payer_pubkey,
-        lite_svm,
-    );
-
-    accounts.extend_from_slice(&base_token_transfer_hook_accounts);
-
-    let ix_data = presale::instruction::InitializePresale {
-        params: presale::InitializePresaleArgs {
-            presale_registries,
-            presale_params,
-            locked_vesting_params: locked_vesting_params.unwrap_or_default(),
-            ..Default::default()
-        },
-        remaining_account_info: RemainingAccountsInfo {
-            slices: vec![RemainingAccountsSlice {
-                accounts_type: AccountsType::TransferHookBase,
-                length: base_token_transfer_hook_accounts.len() as u8,
-            }],
-        },
-    }
-    .data();
-
-    let init_presale_ix = Instruction {
-        program_id: presale::ID,
-        accounts,
-        data: ix_data,
-    };
-
-    vec![init_presale_ix]
-}
+// pub fn handle_initialize_presale_err(
+//     lite_svm: &mut LiteSVM,
+//     args: HandleInitializePresaleArgs,
+// ) -> FailedTransactionMetadata {
+//     let HandleInitializePresaleArgs { payer, .. } = args.clone();
+//     let instructions = create_initialize_presale_ix(lite_svm, args);
+//     process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap_err()
+// }

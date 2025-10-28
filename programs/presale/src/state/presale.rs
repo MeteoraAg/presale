@@ -85,15 +85,14 @@ pub struct Presale {
     pub quote_token_vault: Pubkey,
     /// Base key
     pub base: Pubkey,
-    /// Fixed price presale extra flags. Only applicable for fixed price presale mode
-    pub fixed_price_presale_flags: u8,
+    pub padding: u8,
     /// Presale mode
     pub presale_mode: u8,
     /// Whitelist mode
     pub whitelist_mode: u8,
-    /// Presale flags. Applicable for various presale modes
-    pub presale_flags: u8,
-    pub padding1: [u8; 4],
+    pub disable_withdraw: u8,
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+    pub padding1: [u8; 3],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -157,10 +156,7 @@ static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1264);
 static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs<'a> {
-    pub presale_params: PresaleArgs,
-    pub presale_registries: &'a [PresaleRegistryArgs],
-    pub locked_vesting_params: Option<LockedVestingArgs>,
-    pub fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
+    pub common_args: &'a CommonPresaleArgs,
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub base_token_vault: Pubkey,
@@ -170,6 +166,10 @@ pub struct PresaleInitializeArgs<'a> {
     pub base: Pubkey,
     pub base_token_program: Pubkey,
     pub quote_token_program: Pubkey,
+    pub q_price: u128,
+    pub disable_withdraw: bool,
+    pub disable_earlier_presale_end_once_cap_reached: bool,
+    pub presale_mode: PresaleMode,
 }
 
 fn token_program_to_flag(program: Pubkey) -> TokenProgramFlags {
@@ -210,10 +210,7 @@ impl Presale {
 impl Presale {
     pub fn initialize(&mut self, args: PresaleInitializeArgs) -> Result<()> {
         let PresaleInitializeArgs {
-            presale_params,
-            locked_vesting_params,
-            fixed_price_presale_params,
-            presale_registries,
+            common_args,
             base_mint,
             quote_mint,
             base_token_vault,
@@ -223,6 +220,10 @@ impl Presale {
             base,
             base_token_program,
             quote_token_program,
+            q_price,
+            disable_withdraw,
+            disable_earlier_presale_end_once_cap_reached,
+            presale_mode,
         } = args;
 
         self.owner = owner;
@@ -233,6 +234,13 @@ impl Presale {
         self.base = base;
         self.base_token_program_flag = token_program_to_flag(base_token_program).into();
         self.quote_token_program_flag = token_program_to_flag(quote_token_program).into();
+
+        let CommonPresaleArgs {
+            presale_params,
+            locked_vesting_params,
+            presale_registries,
+            ..
+        } = common_args;
 
         for (idx, registry) in presale_registries.iter().enumerate() {
             self.presale_registries[idx].init(
@@ -247,14 +255,12 @@ impl Presale {
 
         self.total_presale_registry_count = presale_registries.len() as u8;
 
-        let PresaleArgs {
+        let &PresaleArgs {
             presale_maximum_cap,
             presale_minimum_cap,
             presale_end_time,
             whitelist_mode,
-            presale_mode,
             unsold_token_action,
-            disable_earlier_presale_end_once_cap_reached,
             ..
         } = presale_params;
 
@@ -264,15 +270,9 @@ impl Presale {
             presale_params.get_presale_start_time_without_going_backwards(current_timestamp);
         self.presale_end_time = presale_end_time;
         self.whitelist_mode = whitelist_mode;
-        self.presale_mode = presale_mode;
+        self.presale_mode = presale_mode.into();
         self.unsold_token_action = unsold_token_action;
         self.created_at = current_timestamp;
-
-        let mut presale_flags = 0u8;
-        if disable_earlier_presale_end_once_cap_reached > 0 {
-            presale_flags |= DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK;
-        }
-        self.presale_flags = presale_flags;
 
         if let Some(LockedVestingArgs {
             lock_duration,
@@ -280,7 +280,7 @@ impl Presale {
             immediately_release_bps,
             immediate_release_timestamp,
             ..
-        }) = locked_vesting_params
+        }) = locked_vesting_params.option()
         {
             self.lock_duration = lock_duration;
             self.vest_duration = vest_duration;
@@ -300,20 +300,10 @@ impl Presale {
             self.vesting_end_time = vesting_end_time;
         }
 
-        if let Some(FixedPricePresaleExtraArgs {
-            q_price,
-            disable_withdraw,
-            ..
-        }) = fixed_price_presale_params
-        {
-            self.fixed_price_presale_q_price = q_price;
-
-            let mut fixed_price_presale_flags = 0u8;
-            if disable_withdraw > 0 {
-                fixed_price_presale_flags |= DISABLE_WITHDRAW_MASK;
-            }
-            self.fixed_price_presale_flags = fixed_price_presale_flags;
-        }
+        self.fixed_price_presale_q_price = q_price;
+        self.disable_withdraw = disable_withdraw.into();
+        self.disable_earlier_presale_end_once_cap_reached =
+            disable_earlier_presale_end_once_cap_reached.into();
 
         Ok(())
     }
@@ -568,8 +558,12 @@ impl Presale {
         }
     }
 
+    pub fn can_withdraw(&self) -> bool {
+        self.disable_withdraw == 0
+    }
+
     pub fn is_earlier_presale_end_disabled(&self) -> bool {
-        (self.presale_flags & DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK) != 0
+        self.disable_earlier_presale_end_once_cap_reached == 1
     }
 }
 
