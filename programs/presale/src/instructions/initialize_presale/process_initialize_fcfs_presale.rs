@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeFcfsPresaleArgs {
     pub common_args: CommonPresaleArgs,
     pub disable_earlier_presale_end_once_cap_reached: u8,

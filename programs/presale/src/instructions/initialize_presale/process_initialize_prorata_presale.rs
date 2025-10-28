@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeProrataPresaleArgs {
     pub common_args: CommonPresaleArgs,
     pub padding: [u8; 32],

@@ -16,9 +16,10 @@ use anchor_spl::{
 };
 use litesvm::{types::FailedTransactionMetadata, LiteSVM};
 use presale::{
-    AccountsType, CommonPresaleArgs, LockedVestingArgs, PresaleArgs, PresaleMode,
-    PresaleRegistryArgs, RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction,
-    WhitelistMode, MAX_PRESALE_REGISTRY_COUNT, SCALE_MULTIPLIER,
+    AccountsType, CommonPresaleArgs, InitializeFcfsPresaleArgs, InitializeFixedPricePresaleArgs,
+    InitializeProrataPresaleArgs, LockedVestingArgs, PresaleArgs, PresaleMode, PresaleRegistryArgs,
+    RemainingAccountsInfo, RemainingAccountsSlice, UnsoldTokenAction, WhitelistMode,
+    MAX_PRESALE_REGISTRY_COUNT, SCALE_MULTIPLIER,
 };
 
 pub const PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS: [u16; 1] = [10_000];
@@ -1091,17 +1092,137 @@ pub fn handle_create_predefined_permissioned_with_merkle_proof_fcfs_presale_with
     }
 }
 
-// pub fn handle_initialize_presale(lite_svm: &mut LiteSVM, args: HandleInitializePresaleArgs) {
-//     let HandleInitializePresaleArgs { payer, .. } = args.clone();
-//     let instructions = create_initialize_presale_ix(lite_svm, args);
-//     process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap();
-// }
+#[derive(Clone)]
+pub struct HandleInitializeFixedPricePresaleArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub args: InitializeFixedPricePresaleArgs,
+    pub creator: Pubkey,
+    pub payer: Rc<Keypair>,
+}
 
-// pub fn handle_initialize_presale_err(
-//     lite_svm: &mut LiteSVM,
-//     args: HandleInitializePresaleArgs,
-// ) -> FailedTransactionMetadata {
-//     let HandleInitializePresaleArgs { payer, .. } = args.clone();
-//     let instructions = create_initialize_presale_ix(lite_svm, args);
-//     process_transaction(lite_svm, &instructions, Some(&payer.pubkey()), &[&payer]).unwrap_err()
-// }
+pub fn handle_initialize_fixed_price_presale(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeFixedPricePresaleArgs,
+) {
+    let HandleInitializeFixedPricePresaleArgs {
+        base_mint,
+        quote_mint,
+        payer,
+        creator,
+        args,
+    } = args.clone();
+
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        lite_svm,
+        args.common_args.presale_params.whitelist_mode.into(),
+        Rc::clone(&payer),
+        creator,
+    );
+
+    wrapper.args.params = args;
+
+    let instruction = wrapper.to_instruction();
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
+}
+
+#[derive(Clone)]
+pub struct HandleInitializeProrataPresaleArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub args: InitializeProrataPresaleArgs,
+    pub creator: Pubkey,
+    pub payer: Rc<Keypair>,
+}
+
+pub fn handle_initialize_prorata_presale(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeProrataPresaleArgs,
+) {
+    let HandleInitializeProrataPresaleArgs {
+        base_mint,
+        quote_mint,
+        payer,
+        creator,
+        args,
+    } = args.clone();
+
+    let mut wrapper = create_default_prorata_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        lite_svm,
+        args.common_args.presale_params.whitelist_mode.into(),
+        Rc::clone(&payer),
+        creator,
+    );
+
+    wrapper.args.params = args;
+
+    let instruction = wrapper.to_instruction();
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
+}
+
+#[derive(Clone)]
+pub struct HandleInitializeFcfsPresaleArgs {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub args: InitializeFcfsPresaleArgs,
+    pub creator: Pubkey,
+    pub payer: Rc<Keypair>,
+}
+
+pub fn handle_initialize_fcfs_presale(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeFcfsPresaleArgs,
+) {
+    let HandleInitializeFcfsPresaleArgs {
+        base_mint,
+        quote_mint,
+        payer,
+        creator,
+        args,
+    } = args.clone();
+
+    let mut wrapper = create_default_fcfs_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        lite_svm,
+        args.common_args.presale_params.whitelist_mode.into(),
+        Rc::clone(&payer),
+        creator,
+    );
+
+    wrapper.args.params = args;
+
+    let instruction = wrapper.to_instruction();
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
+}
+
+pub fn handle_initialize_fixed_price_presale_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeFixedPricePresaleArgs,
+) -> FailedTransactionMetadata {
+    let HandleInitializeFixedPricePresaleArgs {
+        base_mint,
+        quote_mint,
+        payer,
+        creator,
+        args,
+    } = args.clone();
+
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        lite_svm,
+        args.common_args.presale_params.whitelist_mode.into(),
+        Rc::clone(&payer),
+        creator,
+    );
+
+    wrapper.args.params = args;
+
+    let instruction = wrapper.to_instruction();
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap_err()
+}

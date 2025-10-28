@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
 pub struct InitializeFixedPricePresaleArgs {
     pub common_args: CommonPresaleArgs,
     pub q_price: u128,
