@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-# presale [0.1.1] [PR #31](https://github.com/MeteoraAg/presale/pull/31)
+# presale [0.2.0] [PR #31](https://github.com/MeteoraAg/presale/pull/31)
 
 ### Fixed
 
@@ -29,3 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add option to allow fixed price presale to disable withdraw
 - Add option to allow fixed price, and fcfs presale to not end presale earlier if cap reached
+
+### Removed
+
+- Break: `initialize_fixed_price_presale_args` endpoint
+- Break: `close_fixed_price_presale_args` endpoint
+
+### Changed
+
+- Break: `initialize_presale` has been removed and separated into 3 different endpoint, which are `initialize_prorata_presale`, `initialize_fixed_price_presale` and `initialize_fcfs_presale`
+- Break: Newly added `immediate_release_timestamp` need to be `>= presale_end_time`
