@@ -43,12 +43,28 @@ pub fn handle_initialize_fcfs_presale<'a, 'b, 'c: 'info, 'info>(
     let args = HandleInitializePresaleArgs {
         common_args: &common_args,
         presale_mode: PresaleMode::Fcfs,
-        disable_earlier_presale_end_once_cap_reached,
-        q_price: 0,
-        disable_withdraw: true,
     };
 
-    handle_initialize_presale(&ctx, args, remaining_account_info)?;
+    handle_initialize_presale_common_fields(&ctx, args, remaining_account_info)?;
+
+    // Disc is written only after AccountsExit::exit is called, so this is safe.
+    // 2. Validate presale mode specific fields
+    let presale_params = &common_args.presale_params;
+    let presale_registries = common_args.presale_registries.as_ref();
+
+    let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
+
+    if whitelist_mode.is_permissioned() {
+        enforce_dynamic_price_registries_max_buyer_cap_range(presale_params, &presale_registries)?;
+    }
+
+    // 3. Initialize FCFS presale specific fields
+    let mut presale = ctx.accounts.presale.load_init()?;
+
+    FcfsPresaleHandler::initialize(
+        &mut presale.presale_mode_raw_data,
+        disable_earlier_presale_end_once_cap_reached,
+    )?;
 
     emit_cpi!(EvtFcfsPresaleVaultCreate {
         base_mint: ctx.accounts.presale_mint.key(),

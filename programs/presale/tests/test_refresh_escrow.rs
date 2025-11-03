@@ -3,12 +3,13 @@ use std::rc::Rc;
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_lang::prelude::Clock;
 use presale::{
-    calculate_immediate_release_token, Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-    SCALE_OFFSET,
+    calculate_immediate_release_token, Escrow, FixedPricePresaleHandler, Presale,
+    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_OFFSET,
 };
 
 use crate::helpers::{
-    derive_escrow, handle_create_predefined_permissionless_fixed_price_presale,
+    decode_presale_mode_handler, derive_escrow,
+    handle_create_predefined_permissionless_fixed_price_presale,
     handle_create_predefined_permissionless_fixed_price_presale_with_immediate_release,
     handle_escrow_deposit, handle_escrow_refresh, warp_time, warp_to_presale_end,
     HandleCreatePredefinedPresaleResponse, HandleEscrowDepositArgs, HandleEscrowRefreshArgs,
@@ -23,7 +24,7 @@ fn test_escrow_refresh_with_immediate_release() {
     let mint = setup_context.setup_mint(
         DEFAULT_BASE_TOKEN_DECIMALS,
         1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
-);
+    );
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
@@ -72,6 +73,8 @@ fn test_escrow_refresh_with_immediate_release() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
+    let fp_handler = decode_presale_mode_handler::<FixedPricePresaleHandler>(&presale_state);
+
     let escrow_state: Escrow = lite_svm.get_deserialized_zc_account(&escrow).unwrap();
 
     let presale_registry = presale_state
@@ -80,7 +83,7 @@ fn test_escrow_refresh_with_immediate_release() {
 
     let registry_sold_token: u64 = ((u128::from(presale_registry.total_deposit)
         << u128::from(SCALE_OFFSET))
-        / presale_state.fixed_price_presale_q_price)
+        / fp_handler.q_price)
         .try_into()
         .unwrap();
 

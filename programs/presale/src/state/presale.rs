@@ -90,9 +90,7 @@ pub struct Presale {
     pub presale_mode: u8,
     /// Whitelist mode
     pub whitelist_mode: u8,
-    pub disable_withdraw: u8,
-    pub disable_earlier_presale_end_once_cap_reached: u8,
-    pub padding1: [u8; 3],
+    pub padding1: [u8; 5],
     /// Presale target raised capital
     pub presale_maximum_cap: u64,
     /// Presale minimum raised capital. Else, presale consider as failed.
@@ -142,17 +140,17 @@ pub struct Presale {
     pub is_unsold_token_action_performed: u8,
     /// How many % of the token supply is released immediately
     pub immediate_release_bps: u16,
-    /// Presale rate. Only applicable for fixed price presale mode
-    pub fixed_price_presale_q_price: u128,
+    pub padding3: u128,
     /// Timestamp when the immediate release portion is released
     pub immediate_release_timestamp: u64,
-    pub padding3: u64,
-    pub padding4: [u128; 5],
+    pub padding4: u64,
+    pub presale_mode_raw_data: [u64; 32],
+    pub padding5: [u64; 32],
     /// Presale registries. Note: Supporting more registries will causes increased account size.
     pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
 }
 
-static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1264);
+static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1696);
 static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs<'a> {
@@ -166,9 +164,6 @@ pub struct PresaleInitializeArgs<'a> {
     pub base: Pubkey,
     pub base_token_program: Pubkey,
     pub quote_token_program: Pubkey,
-    pub q_price: u128,
-    pub disable_withdraw: bool,
-    pub disable_earlier_presale_end_once_cap_reached: bool,
     pub presale_mode: PresaleMode,
 }
 
@@ -220,9 +215,6 @@ impl Presale {
             base,
             base_token_program,
             quote_token_program,
-            q_price,
-            disable_withdraw,
-            disable_earlier_presale_end_once_cap_reached,
             presale_mode,
         } = args;
 
@@ -299,11 +291,6 @@ impl Presale {
             self.vesting_start_time = vesting_start_time;
             self.vesting_end_time = vesting_end_time;
         }
-
-        self.fixed_price_presale_q_price = q_price;
-        self.disable_withdraw = disable_withdraw.into();
-        self.disable_earlier_presale_end_once_cap_reached =
-            disable_earlier_presale_end_once_cap_reached.into();
 
         Ok(())
     }
@@ -556,14 +543,6 @@ impl Presale {
             }
             PresaleMode::Fcfs | PresaleMode::FixedPrice => Ok(self.total_deposit_fee),
         }
-    }
-
-    pub fn can_withdraw(&self) -> bool {
-        self.disable_withdraw == 0
-    }
-
-    pub fn is_earlier_presale_end_disabled(&self) -> bool {
-        self.disable_earlier_presale_end_once_cap_reached == 1
     }
 }
 

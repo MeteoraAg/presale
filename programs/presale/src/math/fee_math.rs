@@ -48,7 +48,9 @@ mod tests {
             amount_included_fee,
         } = calculate_deposit_fee_included_amount(deposit_amount, fee_bps, Rounding::Up).unwrap();
 
-        let computed_fee = (u128::from(amount_included_fee) * u128::from(fee_bps))
+        let computed_fee = u128::from(amount_included_fee)
+            .checked_mul(u128::from(fee_bps))
+            .unwrap()
             .div_ceil(u128::from(MAX_FEE_BASIS_POINTS));
 
         assert_eq!(u128::from(fee), computed_fee);
@@ -64,8 +66,11 @@ mod tests {
             amount_included_fee,
         } = calculate_deposit_fee_included_amount(deposit_amount, fee_bps, Rounding::Down).unwrap();
 
-        let computed_fee = u128::from(amount_included_fee) * u128::from(fee_bps)
-            / u128::from(MAX_FEE_BASIS_POINTS);
+        let computed_fee = u128::from(amount_included_fee)
+            .checked_mul(u128::from(fee_bps))
+            .unwrap()
+            .checked_div(u128::from(MAX_FEE_BASIS_POINTS))
+            .unwrap();
 
         assert_eq!(u128::from(fee), computed_fee);
     }

@@ -13,9 +13,9 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use presale::{
-    CommonPresaleArgs, InitializeFcfsPresaleArgs, InitializeFixedPricePresaleArgs,
-    InitializeProrataPresaleArgs, LockedVestingArgs, Presale, PresaleArgs, PresaleMode,
-    PresaleRegistryArgs, WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE,
+    CommonPresaleArgs, FcfsPresaleHandler, FixedPricePresaleHandler, InitializeFcfsPresaleArgs,
+    InitializeFixedPricePresaleArgs, InitializeProrataPresaleArgs, LockedVestingArgs, Presale,
+    PresaleArgs, PresaleMode, PresaleRegistryArgs, WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE,
     MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION, MAX_PRESALE_REGISTRY_COUNT,
     MINIMUM_PRESALE_DURATION, SCALE_MULTIPLIER,
 };
@@ -771,12 +771,12 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
         ))
         .unwrap();
 
+    let fcfs_handler = decode_presale_mode_handler::<FcfsPresaleHandler>(&presale_state);
+
     assert_eq!(presale_state.presale_mode, PresaleMode::Fcfs as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
-    assert!(!presale_state.can_withdraw());
-    assert!(presale_state.is_earlier_presale_end_disabled());
+    assert!(fcfs_handler.is_earlier_presale_end_once_cap_reached_disabled());
 }
 
 #[test]
@@ -847,10 +847,7 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
 
     assert_eq!(presale_state.presale_mode, PresaleMode::Prorata as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
-    assert!(presale_state.can_withdraw());
-    assert!(!presale_state.is_earlier_presale_end_disabled());
 }
 
 #[test]
@@ -929,8 +926,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         ))
         .unwrap();
 
-    assert!(!presale_state.can_withdraw());
-    assert!(presale_state.is_earlier_presale_end_disabled());
+    let fp_handler = decode_presale_mode_handler::<FixedPricePresaleHandler>(&presale_state);
+
+    assert!(fp_handler.is_withdraw_disabled());
+    assert!(fp_handler.is_earlier_presale_end_once_cap_reached_disabled());
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
     assert_eq!(presale_state.presale_mode, PresaleMode::FixedPrice as u8);
@@ -985,7 +984,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + locked_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
@@ -1112,6 +1111,8 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         ))
         .unwrap();
 
+    let fp_handler = decode_presale_mode_handler::<FixedPricePresaleHandler>(&presale_state);
+
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
     assert_eq!(presale_state.presale_mode, PresaleMode::FixedPrice as u8);
@@ -1170,12 +1171,12 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + locked_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
     );
-    assert!(!presale_state.is_earlier_presale_end_disabled());
+    assert!(!fp_handler.is_earlier_presale_end_once_cap_reached_disabled());
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

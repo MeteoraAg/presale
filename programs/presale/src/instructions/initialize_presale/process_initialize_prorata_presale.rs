@@ -26,15 +26,19 @@ pub fn handle_initialize_prorata_presale<'a, 'b, 'c: 'info, 'info>(
     let args = HandleInitializePresaleArgs {
         common_args: &common_args,
         presale_mode: PresaleMode::Prorata,
-        // For prorata presale, we do not allow disable earlier presale end once cap is reached
-        disable_earlier_presale_end_once_cap_reached: false,
-        // Prorata is dynamic price, so q_price is 0
-        q_price: 0,
-        // For prorata presale, we always allow withdraw
-        disable_withdraw: false,
     };
 
-    handle_initialize_presale(&ctx, args, remaining_account_info)?;
+    handle_initialize_presale_common_fields(&ctx, args, remaining_account_info)?;
+
+    // 2. Validate and initialize presale mode specific fields
+    let whitelist_mode = WhitelistMode::from(common_args.presale_params.whitelist_mode);
+
+    let presale_params = &common_args.presale_params;
+    let presale_registries = common_args.presale_registries.as_ref();
+
+    if whitelist_mode.is_permissioned() {
+        enforce_dynamic_price_registries_max_buyer_cap_range(presale_params, presale_registries)?;
+    }
 
     emit_cpi!(EvtProrataPresaleVaultCreate {
         base_mint: ctx.accounts.presale_mint.key(),

@@ -10,9 +10,9 @@ use anchor_spl::{
 };
 use helpers::*;
 use presale::{
-    calculate_deposit_fee_included_amount, DepositFeeIncludedCalculation, Escrow, Presale,
-    PresaleProgress, PresaleRegistryArgs, Rounding, WhitelistMode,
-    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER,
+    calculate_deposit_fee_included_amount, DepositFeeIncludedCalculation, Escrow,
+    FcfsPresaleHandler, FixedPricePresaleHandler, Presale, PresaleProgress, PresaleRegistryArgs,
+    Rounding, WhitelistMode, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER,
 };
 use std::{rc::Rc, vec};
 
@@ -517,12 +517,13 @@ fn test_deposit_over_escrow_max_deposit_cap() {
         .get_deserialized_zc_account(&escrow_address)
         .unwrap();
 
-    let escrow_max_purchasable_amount = (u128::from(escrow_state.deposit_max_cap) << 64)
-        / presale_state.fixed_price_presale_q_price;
+    let fp_handler = decode_presale_mode_handler::<FixedPricePresaleHandler>(&presale_state);
 
-    let escrow_max_quote_without_surplus = (escrow_max_purchasable_amount
-        * presale_state.fixed_price_presale_q_price)
-        .div_ceil(SCALE_MULTIPLIER);
+    let escrow_max_purchasable_amount =
+        (u128::from(escrow_state.deposit_max_cap) << 64) / fp_handler.q_price;
+
+    let escrow_max_quote_without_surplus =
+        (escrow_max_purchasable_amount * fp_handler.q_price).div_ceil(SCALE_MULTIPLIER);
 
     assert_eq!(
         escrow_state.total_deposit,
@@ -830,7 +831,9 @@ fn test_deposit_fixed_price_presale_with_end_earlier_disabled() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    assert!(before_presale_state.is_earlier_presale_end_disabled());
+    let fp_handler = decode_presale_mode_handler::<FixedPricePresaleHandler>(&before_presale_state);
+
+    assert!(fp_handler.is_earlier_presale_end_once_cap_reached_disabled());
 
     handle_escrow_deposit(
         &mut lite_svm,
@@ -894,7 +897,9 @@ fn test_deposit_fcfs_presale_with_end_earlier_disabled() {
         .get_deserialized_zc_account(&presale_pubkey)
         .unwrap();
 
-    assert!(before_presale_state.is_earlier_presale_end_disabled());
+    let fcfs_handler = decode_presale_mode_handler::<FcfsPresaleHandler>(&before_presale_state);
+
+    assert!(fcfs_handler.is_earlier_presale_end_once_cap_reached_disabled());
 
     handle_escrow_deposit(
         &mut lite_svm,

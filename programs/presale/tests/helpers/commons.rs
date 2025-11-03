@@ -41,6 +41,12 @@ const NATIVE_SOL_MINT: Pubkey =
 pub const DEFAULT_BASE_TOKEN_DECIMALS: u8 = 6;
 pub const DEFAULT_QUOTE_TOKEN_DECIMALS: u8 = 9;
 
+pub fn decode_presale_mode_handler<T: bytemuck::Pod>(presale: &Presale) -> T {
+    let slice = bytemuck::try_cast_slice::<u64, u8>(&presale.presale_mode_raw_data).unwrap();
+    let handler = *bytemuck::try_from_bytes::<T>(slice).unwrap();
+    handler
+}
+
 // TODO: Refactor this to allow setup user, and user struct can interact with the program
 pub struct SetupContext {
     pub lite_svm: LiteSVM,

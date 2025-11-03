@@ -1,9 +1,4 @@
-use crate::{
-    instructions::initialize_presale::process_create_presale_vault::{
-        process_create_presale_vault, ProcessCreatePresaleVaultArgs,
-    },
-    *,
-};
+use crate::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 #[event_cpi]
@@ -83,12 +78,9 @@ pub struct InitializePresaleCtx<'info> {
 pub struct HandleInitializePresaleArgs<'a> {
     pub common_args: &'a CommonPresaleArgs,
     pub presale_mode: PresaleMode,
-    pub disable_earlier_presale_end_once_cap_reached: bool,
-    pub q_price: u128,
-    pub disable_withdraw: bool,
 }
 
-pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
+pub fn handle_initialize_presale_common_fields<'a, 'b, 'c: 'info, 'info>(
     ctx: &Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
     args: HandleInitializePresaleArgs,
     remaining_account_info: RemainingAccountsInfo,
@@ -100,7 +92,11 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
     ensure_supported_token2022_extensions(&ctx.accounts.presale_mint)?;
 
     // 2. Initialize vault
-    let mint_pubkeys = InitializePresaleVaultAccountPubkeys {
+    let mut presale = ctx.accounts.presale.load_init()?;
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
+
+    presale.initialize(PresaleInitializeArgs {
+        common_args: args.common_args,
         base_mint: ctx.accounts.presale_mint.key(),
         quote_mint: ctx.accounts.quote_token_mint.key(),
         base_token_vault: ctx.accounts.presale_vault.key(),
@@ -109,12 +105,8 @@ pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
         base: ctx.accounts.base.key(),
         base_token_program: ctx.accounts.base_token_program.key(),
         quote_token_program: ctx.accounts.quote_token_program.key(),
-    };
-
-    process_create_presale_vault(ProcessCreatePresaleVaultArgs {
-        presale: &ctx.accounts.presale,
-        args: &args,
-        mint_pubkeys,
+        presale_mode: args.presale_mode,
+        current_timestamp,
     })?;
 
     let HandleInitializePresaleArgs { common_args, .. } = args;
