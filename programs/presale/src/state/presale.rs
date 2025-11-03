@@ -140,12 +140,11 @@ pub struct Presale {
     pub is_unsold_token_action_performed: u8,
     /// How many % of the token supply is released immediately
     pub immediate_release_bps: u16,
-    pub padding3: u128,
+    pub presale_mode_raw_data: [u64; 32],
     /// Timestamp when the immediate release portion is released
     pub immediate_release_timestamp: u64,
-    pub padding4: u64,
-    pub presale_mode_raw_data: [u64; 32],
-    pub padding5: [u64; 32],
+    pub padding3: [u64; 3],
+    pub padding4: [u64; 32],
     /// Presale registries. Note: Supporting more registries will causes increased account size.
     pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
 }

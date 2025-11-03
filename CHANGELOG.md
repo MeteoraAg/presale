@@ -39,3 +39,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Break: `initialize_presale` has been removed and separated into 3 different endpoint, which are `initialize_prorata_presale`, `initialize_fixed_price_presale` and `initialize_fcfs_presale`
 - Break: Newly added `immediate_release_timestamp` need to be `>= presale_end_time`
+- Break: 
