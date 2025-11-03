@@ -1,31 +1,28 @@
 use crate::*;
 
 #[event]
-pub struct EvtFixedPricePresaleArgsCreate {
-    pub presale: Pubkey,
-    pub q_price: u128,
-}
-
-#[event]
-pub struct EvtFixedPricePresaleArgsClose {
-    pub presale: Pubkey,
-    pub owner: Pubkey,
-    pub fixed_price_presale_args: Pubkey,
-}
-
-#[event]
-pub struct EvtPresaleVaultCreate {
+pub struct EvtFcfsPresaleVaultCreate {
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
-    pub presale_registries: Vec<PresaleRegistryArgs>,
-    pub lock_duration: u64,
-    pub vest_duration: u64,
-    pub whitelist_mode: u8,
-    pub presale_mode: u8,
-    pub presale_start_time: u64,
-    pub presale_end_time: u64,
-    pub presale_maximum_cap: u64,
-    pub presale_minimum_cap: u64,
+    pub args: CommonPresaleArgs,
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+}
+
+#[event]
+pub struct EvtFixedPricePresaleVaultCreate {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub args: CommonPresaleArgs,
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+    pub q_price: u128,
+    pub disable_withdraw: u8,
+}
+
+#[event]
+pub struct EvtProrataPresaleVaultCreate {
+    pub base_mint: Pubkey,
+    pub quote_mint: Pubkey,
+    pub args: CommonPresaleArgs,
 }
 
 #[event]

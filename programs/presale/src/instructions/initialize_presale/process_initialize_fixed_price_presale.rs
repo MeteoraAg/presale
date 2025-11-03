@@ -58,5 +58,17 @@ pub fn handle_initialize_fixed_price_presale<'a, 'b, 'c: 'info, 'info>(
         disable_withdraw,
     };
 
-    handle_initialize_presale(ctx, args, remaining_account_info)
+    handle_initialize_presale(&ctx, args, remaining_account_info)?;
+
+    emit_cpi!(EvtFixedPricePresaleVaultCreate {
+        base_mint: ctx.accounts.presale_mint.key(),
+        quote_mint: ctx.accounts.quote_token_mint.key(),
+        q_price,
+        disable_earlier_presale_end_once_cap_reached: disable_earlier_presale_end_once_cap_reached
+            .into(),
+        disable_withdraw: disable_withdraw.into(),
+        args: common_args
+    });
+
+    Ok(())
 }

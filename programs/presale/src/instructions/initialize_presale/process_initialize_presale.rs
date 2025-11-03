@@ -89,7 +89,7 @@ pub struct HandleInitializePresaleArgs<'a> {
 }
 
 pub fn handle_initialize_presale<'a, 'b, 'c: 'info, 'info>(
-    ctx: Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
+    ctx: &Context<'a, 'b, 'c, 'info, InitializePresaleCtx<'info>>,
     args: HandleInitializePresaleArgs,
     remaining_account_info: RemainingAccountsInfo,
 ) -> Result<()> {

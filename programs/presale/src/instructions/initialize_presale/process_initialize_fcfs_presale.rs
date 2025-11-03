@@ -48,5 +48,15 @@ pub fn handle_initialize_fcfs_presale<'a, 'b, 'c: 'info, 'info>(
         disable_withdraw: true,
     };
 
-    handle_initialize_presale(ctx, args, remaining_account_info)
+    handle_initialize_presale(&ctx, args, remaining_account_info)?;
+
+    emit_cpi!(EvtFcfsPresaleVaultCreate {
+        base_mint: ctx.accounts.presale_mint.key(),
+        quote_mint: ctx.accounts.quote_token_mint.key(),
+        args: common_args,
+        disable_earlier_presale_end_once_cap_reached: disable_earlier_presale_end_once_cap_reached
+            .into(),
+    });
+
+    Ok(())
 }

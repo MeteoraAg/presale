@@ -34,5 +34,13 @@ pub fn handle_initialize_prorata_presale<'a, 'b, 'c: 'info, 'info>(
         disable_withdraw: false,
     };
 
-    handle_initialize_presale(ctx, args, remaining_account_info)
+    handle_initialize_presale(&ctx, args, remaining_account_info)?;
+
+    emit_cpi!(EvtProrataPresaleVaultCreate {
+        base_mint: ctx.accounts.presale_mint.key(),
+        quote_mint: ctx.accounts.quote_token_mint.key(),
+        args: common_args
+    });
+
+    Ok(())
 }
