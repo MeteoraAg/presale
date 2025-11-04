@@ -11,8 +11,8 @@ use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
 use litesvm::LiteSVM;
 use presale::{
-    calculate_dripped_amount_for_user, Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
-    SCALE_OFFSET,
+    calculate_dripped_amount_for_user, Escrow, FixedPricePresaleHandler, Presale,
+    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_OFFSET,
 };
 use std::ops::Shl;
 use std::rc::Rc;
@@ -1164,7 +1164,10 @@ fn test_claim_permissioned_fixed_price_presale_with_multiple_presale_registries(
             .unwrap();
 
         let q_amount = u128::from(presale_registry.total_deposit).shl(SCALE_OFFSET);
-        let registry_sold_token = q_amount / before_presale_state.fixed_price_presale_q_price;
+        let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+            &presale_state.presale_mode_raw_data,
+        );
+        let registry_sold_token = q_amount / fp_handler.q_price;
 
         let amount_to_claim: u64 = calculate_dripped_amount_for_user(
             before_presale_state.vesting_start_time,

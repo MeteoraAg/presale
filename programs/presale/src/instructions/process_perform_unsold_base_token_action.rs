@@ -60,8 +60,7 @@ pub fn handle_perform_unsold_base_token_action<'a, 'b, 'c: 'info, 'info>(
     );
 
     // 2. Compute the total unsold base tokens
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_handler = get_presale_mode_handler(presale_mode);
+    let presale_handler = get_presale_mode_handler(&presale)?;
 
     let total_token_unsold = presale.get_total_unsold_token(presale_handler.as_ref())?;
     require!(total_token_unsold > 0, PresaleError::NoUnsoldBaseTokens);

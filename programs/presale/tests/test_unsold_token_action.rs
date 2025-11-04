@@ -7,7 +7,8 @@ use anchor_spl::{
 };
 use helpers::*;
 use presale::{
-    Presale, UnsoldTokenAction, WhitelistMode, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_OFFSET,
+    FixedPricePresaleHandler, Presale, UnsoldTokenAction, WhitelistMode,
+    DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_OFFSET,
 };
 use std::{ops::Shl, rc::Rc};
 
@@ -492,14 +493,17 @@ fn test_unsold_token_action_fixed_price_presale_with_zero_deposit_registry() {
 
     let balance_delta = after_balance - before_balance;
 
+    let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+        &presale_state.presale_mode_raw_data,
+    );
+
     let total_unsold_token = presale_state
         .presale_registries
         .iter()
         .fold(0u64, |acc, reg| {
             if reg.total_deposit > 0 {
-                let total_token_sold = (u128::from(reg.total_deposit).shl(SCALE_OFFSET)
-                    / presale_state.fixed_price_presale_q_price)
-                    as u64;
+                let total_token_sold =
+                    (u128::from(reg.total_deposit).shl(SCALE_OFFSET) / fp_handler.q_price) as u64;
                 acc + (reg.presale_supply - total_token_sold)
             } else {
                 acc + reg.presale_supply

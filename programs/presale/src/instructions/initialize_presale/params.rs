@@ -130,6 +130,7 @@ pub struct PresaleArgs {
     pub whitelist_mode: u8,
     pub presale_mode: u8,
     pub unsold_token_action: u8,
+    // Only applicable to fcfs and fixed price
     pub disable_earlier_presale_end_once_cap_reached: u8,
     pub padding: [u8; 30],
 }

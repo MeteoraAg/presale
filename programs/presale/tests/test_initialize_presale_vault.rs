@@ -13,9 +13,10 @@ use anchor_client::solana_sdk::{
     native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
 };
 use presale::{
-    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, WhitelistMode,
-    MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION,
-    MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION, SCALE_MULTIPLIER,
+    FixedPricePresaleHandler, LockedVestingArgs, Presale, PresaleArgs, PresaleMode,
+    PresaleRegistryArgs, WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE,
+    MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION, MAX_PRESALE_REGISTRY_COUNT,
+    MINIMUM_PRESALE_DURATION, SCALE_MULTIPLIER,
 };
 
 fn assert_err_invalid_locked_vesting_param(
@@ -910,7 +911,6 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
 
     assert_eq!(presale_state.presale_mode, PresaleMode::Fcfs as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
 }
 
@@ -975,7 +975,6 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
 
     assert_eq!(presale_state.presale_mode, PresaleMode::Prorata as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
 }
 
@@ -1067,6 +1066,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         ))
         .unwrap();
 
+    let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+        &presale_state.presale_mode_raw_data,
+    );
+
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
     assert_eq!(presale_state.presale_mode, PresaleMode::FixedPrice as u8);
@@ -1121,7 +1124,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
@@ -1260,6 +1263,10 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         ))
         .unwrap();
 
+    let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+        &presale_state.presale_mode_raw_data,
+    );
+
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
     assert_eq!(presale_state.presale_mode, PresaleMode::FixedPrice as u8);
@@ -1318,12 +1325,12 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
     );
-    assert!(!presale_state.is_earlier_presale_end_disabled());
+    assert!(!fp_handler.is_earlier_presale_end_disabled());
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

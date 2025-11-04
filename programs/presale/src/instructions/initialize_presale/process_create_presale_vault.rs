@@ -20,16 +20,41 @@ pub fn process_create_presale_vault(params: ProcessCreatePresaleVaultArgs) -> Re
     } = params;
 
     let mut presale_state = presale.load_init()?;
-    let presale_mode = PresaleMode::from(presale_params.presale_mode);
-    let presale_handler = get_presale_mode_handler(presale_mode);
+    let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
 
+    // 1. Initialize presale common fields
+    let InitializePresaleVaultAccountPubkeys {
+        base_mint,
+        quote_mint,
+        base_token_vault,
+        quote_token_vault,
+        owner,
+        base,
+        base_token_program,
+        quote_token_program,
+    } = mint_pubkeys;
+
+    presale_state.initialize(PresaleInitializeArgs {
+        presale_params,
+        locked_vesting_params: locked_vesting_params.cloned(),
+        presale_registries,
+        base_mint,
+        quote_mint,
+        base_token_vault,
+        quote_token_vault,
+        owner,
+        current_timestamp,
+        base,
+        base_token_program,
+        quote_token_program,
+    })?;
+
+    // 2. Initialize presale mode specific fields
+    let presale_handler = get_presale_mode_handler(&presale_state)?;
     presale_handler.initialize_presale(
         presale.key(),
         &mut presale_state,
         presale_params,
-        presale_registries,
-        locked_vesting_params,
-        mint_pubkeys,
         remaining_accounts,
     )?;
 
