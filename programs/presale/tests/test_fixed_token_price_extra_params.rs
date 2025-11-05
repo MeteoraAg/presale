@@ -31,6 +31,7 @@ pub fn test_initialize_fixed_token_price_extra_params() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -43,11 +44,13 @@ pub fn test_initialize_fixed_token_price_extra_params() {
     let FixedPricePresaleExtraArgs {
         q_price: q_price_set,
         owner,
+        disable_withdraw,
         ..
     } = fixed_price_args;
 
     assert_eq!(q_price_set, q_price);
     assert_eq!(owner, user_pubkey);
+    assert_eq!(disable_withdraw, 0);
 }
 
 #[test]
@@ -75,6 +78,7 @@ pub fn test_close_fixed_token_price_extra_params() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -123,6 +127,7 @@ pub fn test_non_owner_cannot_close_fixed_token_price_extra_params() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 

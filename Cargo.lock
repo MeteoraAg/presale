@@ -2915,7 +2915,7 @@ dependencies = [
 
 [[package]]
 name = "presale"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -2927,6 +2927,7 @@ dependencies = [
  "num_enum",
  "proptest",
  "serde_json",
+ "solana-security-txt",
  "spl-discriminator",
  "spl-tlv-account-resolution 0.10.0",
  "spl-transfer-hook-interface 0.10.0",

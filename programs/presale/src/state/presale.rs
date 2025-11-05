@@ -13,10 +13,10 @@ pub enum PresaleMode {
     Fcfs,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive, Default)]
 #[repr(u8)]
 pub enum WhitelistMode {
-    #[num_enum(default)]
+    #[default]
     /// No whitelist
     Permissionless,
     /// Whitelist using merkle proof
@@ -36,11 +36,11 @@ impl WhitelistMode {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive, Default)]
 #[repr(u8)]
 pub enum UnsoldTokenAction {
+    #[default]
     /// Refund unsold token back to creator
-    #[num_enum(default)]
     Refund,
     /// Burn unsold token
     Burn,
@@ -98,7 +98,7 @@ pub struct Presale {
     pub presale_minimum_cap: u64,
     /// When presale starts
     pub presale_start_time: u64,
-    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode).
+    /// When presale ends. Presale can be ended earlier by creator if raised capital is reached (based on presale mode). This is also the lock start time.
     pub presale_end_time: u64,
     /// Total base token supply that can be bought by presale participants
     pub presale_supply: u64,
@@ -112,11 +112,10 @@ pub struct Presale {
     pub lock_duration: u64,
     /// Duration of bought token will be vested until claimable
     pub vest_duration: u64,
-    /// When the lock starts
-    pub lock_start_time: u64,
-    /// When the lock ends
-    pub lock_end_time: u64,
-    /// When the vesting starts
+    /// Timestamp when the immediate release portion is released
+    pub immediate_release_timestamp: u64,
+    pub padding2: u64,
+    /// When the vesting starts. This is also lock end time.
     pub vesting_start_time: u64,
     /// When the vesting ends
     pub vesting_end_time: u64,
@@ -129,7 +128,7 @@ pub struct Presale {
     /// Determine whether creator collected the deposit fee
     pub deposit_fee_collected: u8,
     /// Padding
-    pub padding2: [u8; 7],
+    pub padding3: [u8; 7],
     /// Determine whether creator withdrawn the raised capital
     pub has_creator_withdrawn: u8,
     /// Base token program flag
@@ -144,9 +143,8 @@ pub struct Presale {
     pub is_unsold_token_action_performed: u8,
     /// How many % of the token supply is released immediately
     pub immediate_release_bps: u16,
-    /// Presale rate. Only applicable for fixed price presale mode
-    pub fixed_price_presale_q_price: u128,
-    pub padding3: [u128; 6],
+    pub presale_mode_raw_data: [u128; 3],
+    pub padding4: [u128; 4],
     /// Presale registries. Note: Supporting more registries will causes increased account size.
     pub presale_registries: [PresaleRegistry; MAX_PRESALE_REGISTRY_COUNT],
 }
@@ -155,10 +153,9 @@ static_assertions::const_assert_eq!(Presale::INIT_SPACE, 1264);
 static_assertions::assert_eq_align!(Presale, u128);
 
 pub struct PresaleInitializeArgs<'a> {
-    pub presale_params: PresaleArgs,
+    pub presale_params: &'a PresaleArgs,
     pub presale_registries: &'a [PresaleRegistryArgs],
     pub locked_vesting_params: Option<LockedVestingArgs>,
-    pub fixed_price_presale_params: Option<FixedPricePresaleExtraArgs>,
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
     pub base_token_vault: Pubkey,
@@ -180,12 +177,36 @@ fn token_program_to_flag(program: Pubkey) -> TokenProgramFlags {
     }
 }
 
+pub struct PresaleTimings {
+    pub vesting_start_time: u64,
+    pub vesting_end_time: u64,
+}
+
+// Presale static methods
+impl Presale {
+    pub fn calculate_presale_vest_and_lock_timings(
+        presale_end_time: u64,
+        lock_duration: u64,
+        vest_duration: u64,
+    ) -> Result<PresaleTimings> {
+        let lock_start_time = presale_end_time;
+        let lock_end_time = lock_start_time.safe_add(lock_duration)?;
+
+        let vesting_start_time = lock_end_time;
+        let vesting_end_time = vesting_start_time.safe_add(vest_duration)?;
+
+        Ok(PresaleTimings {
+            vesting_start_time,
+            vesting_end_time,
+        })
+    }
+}
+
 impl Presale {
     pub fn initialize(&mut self, args: PresaleInitializeArgs) -> Result<()> {
         let PresaleInitializeArgs {
             presale_params,
             locked_vesting_params,
-            fixed_price_presale_params,
             presale_registries,
             base_mint,
             quote_mint,
@@ -220,7 +241,7 @@ impl Presale {
 
         self.total_presale_registry_count = presale_registries.len() as u8;
 
-        let PresaleArgs {
+        let &PresaleArgs {
             presale_maximum_cap,
             presale_minimum_cap,
             presale_end_time,
@@ -244,18 +265,26 @@ impl Presale {
             lock_duration,
             vest_duration,
             immediately_release_bps,
+            immediate_release_timestamp,
             ..
         }) = locked_vesting_params
         {
             self.lock_duration = lock_duration;
             self.vest_duration = vest_duration;
             self.immediate_release_bps = immediately_release_bps;
+            self.immediate_release_timestamp = immediate_release_timestamp;
 
-            self.recalculate_presale_timing(self.presale_end_time)?;
-        }
+            let PresaleTimings {
+                vesting_start_time,
+                vesting_end_time,
+            } = Presale::calculate_presale_vest_and_lock_timings(
+                self.presale_end_time,
+                self.lock_duration,
+                self.vest_duration,
+            )?;
 
-        if let Some(FixedPricePresaleExtraArgs { q_price, .. }) = fixed_price_presale_params {
-            self.fixed_price_presale_q_price = q_price;
+            self.vesting_start_time = vesting_start_time;
+            self.vesting_end_time = vesting_end_time;
         }
 
         Ok(())
@@ -290,13 +319,28 @@ impl Presale {
     }
 
     fn recalculate_presale_timing(&mut self, new_presale_end_time: u64) -> Result<()> {
+        // Backward compatibility using saturating_sub. Old version with immediate_release_timestamp == 0 by default was released upon presale end time
+        let duration_until_immediate_release = self
+            .immediate_release_timestamp
+            .saturating_sub(self.presale_end_time);
+
         self.presale_end_time = new_presale_end_time;
 
-        self.lock_start_time = self.presale_end_time.safe_add(1)?;
-        self.lock_end_time = self.lock_start_time.safe_add(self.lock_duration)?;
+        let PresaleTimings {
+            vesting_start_time,
+            vesting_end_time,
+        } = Presale::calculate_presale_vest_and_lock_timings(
+            self.presale_end_time,
+            self.lock_duration,
+            self.vest_duration,
+        )?;
 
-        self.vesting_start_time = self.lock_end_time.safe_add(1)?;
-        self.vesting_end_time = self.vesting_start_time.safe_add(self.vest_duration)?;
+        self.vesting_start_time = vesting_start_time;
+        self.vesting_end_time = vesting_end_time;
+
+        self.immediate_release_timestamp = self
+            .presale_end_time
+            .safe_add(duration_until_immediate_release)?;
 
         Ok(())
     }

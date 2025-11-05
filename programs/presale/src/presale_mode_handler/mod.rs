@@ -1,15 +1,13 @@
-use std::u64;
-
 use crate::*;
 
 mod fixed_price_presale;
-use fixed_price_presale::*;
+pub use fixed_price_presale::*;
 
 mod prorata_presale;
 use prorata_presale::*;
 
 mod fcfs_presale;
-use fcfs_presale::*;
+pub use fcfs_presale::*;
 
 pub struct InitializePresaleVaultAccountPubkeys {
     pub base_mint: Pubkey,
@@ -28,9 +26,6 @@ pub trait PresaleModeHandler {
         presale_pubkey: Pubkey,
         presale: &mut Presale,
         presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
-        mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()>;
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64>;
@@ -59,21 +54,57 @@ pub trait PresaleModeHandler {
         escrow: &Escrow,
         current_timestamp: u64,
     ) -> Result<u64>;
-    fn suggest_deposit_amount(&self, presale: &Presale, max_deposit_amount: u64) -> Result<u64>;
-    fn suggest_withdraw_amount(
-        &self,
-        presale: &Presale,
-        escrow: &Escrow,
-        max_withdraw_amount: u64,
-    ) -> Result<u64>;
+    fn suggest_deposit_amount(&self, max_deposit_amount: u64) -> Result<u64>;
+    fn suggest_withdraw_amount(&self, escrow: &Escrow, max_withdraw_amount: u64) -> Result<u64>;
 }
 
-pub fn get_presale_mode_handler(presale_mode: PresaleMode) -> Box<dyn PresaleModeHandler> {
-    match presale_mode {
-        PresaleMode::FixedPrice => Box::new(FixedPricePresaleHandler),
-        PresaleMode::Prorata => Box::new(ProrataPresaleHandler),
-        PresaleMode::Fcfs => Box::new(FcfsPresaleHandler),
+pub fn enforce_dynamic_price_registries_max_buyer_cap_range(presale: &Presale) -> Result<()> {
+    for registry in presale.presale_registries.iter() {
+        if !registry.is_uninitialized() {
+            require!(
+                registry.buyer_minimum_deposit_cap == 1
+                    && registry.buyer_maximum_deposit_cap == presale.presale_maximum_cap,
+                PresaleError::InvalidBuyerCapRange
+            );
+        }
     }
+    Ok(())
+}
+
+pub fn get_presale_mode_handler(presale: &Presale) -> Result<Box<dyn PresaleModeHandler>> {
+    let presale_mode = PresaleMode::from(presale.presale_mode);
+    let raw_data_slice = bytemuck::try_cast_slice::<u128, u8>(&presale.presale_mode_raw_data)
+        .map_err(|_| PresaleError::UndeterminedError)?;
+
+    match presale_mode {
+        PresaleMode::FixedPrice => {
+            let handler = bytemuck::try_from_bytes::<FixedPricePresaleHandler>(raw_data_slice)
+                .map_err(|_| PresaleError::UndeterminedError)?;
+            Ok(Box::new(*handler))
+        }
+        PresaleMode::Prorata => Ok(Box::new(ProrataPresaleHandler)),
+        PresaleMode::Fcfs => {
+            let handler = bytemuck::try_from_bytes::<FcfsPresaleHandler>(raw_data_slice)
+                .map_err(|_| PresaleError::UndeterminedError)?;
+            Ok(Box::new(*handler))
+        }
+    }
+}
+
+pub fn end_presale_if_max_cap_reached(
+    presale: &mut Presale,
+    disable_earlier_presale_end_once_cap_reached: bool,
+    current_timestamp: u64,
+) -> Result<()> {
+    if disable_earlier_presale_end_once_cap_reached {
+        return Ok(());
+    }
+
+    if presale.total_deposit >= presale.presale_maximum_cap {
+        presale.advance_progress_to_completed(current_timestamp)?;
+    }
+
+    Ok(())
 }
 
 pub fn get_dynamic_price_based_total_base_token_sold(presale: &Presale) -> Result<u64> {
@@ -103,6 +134,7 @@ pub fn process_claim_full_presale_supply_by_share(
     let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
     let cumulative_escrow_claimable_token = calculate_cumulative_claimable_amount_for_user(
         presale.immediate_release_bps,
+        presale.immediate_release_timestamp,
         presale_registry.presale_supply,
         presale.vesting_start_time,
         presale.vest_duration,

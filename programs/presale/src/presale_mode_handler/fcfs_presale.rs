@@ -1,7 +1,34 @@
 use crate::PresaleModeHandler;
 use crate::*;
 
-pub struct FcfsPresaleHandler;
+#[zero_copy]
+pub struct FcfsPresaleHandler {
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+    pub padding0: [u8; 15],
+    pub padding1: [u128; 2],
+}
+
+impl FcfsPresaleHandler {
+    pub fn initialize_data(
+        presale_raw_data: &mut [u128; 3],
+        disable_earlier_presale_end_once_cap_reached: u8,
+    ) -> Result<()> {
+        let presale_raw_data_slice = bytemuck::try_cast_slice_mut::<u128, u8>(presale_raw_data)
+            .map_err(|_| PresaleError::UndeterminedError)?;
+
+        let handler = bytemuck::try_from_bytes_mut::<FcfsPresaleHandler>(presale_raw_data_slice)
+            .map_err(|_| PresaleError::UndeterminedError)?;
+
+        handler.disable_earlier_presale_end_once_cap_reached =
+            disable_earlier_presale_end_once_cap_reached;
+
+        Ok(())
+    }
+
+    pub fn is_earlier_presale_end_disabled(&self) -> bool {
+        self.disable_earlier_presale_end_once_cap_reached != 0
+    }
+}
 
 impl PresaleModeHandler for FcfsPresaleHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
@@ -9,39 +36,17 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         _presale_pubkey: Pubkey,
         presale: &mut Presale,
         presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
-        mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
-        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
+        let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+        if whitelist_mode.is_permissioned() {
+            enforce_dynamic_price_registries_max_buyer_cap_range(&presale)?;
+        }
 
-        let InitializePresaleVaultAccountPubkeys {
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            base,
-            base_token_program,
-            quote_token_program,
-        } = mint_pubkeys;
-
-        presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            presale_registries,
-            fixed_price_presale_params: None,
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            current_timestamp,
-            base,
-            base_token_program,
-            quote_token_program,
-        })?;
+        FcfsPresaleHandler::initialize_data(
+            &mut presale.presale_mode_raw_data,
+            presale_params.disable_earlier_presale_end_once_cap_reached,
+        )?;
 
         Ok(())
     }
@@ -61,11 +66,11 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()> {
-        if presale.total_deposit >= presale.presale_maximum_cap {
-            presale.advance_progress_to_completed(current_timestamp)?;
-        }
-
-        Ok(())
+        super::end_presale_if_max_cap_reached(
+            presale,
+            self.is_earlier_presale_end_disabled(),
+            current_timestamp,
+        )
     }
 
     fn can_withdraw(&self) -> bool {
@@ -100,6 +105,7 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         calculate_cumulative_claimable_amount_for_user(
             presale.immediate_release_bps,
+            presale.immediate_release_timestamp,
             presale_registry.presale_supply,
             presale.vesting_start_time,
             presale.vest_duration,
@@ -113,16 +119,11 @@ impl PresaleModeHandler for FcfsPresaleHandler {
         get_dynamic_price_based_total_base_token_sold(presale)
     }
 
-    fn suggest_deposit_amount(&self, _presale: &Presale, max_deposit_amount: u64) -> Result<u64> {
+    fn suggest_deposit_amount(&self, max_deposit_amount: u64) -> Result<u64> {
         Ok(max_deposit_amount)
     }
 
-    fn suggest_withdraw_amount(
-        &self,
-        _presale: &Presale,
-        _escrow: &Escrow,
-        _max_withdraw_amount: u64,
-    ) -> Result<u64> {
+    fn suggest_withdraw_amount(&self, _escrow: &Escrow, _max_withdraw_amount: u64) -> Result<u64> {
         Ok(0)
     }
 }

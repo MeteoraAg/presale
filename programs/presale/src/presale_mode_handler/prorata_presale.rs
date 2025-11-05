@@ -8,41 +8,13 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         &self,
         _presale_pubkey: Pubkey,
         presale: &mut Presale,
-        presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
-        mint_pubkeys: InitializePresaleVaultAccountPubkeys,
+        _presale_params: &PresaleArgs,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
-        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
-
-        let InitializePresaleVaultAccountPubkeys {
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            base,
-            base_token_program,
-            quote_token_program,
-        } = mint_pubkeys;
-
-        // 3. Create presale vault
-        presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            presale_registries,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            fixed_price_presale_params: None,
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            current_timestamp,
-            base,
-            base_token_program,
-            quote_token_program,
-        })?;
+        let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+        if whitelist_mode.is_permissioned() {
+            enforce_dynamic_price_registries_max_buyer_cap_range(&presale)?;
+        }
 
         Ok(())
     }
@@ -94,6 +66,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         calculate_cumulative_claimable_amount_for_user(
             presale.immediate_release_bps,
+            presale.immediate_release_timestamp,
             presale_registry.presale_supply,
             presale.vesting_start_time,
             presale.vest_duration,
@@ -107,16 +80,11 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         get_dynamic_price_based_total_base_token_sold(presale)
     }
 
-    fn suggest_deposit_amount(&self, _presale: &Presale, max_deposit_amount: u64) -> Result<u64> {
+    fn suggest_deposit_amount(&self, max_deposit_amount: u64) -> Result<u64> {
         Ok(max_deposit_amount)
     }
 
-    fn suggest_withdraw_amount(
-        &self,
-        _presale: &Presale,
-        _escrow: &Escrow,
-        max_withdraw_amount: u64,
-    ) -> Result<u64> {
+    fn suggest_withdraw_amount(&self, _escrow: &Escrow, max_withdraw_amount: u64) -> Result<u64> {
         Ok(max_withdraw_amount)
     }
 }
