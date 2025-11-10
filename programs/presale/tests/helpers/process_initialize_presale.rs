@@ -232,7 +232,7 @@ pub fn create_default_fcfs_presale_args_wrapper(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 
@@ -303,7 +303,7 @@ pub fn create_default_prorata_presale_args_wrapper(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 
@@ -396,7 +396,7 @@ pub fn create_default_fixed_price_presale_args_wrapper(
         &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
         fixed_point_q_price,
         whitelist_mode,
-        presale_args.presale_mode.into(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 
@@ -594,8 +594,8 @@ pub fn create_predefined_fixed_price_presale_ix_with_multiple_registries(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
         fixed_point_params_wrapper.args.params.q_price,
-        presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        presale_args.whitelist_mode.try_into().unwrap(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 
@@ -673,8 +673,8 @@ fn create_predefined_prorata_presale_with_multiple_registries_ix(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
-        presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        presale_args.whitelist_mode.try_into().unwrap(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 
@@ -751,8 +751,8 @@ fn create_predefined_fcfs_presale_with_multiple_registries_ix(
         base_mint_state.decimals,
         &PRESALE_MULTIPLE_REGISTRIES_DEFAULT_BASIS_POINTS,
         0,
-        presale_args.whitelist_mode.into(),
-        presale_args.presale_mode.into(),
+        presale_args.whitelist_mode.try_into().unwrap(),
+        presale_args.presale_mode.try_into().unwrap(),
         presale_args.presale_maximum_cap,
     );
 

@@ -11,7 +11,7 @@ impl PresaleModeHandler for ProrataPresaleHandler {
         _presale_params: &PresaleArgs,
         _remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
-        let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+        let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
         if whitelist_mode.is_permissioned() {
             enforce_dynamic_price_registries_max_buyer_cap_range(&presale)?;
         }

@@ -30,7 +30,7 @@ fn validate_presale_registries(
     // Reason: It make no sense for a single user to deposit to multiple registries which might have different price when it's dynamic price mode.
     // Note: Presale creator have to make sure user doesn't duplicate across registries.
     if presale_registries.len() > 1 {
-        let whitelist_mode = WhitelistMode::from(presale_params.whitelist_mode);
+        let whitelist_mode: WhitelistMode = presale_params.whitelist_mode.safe_cast()?;
         require!(
             whitelist_mode.is_permissioned(),
             PresaleError::MultiplePresaleRegistriesNotAllowed
@@ -189,7 +189,7 @@ impl PresaleArgs {
         );
 
         let maybe_disable_earlier_presale_end_once_cap_reached =
-            Bool::try_from(self.disable_earlier_presale_end_once_cap_reached);
+            BoolType::try_from(self.disable_earlier_presale_end_once_cap_reached);
         require!(
             maybe_disable_earlier_presale_end_once_cap_reached.is_ok(),
             PresaleError::InvalidType

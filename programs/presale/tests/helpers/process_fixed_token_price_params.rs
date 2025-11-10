@@ -86,6 +86,15 @@ pub fn handle_initialize_fixed_token_price_presale_params(
     process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap();
 }
 
+pub fn handle_initialize_fixed_token_price_presale_params_err(
+    lite_svm: &mut LiteSVM,
+    args: HandleInitializeFixedTokenPricePresaleParamsArgs,
+) -> FailedTransactionMetadata {
+    let instruction = create_initialize_fixed_token_price_presale_params_args_ix(args.clone());
+    let HandleInitializeFixedTokenPricePresaleParamsArgs { payer, .. } = args;
+    process_transaction(lite_svm, &[instruction], Some(&payer.pubkey()), &[&payer]).unwrap_err()
+}
+
 #[derive(Clone)]
 pub struct HandleCloseFixedTokenPricePresaleParamsArgs {
     pub base_mint: Pubkey,
