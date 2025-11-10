@@ -1,4 +1,4 @@
-use crate::errors::PresaleError;
+use crate::{errors::PresaleError, BoolType, PresaleMode, WhitelistMode};
 use anchor_lang::solana_program::msg;
 use std::panic::Location;
 
@@ -136,3 +136,6 @@ macro_rules! try_into_impl {
 
 try_into_impl!(u128, u64);
 try_into_impl!(i64, u64);
+try_into_impl!(u8, WhitelistMode);
+try_into_impl!(u8, PresaleMode);
+try_into_impl!(u8, BoolType);

@@ -1,10 +1,79 @@
 pub mod helpers;
 
+use anchor_client::solana_sdk::instruction::Instruction;
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::{signature::Keypair, signer::Signer};
+use anchor_lang::error::ERROR_CODE_OFFSET;
+use anchor_lang::InstructionData;
+use anchor_lang::ToAccountMetas;
 use helpers::*;
 use presale::FixedPricePresaleExtraArgs;
 use std::rc::Rc;
+
+#[test]
+pub fn test_initialize_fixed_token_price_with_invalid_extra_params() {
+    let SetupContext { mut lite_svm, user } = SetupContext::initialize();
+    let user_pubkey = user.pubkey();
+
+    let base_mint = Keypair::new();
+    let base_mint_pubkey = base_mint.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let invalid_q_price = 0;
+
+    let err = handle_initialize_fixed_token_price_presale_params_err(
+        &mut lite_svm,
+        HandleInitializeFixedTokenPricePresaleParamsArgs {
+            base_mint: base_mint_pubkey,
+            quote_mint,
+            q_price: invalid_q_price,
+            owner: user_pubkey,
+            payer: Rc::clone(&user),
+            base: user_pubkey,
+            disable_withdraw: true,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::InvalidTokenPrice;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+
+    let invalid_disable_withdraw = 2u8;
+    let ui_price = DEFAULT_PRICE;
+    let q_price = calculate_q_price_from_ui_price(
+        ui_price,
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        DEFAULT_QUOTE_TOKEN_DECIMALS,
+    );
+
+    let CreateInitializeFixedTokenPricePresaleParamsArgsWrapper { mut args, accounts } =
+        create_initialize_fixed_token_price_presale_params_args_wrapper(
+            HandleInitializeFixedTokenPricePresaleParamsArgs {
+                base_mint: base_mint_pubkey,
+                quote_mint,
+                q_price,
+                owner: user_pubkey,
+                payer: Rc::clone(&user),
+                base: user_pubkey,
+                disable_withdraw: true,
+            },
+        );
+
+    args.params.disable_withdraw = invalid_disable_withdraw;
+
+    let ix = Instruction {
+        program_id: presale::ID,
+        accounts: accounts.to_account_metas(None),
+        data: args.data(),
+    };
+
+    let err = process_transaction(&mut lite_svm, &[ix], Some(&user_pubkey), &[&user]).unwrap_err();
+    let expected_err = presale::errors::PresaleError::InvalidType;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+}
 
 #[test]
 pub fn test_initialize_fixed_token_price_extra_params() {
@@ -146,8 +215,6 @@ pub fn test_non_owner_cannot_close_fixed_token_price_extra_params() {
 
     let expected_err = anchor_lang::error::ErrorCode::ConstraintHasOne;
     let err_code = expected_err as u32;
-
     let err_str = format!("Error Number: {}.", err_code);
-
     assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
 }

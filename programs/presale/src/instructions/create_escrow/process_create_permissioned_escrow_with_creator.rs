@@ -53,7 +53,7 @@ pub fn handle_create_permissioned_escrow_with_creator(
     let mut presale = ctx.accounts.presale.load_mut()?;
 
     // 1. Ensure presale is permissioned with authority
-    let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+    let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
     require!(
         whitelist_mode == WhitelistMode::PermissionWithAuthority,
         PresaleError::InvalidPresaleWhitelistMode
