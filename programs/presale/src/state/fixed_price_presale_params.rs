@@ -1,14 +1,6 @@
 use crate::*;
 use num_enum::{FromPrimitive, IntoPrimitive};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
-#[repr(u8)]
-pub enum Bool {
-    #[default]
-    False = 0,
-    True = 1,
-}
-
 #[account(zero_copy)]
 #[derive(InitSpace)]
 pub struct FixedPricePresaleExtraArgs {
@@ -29,7 +21,7 @@ impl FixedPricePresaleExtraArgs {
         q_price: u128,
         owner: Pubkey,
         presale: Pubkey,
-        disable_withdraw: Bool,
+        disable_withdraw: BoolType,
     ) -> Result<()> {
         self.q_price = q_price;
         self.owner = owner;
