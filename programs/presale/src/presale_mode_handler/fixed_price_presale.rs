@@ -123,7 +123,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             PresaleError::MissingPresaleExtraParams
         );
 
-        let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+        let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
 
         // 2. Validate fixed price presale parameters
         // TODO: Should we make sure there's no impossible to fill gap?

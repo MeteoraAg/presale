@@ -36,7 +36,7 @@ impl InitializeFixedPricePresaleExtraArgs {
     pub fn validate(&self) -> Result<()> {
         require!(self.q_price > 0, PresaleError::InvalidTokenPrice);
 
-        let disable_withdraw = Bool::try_from(self.disable_withdraw);
+        let disable_withdraw = BoolType::try_from(self.disable_withdraw);
         require!(disable_withdraw.is_ok(), PresaleError::InvalidType);
 
         Ok(())
@@ -47,6 +47,8 @@ pub fn handle_initialize_fixed_price_presale_args(
     ctx: Context<InitializeFixedPricePresaleArgsCtx>,
     params: InitializeFixedPricePresaleExtraArgs,
 ) -> Result<()> {
+    params.validate()?;
+
     let InitializeFixedPricePresaleExtraArgs {
         presale,
         q_price,
@@ -59,7 +61,7 @@ pub fn handle_initialize_fixed_price_presale_args(
         q_price,
         ctx.accounts.owner.key(),
         presale,
-        disable_withdraw.into(),
+        disable_withdraw.safe_cast()?,
     )?;
 
     emit_cpi!(EvtFixedPricePresaleArgsCreate { presale, q_price });
