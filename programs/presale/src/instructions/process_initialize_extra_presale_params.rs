@@ -61,7 +61,7 @@ pub fn handle_initialize_fixed_price_presale_args(
         q_price,
         ctx.accounts.owner.key(),
         presale,
-        disable_withdraw.into(),
+        disable_withdraw.safe_cast()?,
     )?;
 
     emit_cpi!(EvtFixedPricePresaleArgsCreate { presale, q_price });
