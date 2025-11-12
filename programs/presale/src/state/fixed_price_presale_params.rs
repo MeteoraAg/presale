@@ -1,5 +1,4 @@
 use crate::*;
-use num_enum::{FromPrimitive, IntoPrimitive};
 
 #[account(zero_copy)]
 #[derive(InitSpace)]
