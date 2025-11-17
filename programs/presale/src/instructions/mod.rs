@@ -51,3 +51,6 @@ pub use process_close_merkle_proof_metadata::*;
 
 mod process_creator_collect_fee;
 pub use process_creator_collect_fee::*;
+
+mod process_close_merkle_root_config;
+pub use process_close_merkle_root_config::*;

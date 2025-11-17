@@ -131,4 +131,7 @@ pub enum PresaleError {
 
     #[msg("Invalid buyer cap range")]
     InvalidBuyerCapRange,
+
+    #[msg("Presale is ongoing")]
+    PresaleOngoing,
 }
