@@ -1,18 +1,27 @@
 use std::rc::Rc;
 
+use anchor_client::solana_sdk::instruction::Instruction;
+use anchor_client::solana_sdk::program_pack::Pack;
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_lang::error::ERROR_CODE_OFFSET;
-use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX};
+use anchor_lang::{InstructionData, ToAccountMetas};
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::token_2022::spl_token_2022::state::Account;
+use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER};
 
 use crate::helpers::{
-    create_deposit_ix, create_escrow_withdraw_ix, create_escrow_withdraw_remaining_quote_ix,
-    derive_escrow, handle_close_escrow_ix,
+    build_merkle_tree, create_default_fixed_price_presale_args_wrapper, create_deposit_ix,
+    create_escrow_withdraw_ix, create_escrow_withdraw_remaining_quote_ix, derive_escrow,
+    handle_close_escrow_ix, handle_create_merkle_root_config,
+    handle_create_permissioned_escrow_with_merkle_proof,
     handle_create_predefined_permissionless_fixed_price_presale,
     handle_create_predefined_permissionless_prorata_presale_with_no_vest_nor_lock,
-    handle_escrow_claim, handle_escrow_deposit, process_transaction, warp_time,
-    HandleCloseEscrowArgs, HandleCreatePredefinedPresaleResponse, HandleEscrowClaimArgs,
-    HandleEscrowDepositArgs, HandleEscrowWithdrawArgs, HandleEscrowWithdrawRemainingQuoteArgs,
-    LiteSVMExt, SetupContext, DEFAULT_BASE_TOKEN_DECIMALS,
+    handle_escrow_claim, handle_escrow_deposit, handle_escrow_refresh, process_transaction,
+    warp_time, CreateDefaultFixedPricePresaleArgsWrapper, HandleCloseEscrowArgs,
+    HandleCreateMerkleRootConfigArgs, HandleCreatePermissionedEscrowWithMerkleProofArgs,
+    HandleCreatePredefinedPresaleResponse, HandleEscrowClaimArgs, HandleEscrowDepositArgs,
+    HandleEscrowRefreshArgs, HandleEscrowWithdrawArgs, HandleEscrowWithdrawRemainingQuoteArgs,
+    LiteSVMExt, SetupContext, WhitelistWallet, DEFAULT_BASE_TOKEN_DECIMALS,
 };
 use anchor_client::solana_sdk::pubkey::Pubkey;
 use anchor_client::solana_sdk::signer::keypair::Keypair;
@@ -24,6 +33,200 @@ use crate::helpers::{
 };
 
 pub mod helpers;
+
+#[test]
+fn test_fixed_price_presale_registry_consume_over_supply() {
+    let mut setup_context = SetupContext::initialize();
+    let mint = setup_context.setup_mint(
+        DEFAULT_BASE_TOKEN_DECIMALS,
+        1_000_000_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into()),
+    );
+    let SetupContext { mut lite_svm, user } = setup_context;
+    let user_pubkey = user.pubkey();
+
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+
+    let CreateDefaultFixedPricePresaleArgsWrapper {
+        mut presale_params_wrapper,
+        fixed_point_params_wrapper,
+    } = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        WhitelistMode::PermissionWithMerkleProof,
+        Rc::clone(&user),
+        user_pubkey,
+    );
+
+    let presale_pubkey = presale_params_wrapper.accounts.presale;
+
+    let q_price = fixed_point_params_wrapper.args.params.q_price;
+    let presale_supply = 1_000 * 10u64.pow(DEFAULT_BASE_TOKEN_DECIMALS.into());
+    let half_presale_supply = presale_supply / 2;
+
+    presale_params_wrapper
+        .args
+        .params
+        .presale_params
+        .presale_minimum_cap = q_price.div_ceil(SCALE_MULTIPLIER).try_into().unwrap();
+
+    let presale_maximum_cap: u64 = ((q_price * u128::from(presale_supply)) >> 64)
+        .try_into()
+        .unwrap();
+
+    // Round down
+    presale_params_wrapper
+        .args
+        .params
+        .presale_params
+        .presale_maximum_cap = presale_maximum_cap;
+
+    {
+        let registry_0 = presale_params_wrapper
+            .args
+            .params
+            .presale_registries
+            .get_mut(0)
+            .unwrap();
+
+        registry_0.presale_supply = half_presale_supply;
+        registry_0.buyer_minimum_deposit_cap = presale_params_wrapper
+            .args
+            .params
+            .presale_params
+            .presale_minimum_cap;
+        registry_0.buyer_maximum_deposit_cap = presale_maximum_cap;
+    }
+    {
+        let registry_0 = presale_params_wrapper
+            .args
+            .params
+            .presale_registries
+            .first()
+            .unwrap();
+
+        presale_params_wrapper
+            .args
+            .params
+            .presale_registries
+            .push(*registry_0);
+    }
+
+    let init_fp_ix = Instruction {
+        program_id: presale::ID,
+        accounts: fixed_point_params_wrapper.accounts.to_account_metas(None),
+        data: fixed_point_params_wrapper.args.data(),
+    };
+
+    let init_presale_ix = presale_params_wrapper.to_instructions();
+
+    let mut instructions = vec![init_fp_ix];
+    instructions.extend_from_slice(&init_presale_ix);
+
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+
+    let whitelist_wallets = vec![WhitelistWallet {
+        address: user_pubkey,
+        max_deposit_cap: presale_maximum_cap,
+        registry_index: 0,
+    }];
+
+    let merkle_tree = build_merkle_tree(whitelist_wallets, 0);
+    let tree_node = merkle_tree.get_node(&user_pubkey);
+
+    handle_create_merkle_root_config(
+        &mut lite_svm,
+        HandleCreateMerkleRootConfigArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_tree: &merkle_tree,
+        },
+    );
+
+    let merkle_root_config =
+        merkle_tree.get_merkle_root_config_pubkey(presale_pubkey, &presale::ID);
+
+    handle_create_permissioned_escrow_with_merkle_proof(
+        &mut lite_svm,
+        HandleCreatePermissionedEscrowWithMerkleProofArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            merkle_root_config,
+            registry_index: 0,
+            max_deposit_cap: tree_node.deposit_cap,
+            proof: tree_node.proof.unwrap(),
+        },
+    );
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: tree_node.deposit_cap,
+            registry_index: 0,
+        },
+    );
+
+    let presale_state = lite_svm
+        .get_deserialized_zc_account::<Presale>(&presale_pubkey)
+        .unwrap();
+
+    warp_time(&mut lite_svm, presale_state.vesting_end_time + 1);
+
+    handle_escrow_refresh(
+        &mut lite_svm,
+        HandleEscrowRefreshArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            registry_index: 0,
+        },
+    );
+
+    let escrow = derive_escrow(&presale_pubkey, &user_pubkey, 0, &presale::ID);
+    let escrow_state = lite_svm
+        .get_deserialized_zc_account::<Escrow>(&escrow)
+        .unwrap();
+
+    let escrow_presale_registry = presale_state
+        .get_presale_registry(escrow_state.registry_index.into())
+        .unwrap();
+    println!(
+        "pending_claim_token: {}, presale_supply: {}",
+        escrow_state.pending_claim_token, escrow_presale_registry.presale_supply
+    );
+    assert!(escrow_state.pending_claim_token <= escrow_presale_registry.presale_supply);
+
+    let base_mint_account = lite_svm.get_account(&presale_state.base_mint).unwrap();
+
+    let user_token_account = get_associated_token_address_with_program_id(
+        &user_pubkey,
+        &presale_state.base_mint,
+        &base_mint_account.owner,
+    );
+
+    let before_user_token_account = lite_svm.get_account(&user_token_account).unwrap();
+    handle_escrow_claim(
+        &mut lite_svm,
+        HandleEscrowClaimArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            refresh_escrow: true,
+            registry_index: escrow_state.registry_index,
+        },
+    );
+    let after_user_token_account = lite_svm.get_account(&user_token_account).unwrap();
+
+    let before_amount = Account::unpack(&before_user_token_account.data)
+        .unwrap()
+        .amount;
+    let after_amount = Account::unpack(&after_user_token_account.data)
+        .unwrap()
+        .amount;
+
+    let claimed_amount = after_amount - before_amount;
+    assert_eq!(claimed_amount, escrow_state.pending_claim_token);
+}
 
 #[test]
 fn test_presale_progress_manipulation() {

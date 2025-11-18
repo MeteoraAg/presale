@@ -95,7 +95,8 @@ impl PresaleRegistry {
             && self.deposit_fee_bps == 0
     }
 
-    pub fn get_remaining_quote(
+    // Get unused quote token amount for finalized presale refund
+    pub fn get_finalized_presale_remaining_quote(
         &self,
         presale_remaining_quote: u64,
         presale_total_deposit: u64,
