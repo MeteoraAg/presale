@@ -134,4 +134,7 @@ pub enum PresaleError {
 
     #[msg("Presale is ongoing")]
     PresaleOngoing,
+
+    #[msg("Presale min/max cap gap too small")]
+    PresaleMinMaxCapGapTooSmall,
 }
