@@ -4,16 +4,19 @@ use anchor_client::solana_sdk::instruction::Instruction;
 use anchor_client::solana_sdk::program_pack::Pack;
 use anchor_client::solana_sdk::signer::Signer;
 use anchor_lang::error::ERROR_CODE_OFFSET;
+use anchor_lang::prelude::Clock;
 use anchor_lang::{InstructionData, ToAccountMetas};
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
 use anchor_spl::token_2022::spl_token_2022::state::Account;
-use presale::{Escrow, Presale, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER};
+use presale::{
+    Escrow, Presale, PresaleProgress, DEFAULT_PERMISSIONLESS_REGISTRY_INDEX, SCALE_MULTIPLIER,
+};
 
 use crate::helpers::{
-    build_merkle_tree, create_default_fixed_price_presale_args_wrapper, create_deposit_ix,
-    create_escrow_withdraw_ix, create_escrow_withdraw_remaining_quote_ix, derive_escrow,
-    handle_close_escrow_ix, handle_create_merkle_root_config,
-    handle_create_permissioned_escrow_with_merkle_proof,
+    build_merkle_tree, calculate_q_price_from_ui_price,
+    create_default_fixed_price_presale_args_wrapper, create_deposit_ix, create_escrow_withdraw_ix,
+    create_escrow_withdraw_remaining_quote_ix, derive_escrow, handle_close_escrow_ix,
+    handle_create_merkle_root_config, handle_create_permissioned_escrow_with_merkle_proof,
     handle_create_predefined_permissionless_fixed_price_presale,
     handle_create_predefined_permissionless_prorata_presale_with_no_vest_nor_lock,
     handle_escrow_claim, handle_escrow_deposit, handle_escrow_refresh, process_transaction,
@@ -451,10 +454,97 @@ fn test_zero_vest_duration_dos_escrow_claim() {
     assert_eq!(presale_registry_0.presale_supply, total_claimed_token);
 }
 
+// https://github.com/sherlock-audit/2025-11-meteora-nov-10th/pull/26
+#[test]
+fn test_fixed_price_presale_completion_unreachable() {
+    let mut setup_context = SetupContext::initialize();
+    let base_mint = setup_context.setup_mint(9, 1_000_000_000 * 10u64.pow(9));
+
+    let SetupContext { mut lite_svm, user } = setup_context;
+
+    let user_pubkey = user.pubkey();
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
+
+    let mut wrapper = create_default_fixed_price_presale_args_wrapper(
+        base_mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user_pubkey,
+    );
+
+    let presale_pubkey = wrapper.presale_params_wrapper.accounts.presale;
+    let presale_endtime = wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .presale_params
+        .presale_end_time;
+
+    let q_price = calculate_q_price_from_ui_price(9.0f64, 9, 9);
+    let fixed_price_args = &mut wrapper.fixed_point_params_wrapper.args.params;
+    fixed_price_args.q_price = q_price;
+
+    let presale_params = &mut wrapper.presale_params_wrapper.args.params.presale_params;
+    presale_params.presale_minimum_cap = 92;
+    presale_params.presale_maximum_cap = 100;
+
+    let registry_0 = &mut wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .presale_registries
+        .first_mut()
+        .unwrap();
+
+    registry_0.buyer_minimum_deposit_cap = 10;
+    registry_0.buyer_maximum_deposit_cap = 100;
+
+    let instructions = wrapper.to_instructions();
+    process_transaction(&mut lite_svm, &instructions, Some(&user_pubkey), &[&user]).unwrap();
+
+    handle_escrow_deposit(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: 99,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    // This deposit will fail with zero token amount, making it impossible to reach the presale maximum cap if there's no gap between min and max cap
+    let err = handle_escrow_deposit_err(
+        &mut lite_svm,
+        HandleEscrowDepositArgs {
+            presale: presale_pubkey,
+            owner: Rc::clone(&user),
+            max_amount: 1,
+            registry_index: DEFAULT_PERMISSIONLESS_REGISTRY_INDEX,
+        },
+    );
+
+    let expected_err = presale::errors::PresaleError::ZeroTokenAmount;
+    let err_code = ERROR_CODE_OFFSET + expected_err as u32;
+    let err_str = format!("Error Number: {}.", err_code);
+    assert!(err.meta.logs.iter().any(|log| log.contains(&err_str)));
+
+    warp_time(&mut lite_svm, presale_endtime);
+    let presale_state = lite_svm
+        .get_deserialized_zc_account::<Presale>(&presale_pubkey)
+        .unwrap();
+
+    let clock: Clock = lite_svm.get_sysvar();
+    let presale_progress = presale_state.get_presale_progress(clock.unix_timestamp as u64);
+
+    assert_eq!(presale_progress, PresaleProgress::Completed)
+}
+
 // https://www.notion.so/offsidelabs/Meteora-Presale-Audit-Draft-24dd5242e8af806f8703cdb86b093639#26bd5242e8af80d08ad3e750f85fa025
 pub mod fixed_price_deposit_surplus_stuck_tests {
     use super::*;
-    use crate::helpers::create_default_fixed_price_presale_args_wrapper;
     use presale::SCALE_MULTIPLIER;
 
     struct SetupResult {
