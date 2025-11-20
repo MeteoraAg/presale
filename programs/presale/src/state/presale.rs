@@ -436,8 +436,10 @@ impl Presale {
                 let RemainingQuote {
                     refund_amount,
                     refund_fee,
-                } = presale_registry
-                    .get_remaining_quote(self.get_remaining_quote(), self.total_deposit)?;
+                } = presale_registry.get_finalized_presale_remaining_quote(
+                    self.get_remaining_quote(),
+                    self.total_deposit,
+                )?;
 
                 // To be fair to all participants in the registry (same price), refund deposit fee charges on remaining quote amount
                 let escrow_refund_fee = if presale_registry.total_deposit_fee > 0 {
@@ -528,7 +530,10 @@ impl Presale {
                     }
 
                     let RemainingQuote { refund_fee, .. } = registry
-                        .get_remaining_quote(presale_remaining_quote, self.total_deposit)?;
+                        .get_finalized_presale_remaining_quote(
+                            presale_remaining_quote,
+                            self.total_deposit,
+                        )?;
 
                     let registry_collected_fee = registry.total_deposit_fee.safe_sub(refund_fee)?;
                     total_fee = total_fee.safe_add(registry_collected_fee)?;

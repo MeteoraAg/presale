@@ -46,6 +46,7 @@ fn calculate_quote_token_without_surplus(q_price: u128, amount: u64) -> Result<u
         .safe_mul(q_price)?
         .div_ceil(SCALE_MULTIPLIER);
 
+    // Due to the rounding in in favor of the program, the token price might be inflated
     let quote_token_needed: u64 = quote_token_needed.safe_cast()?;
 
     // This should never happen
@@ -183,10 +184,39 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         let global_remaining_quota = presale.get_remaining_deposit_quota()?;
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+
+        let total_token_sold: u64 = if presale_registry.total_deposit > 0 {
+            calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .safe_cast()?
+                // Reason for min: Due to deposit amount is rounding up, it's possible total_token_sold > presale_supply
+                // Example: presale_supply = 100, q_price = 0.333, registry.total_deposit 33, total_token_sold = 99 (round down)
+                // registry_remaining_base_token = 100 - 99 = 1
+                // registry_remaining_deposit_quota = 1 * 0.333 = 0.333 -> 1 (round up)
+                // base_token_purchasable_with_remaining_deposit_quota = 1 / 0.333 = 3 (round down)
+                // base_token_purchasable_with_remaining_deposit_quota = 3 > registry_remaining_base_token = 1
+                .min(presale_registry.presale_supply)
+        } else {
+            0
+        };
+
+        if total_token_sold == presale_registry.presale_supply {
+            return Ok(0);
+        }
+
+        let registry_remaining_base_token =
+            presale_registry.presale_supply.safe_sub(total_token_sold)?;
+
+        let registry_remaining_deposit_quota: u64 = u128::from(registry_remaining_base_token)
+            .safe_mul(self.q_price)?
+            .div_ceil(SCALE_MULTIPLIER)
+            .safe_cast()?;
+
         let personal_remaining_quota =
             escrow.get_remaining_deposit_quota(presale_registry.buyer_maximum_deposit_cap)?;
 
-        Ok(global_remaining_quota.min(personal_remaining_quota))
+        Ok(global_remaining_quota
+            .min(personal_remaining_quota)
+            .min(registry_remaining_deposit_quota))
     }
 
     /// Fixed price presale stop accept deposit when the presale maximum cap is reached. Therefore, can end presale immediately.
@@ -245,10 +275,10 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                 continue;
             }
 
-            total_sold_token = total_sold_token.safe_add(calculate_token_bought(
-                self.q_price,
-                presale_registry.total_deposit,
-            )?)?;
+            let sold_token = calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .min(presale_registry.presale_supply.into());
+
+            total_sold_token = total_sold_token.safe_add(sold_token)?;
         }
 
         Ok(total_sold_token.safe_cast()?)
@@ -263,7 +293,9 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         // 1. Calculate how many base tokens were bought
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
         let total_sold_token =
-            calculate_token_bought(self.q_price, presale_registry.total_deposit)?.safe_cast()?;
+            calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .safe_cast()?
+                .min(presale_registry.presale_supply);
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
         let claimable_bought_token = calculate_cumulative_claimable_amount_for_user(
@@ -328,6 +360,44 @@ mod tests {
         let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
         let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
         assert_eq!(base_amount, 9);
+    }
+
+    #[test]
+    fn test_total_token_bought_over_presale_supply_due_to_accumulated_precision_loss() {
+        let presale_supply: u128 = 100;
+
+        for lamport_price in [0.33, 1.33] {
+            let mut total_quote_token_spent = 0;
+            let q_price = (lamport_price * 2.0f64.powi(SCALE_OFFSET.try_into().unwrap())) as u128;
+
+            // Simulate user buying until presale supply is bought out
+            loop {
+                let quote_token_sold =
+                    calculate_token_bought(q_price, total_quote_token_spent).unwrap_or_default();
+
+                if quote_token_sold >= presale_supply {
+                    break;
+                }
+
+                let base_token_bought = calculate_token_bought(q_price, 2).unwrap();
+                let quote_token_needed = (base_token_bought * q_price).div_ceil(SCALE_MULTIPLIER);
+                total_quote_token_spent += quote_token_needed as u64;
+            }
+
+            let total_base_token_bought =
+                calculate_token_bought(q_price, total_quote_token_spent).unwrap();
+
+            println!("total_quote_token_spent: {}", total_quote_token_spent);
+            println!("total_base_token_bought: {}", total_base_token_bought);
+            let average_lamport_price = total_quote_token_spent as f64 / presale_supply as f64;
+            println!(
+                "price: {}, average price: {}",
+                lamport_price, average_lamport_price
+            );
+
+            assert!(total_base_token_bought >= presale_supply);
+            assert!(average_lamport_price >= lamport_price);
+        }
     }
 
     proptest! {
