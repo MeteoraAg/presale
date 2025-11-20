@@ -80,6 +80,10 @@ pub mod presale {
         instructions::handle_create_merkle_root_config(ctx, params)
     }
 
+    pub fn close_merkle_root_config(ctx: Context<CloseMerkleRootConfigCtx>) -> Result<()> {
+        instructions::handle_close_merkle_root_config(ctx)
+    }
+
     pub fn create_permissionless_escrow(ctx: Context<CreatePermissionlessEscrowCtx>) -> Result<()> {
         instructions::handle_create_permissionless_escrow(ctx)
     }
