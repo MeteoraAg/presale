@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add option to allow fixed price presale to disable withdraw
 - Add option to allow fixed price, and fcfs presale to not end presale earlier if cap reached
+- Close of `MerkleRoofConfig` account.
 
 ### Changed
 
