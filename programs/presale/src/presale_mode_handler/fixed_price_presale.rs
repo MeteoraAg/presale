@@ -39,6 +39,20 @@ fn ensure_enough_presale_supply(
     Ok(())
 }
 
+fn ensure_gap_between_min_and_max_presale_cap(
+    q_price: u128,
+    presale_minimum_cap: u64,
+    presale_maximum_cap: u64,
+) -> Result<()> {
+    let minimum_base_token_bought = calculate_token_bought(q_price, presale_minimum_cap)?;
+    let maximum_base_token_bought = calculate_token_bought(q_price, presale_maximum_cap)?;
+
+    let delta = maximum_base_token_bought.safe_sub(minimum_base_token_bought)?;
+    require!(delta > 0, PresaleError::PresaleMinMaxCapGapTooSmall);
+
+    Ok(())
+}
+
 fn calculate_quote_token_without_surplus(q_price: u128, amount: u64) -> Result<u64> {
     let base_token_amount = calculate_token_bought(q_price, amount)?;
 
@@ -166,6 +180,14 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         ensure_enough_presale_supply(
             presale_extra_param.q_price,
             presale.presale_supply,
+            presale.presale_maximum_cap,
+        )?;
+
+        // Ensure there's a gap between presale minimum cap and presale maximum cap
+        // This is to prevent presale progress stuck when both min and max cap are unreachable (e.g. both are the same)
+        ensure_gap_between_min_and_max_presale_cap(
+            presale_extra_param.q_price,
+            presale.presale_minimum_cap,
             presale.presale_maximum_cap,
         )?;
 
@@ -328,6 +350,7 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use ruint::aliases::U256;
 
     #[test]
     fn test_calculate_quote_token_without_surplus() {
@@ -406,6 +429,88 @@ mod tests {
             let q_price = u128::from(lamport_per_price) * SCALE_MULTIPLIER; // lamport_per_price quote token per base token
             let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, max_deposit_amount).unwrap();
             assert!(suggested_deposit_amount <= max_deposit_amount);
+        }
+
+        // Shows that suggest deposit amount on presale maximum cap doesn't work
+        #[test]
+        fn test_suggest_deposit_amount_on_presale_maximum_cap_prop(
+            q_price in 1u128..(u128::MAX / 2),
+            presale_supply in 100..100_000_000u64
+        ) {
+            let presale_maximum_cap_u256 = (U256::from(presale_supply) * U256::from(q_price)).div_ceil(U256::from(SCALE_MULTIPLIER));
+            let presale_maximum_cap: u64 = presale_maximum_cap_u256.try_into().unwrap_or(u64::MAX);
+
+            let base_token_bought = (u128::from(presale_maximum_cap) << SCALE_OFFSET).safe_div(q_price).unwrap();
+            // This will be the adjusted presale maximum cap that 100% reachable
+            let adjusted_presale_maximum_cap: u64 = base_token_bought.safe_mul(q_price).unwrap().div_ceil(SCALE_MULTIPLIER).safe_cast().unwrap();
+
+            let mut total_deposit = 0;
+
+            // Simulate suggesting deposit amount until reaching presale maximum cap
+            // 1. Deposit adjusted_presale_maximum_cap - 1, which leave the smallest deposit quota (last deposit available)
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, adjusted_presale_maximum_cap - 1).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // 2. Deposit the remaining quota
+            let remaining_quota = adjusted_presale_maximum_cap.safe_sub(total_deposit).unwrap();
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, remaining_quota).unwrap();
+
+            if suggested_deposit_amount == 0 {
+                // Happen only when price > 1 quote token per base token
+                assert!(q_price > SCALE_MULTIPLIER);
+            } else {
+                total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+                assert_eq!(total_deposit, adjusted_presale_maximum_cap);
+
+                let token_bought: u64 = calculate_token_bought(q_price, total_deposit).unwrap().try_into().unwrap();
+
+                // Just some debugging info ...
+                if token_bought != presale_supply && presale_maximum_cap_u256 < U256::from(u64::MAX) {
+                    println!("presale_supply: {}", presale_supply);
+                    println!("token_bought: {}", token_bought);
+                    println!("q_price: {}", q_price);
+                    println!("presale_maximum_cap: {}", presale_maximum_cap);
+                    println!("adjusted_presale_maximum_cap: {}", adjusted_presale_maximum_cap);
+                }
+
+                // Presale maximum cap must able to buy all presale supply since it's not exceeded u64::MAX
+                if presale_maximum_cap_u256 < U256::from(u64::MAX) {
+                    assert_eq!(token_bought, presale_supply);
+                    assert_eq!(presale_maximum_cap, adjusted_presale_maximum_cap);
+                }
+            }
+
+            if q_price < SCALE_MULTIPLIER {
+                assert!(suggested_deposit_amount > 0);
+            }
+        }
+
+        #[test]
+        fn test_presale_min_max_gap_completion_prop(
+            q_price in 1u128..(u128::MAX / 2),
+            presale_supply in 100..100_000_000u64,
+        ) {
+            let presale_maximum_cap_u256 = (U256::from(presale_supply) * U256::from(q_price)).div_ceil(U256::from(SCALE_MULTIPLIER));
+            let presale_maximum_cap: u64 = presale_maximum_cap_u256.try_into().unwrap_or(u64::MAX);
+
+            let base_token_bought = (u128::from(presale_maximum_cap) << SCALE_OFFSET).safe_div(q_price).unwrap();
+            // Smallest gap
+            let presale_minimum_cap = (base_token_bought - 1).safe_mul(q_price).unwrap().div_ceil(SCALE_MULTIPLIER).safe_cast().unwrap();
+
+            let mut total_deposit = 0;
+
+            // Simulate suggesting deposit amount until reaching presale maximum cap
+            // 1. Deposit adjusted_presale_maximum_cap - 1, which leave the smallest deposit quota (last deposit available)
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, presale_minimum_cap).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // 2. Deposit the remaining quota
+            let remaining_quota = presale_maximum_cap.safe_sub(total_deposit).unwrap();
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, remaining_quota).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // Completable
+            assert!(total_deposit >= presale_minimum_cap && total_deposit <= presale_maximum_cap);
         }
     }
 }

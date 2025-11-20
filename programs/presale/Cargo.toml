@@ -35,3 +35,4 @@ spl-type-length-value = "0.8.0"
 spl-tlv-account-resolution = "0.10.0"
 proptest = "1.7.0"
 merkle-tree = { path = "../../merkle-tree", version = "0.1.0" }
+ruint = "1.3.0"
