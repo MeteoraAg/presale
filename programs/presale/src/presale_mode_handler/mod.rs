@@ -72,7 +72,7 @@ pub fn enforce_dynamic_price_registries_max_buyer_cap_range(presale: &Presale) -
 }
 
 pub fn get_presale_mode_handler(presale: &Presale) -> Result<Box<dyn PresaleModeHandler>> {
-    let presale_mode = PresaleMode::from(presale.presale_mode);
+    let presale_mode: PresaleMode = presale.presale_mode.safe_cast()?;
     let raw_data_slice = bytemuck::try_cast_slice::<u128, u8>(&presale.presale_mode_raw_data)
         .map_err(|_| PresaleError::UndeterminedError)?;
 

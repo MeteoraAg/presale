@@ -53,7 +53,7 @@ pub fn handle_create_merkle_root_config(
     );
 
     // 2. Ensure presale is permissioned with merkle proof
-    let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+    let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
     require!(
         whitelist_mode == WhitelistMode::PermissionWithMerkleProof,
         PresaleError::InvalidPresaleWhitelistMode

@@ -1,7 +1,14 @@
 use crate::*;
-use num_enum::{FromPrimitive, IntoPrimitive};
+use num_enum::{FromPrimitive, IntoPrimitive, TryFromPrimitive};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+pub enum BoolType {
+    False,
+    True,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u8)]
 pub enum PresaleMode {
     /// Fixed token price. The remaining will either be burn or refund to the creator
@@ -13,7 +20,7 @@ pub enum PresaleMode {
     Fcfs,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, FromPrimitive, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, IntoPrimitive, TryFromPrimitive, Default)]
 #[repr(u8)]
 pub enum WhitelistMode {
     #[default]
@@ -401,12 +408,15 @@ impl Presale {
         Ok(())
     }
 
-    pub fn allow_withdraw_remaining_quote(&self, presale_progress: PresaleProgress) -> bool {
-        let presale_mode = PresaleMode::from(self.presale_mode);
+    pub fn allow_withdraw_remaining_quote(
+        &self,
+        presale_progress: PresaleProgress,
+    ) -> Result<bool> {
+        let presale_mode: PresaleMode = self.presale_mode.safe_cast()?;
 
-        presale_progress == PresaleProgress::Failed
+        Ok(presale_progress == PresaleProgress::Failed
             || (presale_progress == PresaleProgress::Completed
-                && presale_mode == PresaleMode::Prorata)
+                && presale_mode == PresaleMode::Prorata))
     }
 
     pub fn get_remaining_quote(&self) -> u64 {
@@ -421,7 +431,7 @@ impl Presale {
         // 1. Ensure presale is in failed or prorata completed state
         let presale_progress = self.get_presale_progress(current_timestamp);
         require!(
-            self.allow_withdraw_remaining_quote(presale_progress),
+            self.allow_withdraw_remaining_quote(presale_progress)?,
             PresaleError::PresaleNotOpenForWithdrawRemainingQuote
         );
 
@@ -436,8 +446,10 @@ impl Presale {
                 let RemainingQuote {
                     refund_amount,
                     refund_fee,
-                } = presale_registry
-                    .get_remaining_quote(self.get_remaining_quote(), self.total_deposit)?;
+                } = presale_registry.get_finalized_presale_remaining_quote(
+                    self.get_remaining_quote(),
+                    self.total_deposit,
+                )?;
 
                 // To be fair to all participants in the registry (same price), refund deposit fee charges on remaining quote amount
                 let escrow_refund_fee = if presale_registry.total_deposit_fee > 0 {
@@ -513,7 +525,7 @@ impl Presale {
     }
 
     pub fn get_total_collected_fee(&self) -> Result<u64> {
-        let presale_mode = PresaleMode::from(self.presale_mode);
+        let presale_mode: PresaleMode = self.presale_mode.safe_cast()?;
         match presale_mode {
             // In prorata, we need to refund deposit fee of remaining quote to allow fair price for participants in the same registry
             PresaleMode::Prorata => {
@@ -528,7 +540,10 @@ impl Presale {
                     }
 
                     let RemainingQuote { refund_fee, .. } = registry
-                        .get_remaining_quote(presale_remaining_quote, self.total_deposit)?;
+                        .get_finalized_presale_remaining_quote(
+                            presale_remaining_quote,
+                            self.total_deposit,
+                        )?;
 
                     let registry_collected_fee = registry.total_deposit_fee.safe_sub(refund_fee)?;
                     total_fee = total_fee.safe_add(registry_collected_fee)?;
