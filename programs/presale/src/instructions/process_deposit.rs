@@ -47,15 +47,14 @@ pub fn handle_deposit<'a, 'b, 'c: 'info, 'info>(
     );
 
     // 2. Ensure deposit amount is within the cap
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_handler = get_presale_mode_handler(presale_mode);
+    let presale_handler = get_presale_mode_handler(&presale)?;
     let remaining_deposit_quota = presale_handler.get_remaining_deposit_quota(&presale, &escrow)?;
     let max_capped_deposit_amount = remaining_deposit_quota.min(max_amount);
 
     require!(max_capped_deposit_amount > 0, PresaleError::ZeroTokenAmount);
 
     let suggested_deposit_amount =
-        presale_handler.suggest_deposit_amount(&presale, max_capped_deposit_amount)?;
+        presale_handler.suggest_deposit_amount(max_capped_deposit_amount)?;
 
     require!(suggested_deposit_amount > 0, PresaleError::ZeroTokenAmount);
 

@@ -32,7 +32,7 @@ pub fn handle_create_permissioned_server_metadata(
 ) -> Result<()> {
     let presale = ctx.accounts.presale.load()?;
 
-    let whitelist_mode = WhitelistMode::from(presale.whitelist_mode);
+    let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
     require!(
         whitelist_mode == WhitelistMode::PermissionWithMerkleProof
             || whitelist_mode == WhitelistMode::PermissionWithAuthority,

@@ -125,4 +125,16 @@ pub enum PresaleError {
 
     #[msg("Presale is not open for collect fee")]
     PresaleNotOpenForCollectFee,
+
+    #[msg("Invalid type")]
+    InvalidType,
+
+    #[msg("Invalid buyer cap range")]
+    InvalidBuyerCapRange,
+
+    #[msg("Presale is ongoing")]
+    PresaleOngoing,
+
+    #[msg("Presale min/max cap gap too small")]
+    PresaleMinMaxCapGapTooSmall,
 }

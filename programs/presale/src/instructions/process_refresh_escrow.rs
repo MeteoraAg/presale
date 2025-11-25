@@ -21,8 +21,7 @@ pub fn handle_refresh_escrow(ctx: Context<RefreshEscrowCtx>) -> Result<()> {
     let presale_progress = presale.get_presale_progress(current_timestamp);
 
     if presale_progress == PresaleProgress::Completed {
-        let presale_mode = PresaleMode::from(presale.presale_mode);
-        let presale_handler = get_presale_mode_handler(presale_mode);
+        let presale_handler = get_presale_mode_handler(&presale)?;
 
         presale_handler.update_pending_claim_amount(&presale, &mut escrow, current_timestamp)?;
     }

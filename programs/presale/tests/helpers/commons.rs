@@ -41,6 +41,11 @@ const NATIVE_SOL_MINT: Pubkey =
 pub const DEFAULT_BASE_TOKEN_DECIMALS: u8 = 6;
 pub const DEFAULT_QUOTE_TOKEN_DECIMALS: u8 = 9;
 
+pub fn decode_presale_mode_raw_data<T: bytemuck::Pod>(raw_data: &[u128; 3]) -> &T {
+    let raw_slices = bytemuck::cast_slice::<u128, u8>(raw_data);
+    bytemuck::from_bytes::<T>(raw_slices)
+}
+
 // TODO: Refactor this to allow setup user, and user struct can interact with the program
 pub struct SetupContext {
     pub lite_svm: LiteSVM,

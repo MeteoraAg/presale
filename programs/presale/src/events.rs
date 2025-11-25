@@ -143,3 +143,10 @@ pub struct EvtCreatorCollectFee {
     pub owner: Pubkey,
     pub total_collected_fee: u64,
 }
+
+#[event]
+pub struct EvtCloseMerkleRootConfig {
+    pub presale: Pubkey,
+    pub merkle_root_config: Pubkey,
+    pub owner: Pubkey,
+}

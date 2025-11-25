@@ -1,5 +1,10 @@
 pub mod helpers;
 
+use std::rc::Rc;
+
+use anchor_client::solana_sdk::{
+    native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
+};
 use anchor_lang::{
     error::ERROR_CODE_OFFSET,
     prelude::{AccountMeta, Clock, Pubkey},
@@ -7,15 +12,11 @@ use anchor_lang::{
 use anchor_spl::token_interface::TokenAccount;
 use helpers::*;
 use litesvm::LiteSVM;
-use std::rc::Rc;
-
-use anchor_client::solana_sdk::{
-    native_token::LAMPORTS_PER_SOL, signature::Keypair, signer::Signer,
-};
 use presale::{
-    LockedVestingArgs, Presale, PresaleArgs, PresaleMode, PresaleRegistryArgs, WhitelistMode,
-    MAXIMUM_DURATION_UNTIL_PRESALE, MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION,
-    MAX_PRESALE_REGISTRY_COUNT, MINIMUM_PRESALE_DURATION,
+    FixedPricePresaleHandler, LockedVestingArgs, Presale, PresaleArgs, PresaleMode,
+    PresaleRegistryArgs, WhitelistMode, MAXIMUM_DURATION_UNTIL_PRESALE,
+    MAXIMUM_LOCK_AND_VEST_DURATION, MAXIMUM_PRESALE_DURATION, MAX_PRESALE_REGISTRY_COUNT,
+    MINIMUM_PRESALE_DURATION, SCALE_MULTIPLIER,
 };
 
 fn assert_err_invalid_locked_vesting_param(
@@ -364,6 +365,7 @@ fn assert_err_buyer_max_cap_cannot_purchase_even_a_single_token(setup_context: &
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -457,6 +459,7 @@ fn assert_err_presale_not_enough_supply_to_fulfill_presale_max_cap(
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -550,6 +553,7 @@ fn assert_err_presale_buyer_minimum_cap_cannot_purchase_any_token(
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -632,6 +636,10 @@ fn test_initialize_permissionless_presale_vault_with_multiple_registries() {
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
+    let user_pubkey = user.pubkey();
+
     let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
     for registry in presale_registries.iter_mut() {
         registry.presale_supply = 1000 * 10u64.pow(6);
@@ -639,9 +647,21 @@ fn test_initialize_permissionless_presale_vault_with_multiple_registries() {
         registry.buyer_minimum_deposit_cap = 0;
     }
 
-    let presale_params = create_presale_args(&lite_svm);
-    let locked_vesting_params = None;
-    let user_pubkey = user.pubkey();
+    let wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user.pubkey(),
+    );
+
+    let presale_params = wrapper.presale_params_wrapper.args.params.presale_params;
+    let locked_vesting_params = wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .locked_vesting_params;
 
     let err = handle_initialize_presale_err(
         &mut lite_svm,
@@ -650,7 +670,7 @@ fn test_initialize_permissionless_presale_vault_with_multiple_registries() {
             quote_mint: anchor_spl::token::spl_token::native_mint::ID,
             presale_params,
             presale_registries: presale_registries.to_vec(),
-            locked_vesting_params,
+            locked_vesting_params: Some(locked_vesting_params),
             creator: user_pubkey,
             payer: Rc::clone(&user),
             remaining_accounts: vec![],
@@ -674,6 +694,19 @@ fn test_total_presale_supply_from_multiple_registries_overflow() {
 
     let SetupContext { mut lite_svm, user } = setup_context;
 
+    let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
+    let user_pubkey = user.pubkey();
+
+    let wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user.pubkey(),
+    );
+
     let mut presale_registries = [PresaleRegistryArgs::default(); MAX_PRESALE_REGISTRY_COUNT];
     for registry in presale_registries.iter_mut() {
         registry.presale_supply = u64::MAX;
@@ -681,18 +714,21 @@ fn test_total_presale_supply_from_multiple_registries_overflow() {
         registry.buyer_minimum_deposit_cap = 0;
     }
 
-    let presale_params = create_presale_args(&lite_svm);
-    let locked_vesting_params = None;
-    let user_pubkey = user.pubkey();
+    let presale_params = wrapper.presale_params_wrapper.args.params.presale_params;
+    let locked_vesting_params = wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .locked_vesting_params;
 
     let err = handle_initialize_presale_err(
         &mut lite_svm,
         HandleInitializePresaleArgs {
             base_mint: mint,
-            quote_mint: anchor_spl::token::spl_token::native_mint::ID,
+            quote_mint,
             presale_params,
             presale_registries: presale_registries.to_vec(),
-            locked_vesting_params,
+            locked_vesting_params: Some(locked_vesting_params),
             creator: user_pubkey,
             payer: Rc::clone(&user),
             remaining_accounts: vec![],
@@ -716,15 +752,26 @@ fn test_initialize_fixed_token_price_presale_vault_missing_fixed_price_extra_arg
     );
 
     let SetupContext { mut lite_svm, user } = setup_context;
-
-    let presale_registries = create_default_presale_registries(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
-    );
-    let presale_params = create_presale_args(&lite_svm);
-
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
+    let whitelist_mode = WhitelistMode::Permissionless;
+
+    let wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user_pubkey,
+    );
+
+    let presale_registries = wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .presale_registries;
+
+    let presale_params = wrapper.presale_params_wrapper.args.params.presale_params;
 
     let err = handle_initialize_presale_err(
         &mut lite_svm,
@@ -756,18 +803,31 @@ fn test_initialize_presale_vault_with_invalid_parameters() {
     );
     let SetupContext { mut lite_svm, user } = setup_context;
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
+    let whitelist_mode = WhitelistMode::Permissionless;
+    let user_pubkey = user.pubkey();
 
-    let presale_registries = create_default_presale_registries(
-        DEFAULT_BASE_TOKEN_DECIMALS,
-        &PRESALE_REGISTRIES_DEFAULT_BASIS_POINTS,
+    let wrapper = create_default_fixed_price_presale_args_wrapper(
+        mint,
+        quote_mint,
+        &lite_svm,
+        whitelist_mode,
+        Rc::clone(&user),
+        user_pubkey,
     );
 
-    let presale_params = create_presale_args(&lite_svm);
     let locked_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
         vest_duration: 3600 * 2,
         ..Default::default()
     };
+
+    let presale_registries = wrapper
+        .presale_params_wrapper
+        .args
+        .params
+        .presale_registries;
+
+    let presale_params = wrapper.presale_params_wrapper.args.params.presale_params;
 
     assert_err_invalid_presale_params(
         &mut lite_svm,
@@ -801,13 +861,6 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
     let quote_mint = anchor_spl::token::spl_token::native_mint::ID;
     let user_pubkey = user.pubkey();
 
-    let mut presale_registries = vec![];
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    presale_registries.push(registry);
-
     let clock: Clock = lite_svm.get_sysvar();
 
     let presale_params = PresaleArgs {
@@ -816,9 +869,16 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Fcfs.into(),
-        whitelist_mode: WhitelistMode::PermissionWithAuthority.into(),
+        whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
+
+    let mut presale_registries = vec![];
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
+    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
+    presale_registries.push(registry);
 
     let lock_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
@@ -851,7 +911,6 @@ fn test_initialize_presale_vault_with_dynamic_price_fcfs() {
 
     assert_eq!(presale_state.presale_mode, PresaleMode::Fcfs as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
 }
 
@@ -881,7 +940,7 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
         presale_maximum_cap: LAMPORTS_PER_SOL,
         presale_minimum_cap: 1_000_000, // 0.0001 SOL
         presale_mode: PresaleMode::Prorata.into(),
-        whitelist_mode: WhitelistMode::PermissionWithMerkleProof.into(),
+        whitelist_mode: WhitelistMode::Permissionless.into(),
         ..Default::default()
     };
 
@@ -916,7 +975,6 @@ fn test_initialize_presale_vault_with_dynamic_price_prorata() {
 
     assert_eq!(presale_state.presale_mode, PresaleMode::Prorata as u8);
     assert_eq!(presale_state.whitelist_mode, presale_params.whitelist_mode);
-    assert_eq!(presale_state.fixed_price_presale_q_price, 0);
     assert_eq!(presale_state.unsold_token_action, 0);
 }
 
@@ -946,6 +1004,7 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
 
@@ -1007,6 +1066,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
         ))
         .unwrap();
 
+    let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+        &presale_state.presale_mode_raw_data,
+    );
+
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
     assert_eq!(presale_state.presale_mode, PresaleMode::FixedPrice as u8);
@@ -1058,22 +1121,10 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     );
 
     assert_eq!(
-        presale_state.lock_start_time,
-        presale_state.presale_end_time + 1
-    );
-    assert_eq!(
-        presale_state.lock_end_time,
-        presale_state.lock_start_time + lock_vesting_params.lock_duration
-    );
-    assert_eq!(
-        presale_state.vesting_start_time,
-        presale_state.lock_end_time + 1
-    );
-    assert_eq!(
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
@@ -1081,6 +1132,11 @@ fn test_initialize_presale_vault_with_fixed_token_price() {
     assert_eq!(
         presale_state.immediate_release_bps,
         lock_vesting_params.immediately_release_bps
+    );
+
+    assert_eq!(
+        presale_state.immediate_release_timestamp,
+        lock_vesting_params.immediate_release_timestamp
     );
 
     let base_vault_token_account: TokenAccount = lite_svm
@@ -1133,26 +1189,9 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
             owner: user_pubkey,
             payer: Rc::clone(&user),
             base: user_pubkey,
+            disable_withdraw: false,
         },
     );
-
-    let mut presale_registries = vec![];
-
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    registry.deposit_fee_bps = 100; // 1%
-
-    presale_registries.push(registry);
-
-    let mut registry = PresaleRegistryArgs::default();
-    registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
-    registry.buyer_maximum_deposit_cap = LAMPORTS_PER_SOL;
-    registry.buyer_minimum_deposit_cap = 1_000_000; // 0.0001 SOL
-    registry.deposit_fee_bps = 200; // 2%
-
-    presale_registries.push(registry);
 
     let clock: Clock = lite_svm.get_sysvar();
 
@@ -1165,6 +1204,26 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
         whitelist_mode: WhitelistMode::PermissionWithMerkleProof.into(),
         ..Default::default()
     };
+
+    let mut presale_registries = vec![];
+
+    let minimum_deposit_cap: u64 = q_price.div_ceil(SCALE_MULTIPLIER).try_into().unwrap();
+
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_000_000 * 10u64.pow(6); // 1 million
+    registry.buyer_maximum_deposit_cap = presale_params.presale_maximum_cap;
+    registry.buyer_minimum_deposit_cap = minimum_deposit_cap;
+    registry.deposit_fee_bps = 100; // 1%
+
+    presale_registries.push(registry);
+
+    let mut registry = PresaleRegistryArgs::default();
+    registry.presale_supply = 1_500_000 * 10u64.pow(6); // 1.5 million
+    registry.buyer_maximum_deposit_cap = presale_params.presale_maximum_cap;
+    registry.buyer_minimum_deposit_cap = minimum_deposit_cap;
+    registry.deposit_fee_bps = 200; // 2%
+
+    presale_registries.push(registry);
 
     let lock_vesting_params = LockedVestingArgs {
         lock_duration: 3600,
@@ -1203,6 +1262,10 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
             &presale::ID,
         ))
         .unwrap();
+
+    let fp_handler = decode_presale_mode_raw_data::<FixedPricePresaleHandler>(
+        &presale_state.presale_mode_raw_data,
+    );
 
     assert_eq!(presale_state.base_mint, mint);
     assert_eq!(presale_state.quote_mint, quote_mint);
@@ -1259,26 +1322,15 @@ fn test_initialize_presale_vault_with_fixed_token_price_with_multiple_registries
     );
 
     assert_eq!(
-        presale_state.lock_start_time,
-        presale_state.presale_end_time + 1
-    );
-    assert_eq!(
-        presale_state.lock_end_time,
-        presale_state.lock_start_time + lock_vesting_params.lock_duration
-    );
-    assert_eq!(
-        presale_state.vesting_start_time,
-        presale_state.lock_end_time + 1
-    );
-    assert_eq!(
         presale_state.vesting_end_time,
         presale_state.vesting_start_time + lock_vesting_params.vest_duration
     );
-    assert_eq!(presale_state.fixed_price_presale_q_price, q_price);
+    assert_eq!(fp_handler.q_price, q_price);
     assert_eq!(
         presale_state.unsold_token_action,
         presale_params.unsold_token_action
     );
+    assert!(!fp_handler.is_earlier_presale_end_disabled());
 
     let base_vault_token_account: TokenAccount = lite_svm
         .get_deserialized_account(&presale_state.base_token_vault)

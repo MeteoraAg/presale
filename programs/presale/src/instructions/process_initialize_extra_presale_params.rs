@@ -27,24 +27,41 @@ pub struct InitializeFixedPricePresaleArgsCtx {
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Default)]
 pub struct InitializeFixedPricePresaleExtraArgs {
     pub presale: Pubkey,
-    pub padding0: u8,
+    pub disable_withdraw: u8,
     pub q_price: u128,
     pub padding1: [u64; 8],
+}
+
+impl InitializeFixedPricePresaleExtraArgs {
+    pub fn validate(&self) -> Result<()> {
+        require!(self.q_price > 0, PresaleError::InvalidTokenPrice);
+
+        let disable_withdraw = BoolType::try_from(self.disable_withdraw);
+        require!(disable_withdraw.is_ok(), PresaleError::InvalidType);
+
+        Ok(())
+    }
 }
 
 pub fn handle_initialize_fixed_price_presale_args(
     ctx: Context<InitializeFixedPricePresaleArgsCtx>,
     params: InitializeFixedPricePresaleExtraArgs,
 ) -> Result<()> {
+    params.validate()?;
+
     let InitializeFixedPricePresaleExtraArgs {
-        presale, q_price, ..
+        presale,
+        q_price,
+        disable_withdraw,
+        ..
     } = params;
 
     let fixed_price_presale_params = &mut ctx.accounts.fixed_price_presale_params.load_init()?;
-    fixed_price_presale_params.validate_and_initialize(
+    fixed_price_presale_params.initialize(
         q_price,
         ctx.accounts.owner.key(),
         presale,
+        disable_withdraw.safe_cast()?,
     )?;
 
     emit_cpi!(EvtFixedPricePresaleArgsCreate { presale, q_price });

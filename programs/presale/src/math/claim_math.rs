@@ -69,6 +69,7 @@ pub fn calculate_dripped_amount_for_user(
 
 pub fn calculate_cumulative_claimable_amount_for_user(
     immediate_release_bps: u16,
+    immediate_release_timestamp: u64,
     total_sold_token: u64,
     vesting_start_time: u64,
     vest_duration: u64,
@@ -85,11 +86,15 @@ pub fn calculate_cumulative_claimable_amount_for_user(
         vested_amount,
     } = calculate_immediate_release_token(total_sold_token, immediate_release_bps)?;
 
-    let user_immediate_release_token = calculate_immediate_release_token_for_user(
-        immediate_released_amount,
-        user_deposit,
-        total_deposit,
-    )?;
+    let user_immediate_release_token = if current_timestamp >= immediate_release_timestamp {
+        calculate_immediate_release_token_for_user(
+            immediate_released_amount,
+            user_deposit,
+            total_deposit,
+        )?
+    } else {
+        0
+    };
 
     let user_dripped_token = calculate_dripped_amount_for_user(
         vesting_start_time,

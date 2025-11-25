@@ -66,15 +66,14 @@ pub fn handle_withdraw<'a, 'b, 'c: 'info, 'info>(
     );
 
     // 4. Ensure presale mode allows withdraw
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_mode_handler = get_presale_mode_handler(presale_mode);
+    let presale_mode_handler = get_presale_mode_handler(&presale)?;
     require!(
         presale_mode_handler.can_withdraw(),
         PresaleError::PresaleNotOpenForWithdraw
     );
 
     let suggested_withdraw_amount =
-        presale_mode_handler.suggest_withdraw_amount(&presale, &escrow, max_amount)?;
+        presale_mode_handler.suggest_withdraw_amount(&escrow, max_amount)?;
     require!(suggested_withdraw_amount > 0, PresaleError::ZeroTokenAmount);
 
     // 5. Update escrow and presale state

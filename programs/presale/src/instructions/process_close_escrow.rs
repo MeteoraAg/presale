@@ -92,8 +92,7 @@ fn ensure_escrow_done_claim_and_withdraw_remaining_quote(
     }
 
     // 2. Ensure the escrow has claimed all bought tokens
-    let presale_mode = PresaleMode::from(presale.presale_mode);
-    let presale_handler = get_presale_mode_handler(presale_mode);
+    let presale_handler = get_presale_mode_handler(&presale)?;
 
     let vesting_end_time = presale.vesting_start_time.safe_add(presale.vest_duration)?;
 

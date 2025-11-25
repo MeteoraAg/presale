@@ -19,6 +19,9 @@ pub const MAX_DEPOSIT_FEE_BPS: u16 = 5000; // 50%
 // Only permissioned whitelist mode allowed to have multiple presale registries. The constant defined below is the default index for permissionless registries.
 pub const DEFAULT_PERMISSIONLESS_REGISTRY_INDEX: u8 = 0;
 
+pub const DISABLE_WITHDRAW_MASK: u8 = 0b1;
+pub const DISABLE_END_PRESALE_ONCE_CAP_REACHED_MASK: u8 = 0b1;
+
 // PDA's seeds
 pub mod seeds {
     pub const PRESALE_AUTHORITY_PREFIX: &[u8] = b"presale_authority";

@@ -1,6 +1,12 @@
 use crate::PresaleModeHandler;
 use crate::*;
 
+// Calculate min quote amount needed to purchase at least 1 base lamport. If price < 1 quote token, min quote amount will be > 1
+fn calculate_min_quote_amount_for_base_lamport(q_price: u128) -> Result<u64> {
+    let min_quote_amount = q_price.div_ceil(SCALE_MULTIPLIER);
+    Ok(min_quote_amount.safe_cast()?)
+}
+
 fn calculate_token_bought(q_price: u128, amount: u64) -> Result<u128> {
     let q_amount = u128::from(amount).safe_shl(SCALE_OFFSET)?;
     let token_bought = q_amount.safe_div(q_price)?;
@@ -33,13 +39,28 @@ fn ensure_enough_presale_supply(
     Ok(())
 }
 
-fn calculate_quote_token_without_surplus(presale: &Presale, amount: u64) -> Result<u64> {
-    let base_token_amount = calculate_token_bought(presale.fixed_price_presale_q_price, amount)?;
+fn ensure_gap_between_min_and_max_presale_cap(
+    q_price: u128,
+    presale_minimum_cap: u64,
+    presale_maximum_cap: u64,
+) -> Result<()> {
+    let minimum_base_token_bought = calculate_token_bought(q_price, presale_minimum_cap)?;
+    let maximum_base_token_bought = calculate_token_bought(q_price, presale_maximum_cap)?;
+
+    let delta = maximum_base_token_bought.safe_sub(minimum_base_token_bought)?;
+    require!(delta > 0, PresaleError::PresaleMinMaxCapGapTooSmall);
+
+    Ok(())
+}
+
+fn calculate_quote_token_without_surplus(q_price: u128, amount: u64) -> Result<u64> {
+    let base_token_amount = calculate_token_bought(q_price, amount)?;
 
     let quote_token_needed = base_token_amount
-        .safe_mul(presale.fixed_price_presale_q_price)?
+        .safe_mul(q_price)?
         .div_ceil(SCALE_MULTIPLIER);
 
+    // Due to the rounding in in favor of the program, the token price might be inflated
     let quote_token_needed: u64 = quote_token_needed.safe_cast()?;
 
     // This should never happen
@@ -51,7 +72,45 @@ fn calculate_quote_token_without_surplus(presale: &Presale, amount: u64) -> Resu
     Ok(quote_token_needed)
 }
 
-pub struct FixedPricePresaleHandler;
+#[zero_copy]
+pub struct FixedPricePresaleHandler {
+    pub q_price: u128,
+    pub disable_withdraw: u8,
+    pub disable_earlier_presale_end_once_cap_reached: u8,
+    pub padding0: [u8; 14],
+    pub padding1: u128,
+}
+
+impl FixedPricePresaleHandler {
+    pub fn initialize_data(
+        presale_raw_data: &mut [u128; 3],
+        q_price: u128,
+        disable_earlier_presale_end_once_cap_reached: u8,
+        disable_withdraw: u8,
+    ) -> Result<()> {
+        let presale_raw_data_slice = bytemuck::try_cast_slice_mut::<u128, u8>(presale_raw_data)
+            .map_err(|_| PresaleError::UndeterminedError)?;
+
+        let handler =
+            bytemuck::try_from_bytes_mut::<FixedPricePresaleHandler>(presale_raw_data_slice)
+                .map_err(|_| PresaleError::UndeterminedError)?;
+
+        handler.disable_earlier_presale_end_once_cap_reached =
+            disable_earlier_presale_end_once_cap_reached;
+        handler.q_price = q_price;
+        handler.disable_withdraw = disable_withdraw;
+
+        Ok(())
+    }
+
+    pub fn is_earlier_presale_end_disabled(&self) -> bool {
+        self.disable_earlier_presale_end_once_cap_reached != 0
+    }
+
+    pub fn is_withdraw_disabled(&self) -> bool {
+        self.disable_withdraw != 0
+    }
+}
 
 impl PresaleModeHandler for FixedPricePresaleHandler {
     fn initialize_presale<'c: 'info, 'e, 'info>(
@@ -59,9 +118,6 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         presale_pubkey: Pubkey,
         presale: &mut Presale,
         presale_params: &PresaleArgs,
-        presale_registries: &[PresaleRegistryArgs],
-        locked_vesting_params: Option<&LockedVestingArgs>,
-        mint_pubkeys: InitializePresaleVaultAccountPubkeys,
         remaining_accounts: &'e mut &'c [AccountInfo<'info>],
     ) -> Result<()> {
         // 1. Get extra params about fixed price presale mode
@@ -82,12 +138,14 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
             PresaleError::MissingPresaleExtraParams
         );
 
+        let whitelist_mode: WhitelistMode = presale.whitelist_mode.safe_cast()?;
+
         // 2. Validate fixed price presale parameters
         // TODO: Should we make sure there's no impossible to fill gap?
         // For example: 1 token = 1 USDC, presale_maximum_cap = 100 USDC, buyer_minimum_deposit_cap = 20 USDC, buyer_maximum_deposit_cap = 90 USDC
         // User 1 deposit 90 USDC, remaining_presale_cap = 100 - 90 = 10
         // But buyer_minimum_deposit_cap = 20, thus it's impossible to fill the gap
-        for registry in presale_registries {
+        for registry in presale.presale_registries.iter() {
             if !registry.is_uninitialized() {
                 // ensure buyer_minimum_deposit_cap and buyer_maximum_deposit_cap can buy at least 1 token and not exceed u64::MAX token
                 ensure_token_buyable(
@@ -98,44 +156,46 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                     presale_extra_param.q_price,
                     registry.buyer_maximum_deposit_cap,
                 )?;
+
+                // In permissioned whitelist mode, ensure buyer min/max cap is set to minimum and maximum allowed range
+                // This reduces the mistake of setting unusable buyer cap in permissioned presale at offchain
+                if whitelist_mode.is_permissioned() {
+                    let min_quote_amount =
+                        calculate_min_quote_amount_for_base_lamport(presale_extra_param.q_price)?;
+
+                    require!(
+                        registry.buyer_minimum_deposit_cap == min_quote_amount,
+                        PresaleError::InvalidBuyerCapRange
+                    );
+
+                    require!(
+                        registry.buyer_maximum_deposit_cap == presale.presale_maximum_cap,
+                        PresaleError::InvalidBuyerCapRange
+                    );
+                }
             }
         }
-
-        let current_timestamp: u64 = Clock::get()?.unix_timestamp.safe_cast()?;
-
-        let InitializePresaleVaultAccountPubkeys {
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            base,
-            base_token_program,
-            quote_token_program,
-        } = mint_pubkeys;
-
-        // 3. Create presale vault
-        presale.initialize(PresaleInitializeArgs {
-            presale_params: *presale_params,
-            presale_registries,
-            locked_vesting_params: locked_vesting_params.cloned(),
-            fixed_price_presale_params: Some(*presale_extra_param),
-            base_mint,
-            quote_mint,
-            base_token_vault,
-            quote_token_vault,
-            owner,
-            current_timestamp,
-            base,
-            base_token_program,
-            quote_token_program,
-        })?;
 
         // Ensure presale supply is enough to fulfill presale maximum cap
         ensure_enough_presale_supply(
             presale_extra_param.q_price,
             presale.presale_supply,
-            presale_params.presale_maximum_cap,
+            presale.presale_maximum_cap,
+        )?;
+
+        // Ensure there's a gap between presale minimum cap and presale maximum cap
+        // This is to prevent presale progress stuck when both min and max cap are unreachable (e.g. both are the same)
+        ensure_gap_between_min_and_max_presale_cap(
+            presale_extra_param.q_price,
+            presale.presale_minimum_cap,
+            presale.presale_maximum_cap,
+        )?;
+
+        FixedPricePresaleHandler::initialize_data(
+            &mut presale.presale_mode_raw_data,
+            presale_extra_param.q_price,
+            presale_params.disable_earlier_presale_end_once_cap_reached,
+            presale_extra_param.disable_withdraw,
         )?;
 
         Ok(())
@@ -146,10 +206,39 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     fn get_remaining_deposit_quota(&self, presale: &Presale, escrow: &Escrow) -> Result<u64> {
         let global_remaining_quota = presale.get_remaining_deposit_quota()?;
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
+
+        let total_token_sold: u64 = if presale_registry.total_deposit > 0 {
+            calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .safe_cast()?
+                // Reason for min: Due to deposit amount is rounding up, it's possible total_token_sold > presale_supply
+                // Example: presale_supply = 100, q_price = 0.333, registry.total_deposit 33, total_token_sold = 99 (round down)
+                // registry_remaining_base_token = 100 - 99 = 1
+                // registry_remaining_deposit_quota = 1 * 0.333 = 0.333 -> 1 (round up)
+                // base_token_purchasable_with_remaining_deposit_quota = 1 / 0.333 = 3 (round down)
+                // base_token_purchasable_with_remaining_deposit_quota = 3 > registry_remaining_base_token = 1
+                .min(presale_registry.presale_supply)
+        } else {
+            0
+        };
+
+        if total_token_sold == presale_registry.presale_supply {
+            return Ok(0);
+        }
+
+        let registry_remaining_base_token =
+            presale_registry.presale_supply.safe_sub(total_token_sold)?;
+
+        let registry_remaining_deposit_quota: u64 = u128::from(registry_remaining_base_token)
+            .safe_mul(self.q_price)?
+            .div_ceil(SCALE_MULTIPLIER)
+            .safe_cast()?;
+
         let personal_remaining_quota =
             escrow.get_remaining_deposit_quota(presale_registry.buyer_maximum_deposit_cap)?;
 
-        Ok(global_remaining_quota.min(personal_remaining_quota))
+        Ok(global_remaining_quota
+            .min(personal_remaining_quota)
+            .min(registry_remaining_deposit_quota))
     }
 
     /// Fixed price presale stop accept deposit when the presale maximum cap is reached. Therefore, can end presale immediately.
@@ -158,16 +247,15 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         presale: &mut Presale,
         current_timestamp: u64,
     ) -> Result<()> {
-        if presale.total_deposit >= presale.presale_maximum_cap {
-            presale.advance_progress_to_completed(current_timestamp)?;
-        }
-
-        Ok(())
+        super::end_presale_if_max_cap_reached(
+            presale,
+            self.is_earlier_presale_end_disabled(),
+            current_timestamp,
+        )
     }
 
     fn can_withdraw(&self) -> bool {
-        // Fixed price presale allow withdraw
-        true
+        !self.is_withdraw_disabled()
     }
 
     fn process_withdraw(
@@ -209,10 +297,10 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
                 continue;
             }
 
-            total_sold_token = total_sold_token.safe_add(calculate_token_bought(
-                presale.fixed_price_presale_q_price,
-                presale_registry.total_deposit,
-            )?)?;
+            let sold_token = calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .min(presale_registry.presale_supply.into());
+
+            total_sold_token = total_sold_token.safe_add(sold_token)?;
         }
 
         Ok(total_sold_token.safe_cast()?)
@@ -226,15 +314,15 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
     ) -> Result<u64> {
         // 1. Calculate how many base tokens were bought
         let presale_registry = presale.get_presale_registry(escrow.registry_index.into())?;
-        let total_sold_token = calculate_token_bought(
-            presale.fixed_price_presale_q_price,
-            presale_registry.total_deposit,
-        )?
-        .safe_cast()?;
+        let total_sold_token =
+            calculate_token_bought(self.q_price, presale_registry.total_deposit)?
+                .safe_cast()?
+                .min(presale_registry.presale_supply);
 
         // 2. Calculate how many base tokens can be claimed based on vesting schedule
         let claimable_bought_token = calculate_cumulative_claimable_amount_for_user(
             presale.immediate_release_bps,
+            presale.immediate_release_timestamp,
             total_sold_token,
             presale.vesting_start_time,
             presale.vest_duration,
@@ -246,20 +334,15 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
         Ok(claimable_bought_token)
     }
 
-    fn suggest_deposit_amount(&self, presale: &Presale, max_deposit_amount: u64) -> Result<u64> {
-        calculate_quote_token_without_surplus(presale, max_deposit_amount)
+    fn suggest_deposit_amount(&self, max_deposit_amount: u64) -> Result<u64> {
+        calculate_quote_token_without_surplus(self.q_price, max_deposit_amount)
     }
 
-    fn suggest_withdraw_amount(
-        &self,
-        presale: &Presale,
-        escrow: &Escrow,
-        max_withdraw_amount: u64,
-    ) -> Result<u64> {
+    fn suggest_withdraw_amount(&self, escrow: &Escrow, max_withdraw_amount: u64) -> Result<u64> {
         if escrow.total_deposit == max_withdraw_amount {
             return Ok(max_withdraw_amount);
         }
-        calculate_quote_token_without_surplus(presale, max_withdraw_amount)
+        calculate_quote_token_without_surplus(self.q_price, max_withdraw_amount)
     }
 }
 
@@ -267,24 +350,167 @@ impl PresaleModeHandler for FixedPricePresaleHandler {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+    use ruint::aliases::U256;
 
     #[test]
     fn test_calculate_quote_token_without_surplus() {
-        let mut presale = Presale::default();
         let lamport_per_price = 5;
-        presale.fixed_price_presale_q_price = lamport_per_price * SCALE_MULTIPLIER; // 5 quote token per base token
+        let q_price = lamport_per_price * SCALE_MULTIPLIER; // 5 quote token per base token
 
-        let suggested_deposit_amount = calculate_quote_token_without_surplus(&presale, 7).unwrap();
+        let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, 7).unwrap();
         assert_eq!(u128::from(suggested_deposit_amount), lamport_per_price);
+    }
+
+    #[test]
+    fn test_calculate_quote_token_for_base_lamport() {
+        let lamport_price: u128 = 10;
+        let q_price = lamport_price * SCALE_MULTIPLIER; // 10 quote token per base token
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 1);
+
+        let lamport_price2: u128 = 1;
+        let q_price = lamport_price2 * SCALE_MULTIPLIER; // 1 quote token per base token
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 1);
+
+        let lamport_price: f64 = 0.1;
+        let q_price = (lamport_price * 2.0f64.powi(SCALE_OFFSET.try_into().unwrap())) as u128;
+
+        let min_quote_amount = calculate_min_quote_amount_for_base_lamport(q_price).unwrap();
+        let base_amount = calculate_token_bought(q_price, min_quote_amount).unwrap();
+        assert_eq!(base_amount, 9);
+    }
+
+    #[test]
+    fn test_total_token_bought_over_presale_supply_due_to_accumulated_precision_loss() {
+        let presale_supply: u128 = 100;
+
+        for lamport_price in [0.33, 1.33] {
+            let mut total_quote_token_spent = 0;
+            let q_price = (lamport_price * 2.0f64.powi(SCALE_OFFSET.try_into().unwrap())) as u128;
+
+            // Simulate user buying until presale supply is bought out
+            loop {
+                let quote_token_sold =
+                    calculate_token_bought(q_price, total_quote_token_spent).unwrap_or_default();
+
+                if quote_token_sold >= presale_supply {
+                    break;
+                }
+
+                let base_token_bought = calculate_token_bought(q_price, 2).unwrap();
+                let quote_token_needed = (base_token_bought * q_price).div_ceil(SCALE_MULTIPLIER);
+                total_quote_token_spent += quote_token_needed as u64;
+            }
+
+            let total_base_token_bought =
+                calculate_token_bought(q_price, total_quote_token_spent).unwrap();
+
+            println!("total_quote_token_spent: {}", total_quote_token_spent);
+            println!("total_base_token_bought: {}", total_base_token_bought);
+            let average_lamport_price = total_quote_token_spent as f64 / presale_supply as f64;
+            println!(
+                "price: {}, average price: {}",
+                lamport_price, average_lamport_price
+            );
+
+            assert!(total_base_token_bought >= presale_supply);
+            assert!(average_lamport_price >= lamport_price);
+        }
     }
 
     proptest! {
         #[test]
         fn test_calculate_quote_token_without_surplus_prop(lamport_per_price in 1u64..u64::MAX, max_deposit_amount in 1u64..u64::MAX) {
-            let mut presale = Presale::default();
-            presale.fixed_price_presale_q_price = u128::from(lamport_per_price) * SCALE_MULTIPLIER; // lamport_per_price quote token per base token
-            let suggested_deposit_amount = calculate_quote_token_without_surplus(&presale, max_deposit_amount).unwrap();
+            let q_price = u128::from(lamport_per_price) * SCALE_MULTIPLIER; // lamport_per_price quote token per base token
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, max_deposit_amount).unwrap();
             assert!(suggested_deposit_amount <= max_deposit_amount);
+        }
+
+        // Shows that suggest deposit amount on presale maximum cap doesn't work
+        #[test]
+        fn test_suggest_deposit_amount_on_presale_maximum_cap_prop(
+            q_price in 1u128..(u128::MAX / 2),
+            presale_supply in 100..100_000_000u64
+        ) {
+            let presale_maximum_cap_u256 = (U256::from(presale_supply) * U256::from(q_price)).div_ceil(U256::from(SCALE_MULTIPLIER));
+            let presale_maximum_cap: u64 = presale_maximum_cap_u256.try_into().unwrap_or(u64::MAX);
+
+            let base_token_bought = (u128::from(presale_maximum_cap) << SCALE_OFFSET).safe_div(q_price).unwrap();
+            // This will be the adjusted presale maximum cap that 100% reachable
+            let adjusted_presale_maximum_cap: u64 = base_token_bought.safe_mul(q_price).unwrap().div_ceil(SCALE_MULTIPLIER).safe_cast().unwrap();
+
+            let mut total_deposit = 0;
+
+            // Simulate suggesting deposit amount until reaching presale maximum cap
+            // 1. Deposit adjusted_presale_maximum_cap - 1, which leave the smallest deposit quota (last deposit available)
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, adjusted_presale_maximum_cap - 1).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // 2. Deposit the remaining quota
+            let remaining_quota = adjusted_presale_maximum_cap.safe_sub(total_deposit).unwrap();
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, remaining_quota).unwrap();
+
+            if suggested_deposit_amount == 0 {
+                // Happen only when price > 1 quote token per base token
+                assert!(q_price > SCALE_MULTIPLIER);
+            } else {
+                total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+                assert_eq!(total_deposit, adjusted_presale_maximum_cap);
+
+                let token_bought: u64 = calculate_token_bought(q_price, total_deposit).unwrap().try_into().unwrap();
+
+                // Just some debugging info ...
+                if token_bought != presale_supply && presale_maximum_cap_u256 < U256::from(u64::MAX) {
+                    println!("presale_supply: {}", presale_supply);
+                    println!("token_bought: {}", token_bought);
+                    println!("q_price: {}", q_price);
+                    println!("presale_maximum_cap: {}", presale_maximum_cap);
+                    println!("adjusted_presale_maximum_cap: {}", adjusted_presale_maximum_cap);
+                }
+
+                // Presale maximum cap must able to buy all presale supply since it's not exceeded u64::MAX
+                if presale_maximum_cap_u256 < U256::from(u64::MAX) {
+                    assert_eq!(token_bought, presale_supply);
+                    assert_eq!(presale_maximum_cap, adjusted_presale_maximum_cap);
+                }
+            }
+
+            if q_price < SCALE_MULTIPLIER {
+                assert!(suggested_deposit_amount > 0);
+            }
+        }
+
+        #[test]
+        fn test_presale_min_max_gap_completion_prop(
+            q_price in 1u128..(u128::MAX / 2),
+            presale_supply in 100..100_000_000u64,
+        ) {
+            let presale_maximum_cap_u256 = (U256::from(presale_supply) * U256::from(q_price)).div_ceil(U256::from(SCALE_MULTIPLIER));
+            let presale_maximum_cap: u64 = presale_maximum_cap_u256.try_into().unwrap_or(u64::MAX);
+
+            let base_token_bought = (u128::from(presale_maximum_cap) << SCALE_OFFSET).safe_div(q_price).unwrap();
+            // Smallest gap
+            let presale_minimum_cap = (base_token_bought - 1).safe_mul(q_price).unwrap().div_ceil(SCALE_MULTIPLIER).safe_cast().unwrap();
+
+            let mut total_deposit = 0;
+
+            // Simulate suggesting deposit amount until reaching presale maximum cap
+            // 1. Deposit adjusted_presale_maximum_cap - 1, which leave the smallest deposit quota (last deposit available)
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, presale_minimum_cap).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // 2. Deposit the remaining quota
+            let remaining_quota = presale_maximum_cap.safe_sub(total_deposit).unwrap();
+            let suggested_deposit_amount = calculate_quote_token_without_surplus(q_price, remaining_quota).unwrap();
+            total_deposit = total_deposit.safe_add(suggested_deposit_amount).unwrap();
+
+            // Completable
+            assert!(total_deposit >= presale_minimum_cap && total_deposit <= presale_maximum_cap);
         }
     }
 }

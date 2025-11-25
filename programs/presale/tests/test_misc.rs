@@ -1,3 +1,5 @@
+use presale::LockedVestingArgs;
+
 use crate::helpers::calculate_q_price_from_ui_price;
 
 pub mod helpers;
@@ -58,4 +60,48 @@ fn test_calculate_q_price_from_market_cap_and_token_supply() {
 
     let q_price = (lamport_price * 2.0f64.powi(64)) as u128;
     println!("Q price: {}", q_price);
+}
+
+#[test]
+fn test_validate_locked_vesting_args() {
+    let mut locked_vesting_args = LockedVestingArgs::default();
+    let presale_end_time = 1_700_000_000;
+
+    // All token is immediately released
+    locked_vesting_args.immediately_release_bps = 10_000;
+    locked_vesting_args.immediate_release_timestamp = presale_end_time + 1;
+
+    // All token must immediately released upon presale end
+    assert!(locked_vesting_args.validate(presale_end_time).is_err());
+    locked_vesting_args.immediate_release_timestamp = presale_end_time;
+    assert!(locked_vesting_args.validate(presale_end_time).is_ok());
+
+    // Portion of token is released within presale end time and vesting end time
+    let mut locked_vesting_args = LockedVestingArgs::default();
+    locked_vesting_args.immediately_release_bps = 5000;
+    locked_vesting_args.lock_duration = 60;
+    locked_vesting_args.vest_duration = 60;
+    locked_vesting_args.immediate_release_timestamp = presale_end_time - 1;
+    assert!(locked_vesting_args.validate(presale_end_time).is_err());
+
+    locked_vesting_args.immediate_release_timestamp = presale_end_time;
+    assert!(locked_vesting_args.validate(presale_end_time).is_ok());
+
+    locked_vesting_args.immediate_release_timestamp = presale_end_time + 120;
+    assert!(locked_vesting_args.validate(presale_end_time).is_ok());
+
+    locked_vesting_args.immediate_release_timestamp = presale_end_time + 121;
+    assert!(locked_vesting_args.validate(presale_end_time).is_err());
+
+    // All token is vested
+    let mut locked_vesting_args = LockedVestingArgs::default();
+    locked_vesting_args.immediately_release_bps = 0;
+    locked_vesting_args.lock_duration = 60;
+    locked_vesting_args.vest_duration = 60;
+    locked_vesting_args.immediate_release_timestamp = presale_end_time + 30;
+
+    // Immediate release timestamp must be presale end time
+    assert!(locked_vesting_args.validate(presale_end_time).is_err());
+    locked_vesting_args.immediate_release_timestamp = presale_end_time;
+    assert!(locked_vesting_args.validate(presale_end_time).is_ok());
 }
