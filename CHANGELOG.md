@@ -23,7 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Calculation of vesting_start_time, vesting_end_time, lock_start_time, and lock_end_time.
+- Calculation of vesting_start_time, vesting_end_time, lock_start_time, and lock_end_time
+- Missing `params.validate()` in `handle_initialize_fixed_price_presale_args`
+- Impossible to complete fixed price presale when an unreachable presale `minimum_cap` and `maximum_cap` was configured
+- Presale registry consume other registry presale supply
 
 ### Added
 
